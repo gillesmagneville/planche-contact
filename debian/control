@@ -1,0 +1,26 @@
+Source: planche-contact
+Section: graphics
+Priority: optional
+Maintainer: Gilles MAGNEVILLE <gilles@magneville.fr>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Homepage: https://github.com/gillesmagneville/planche-contact
+Rules-Requires-Root: no
+
+Package: planche-contact
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends},
+         python3,
+         python3-gi,
+         gir1.2-gtk-4.0,
+         libgtk-4-1,
+         python3-pil,
+         python3-reportlab
+Recommends: python3-pil, python3-reportlab
+Description: Outil léger de génération de planches contact photographiques
+ Planche Contact est un outil simple et rapide permettant de générer
+ des planches contact de haute qualité (300 dpi) à partir de dossiers
+ d'images.
+ .
+ Il propose une interface graphique moderne en GTK4 ainsi qu'une
+ interface en ligne de commande.

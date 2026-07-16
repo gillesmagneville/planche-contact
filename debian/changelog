@@ -1,0 +1,8 @@
+planche-contact (1.0.1) unstable; urgency=medium
+
+  * Version initiale publique
+  * Ajout de l'interface graphique GTK4
+  * Ajout de l'export PDF et HTML
+  * Packaging Debian amélioré
+
+ -- Gilles MAGNEVILLE <gilles@magneville.fr>  Wed, 15 Jul 2026 15:00:00 +0200

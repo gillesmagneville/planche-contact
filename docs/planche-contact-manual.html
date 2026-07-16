@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Planche-Contact - Manuel complet</title>
+    <style>
+        body {
+            font-family: "DejaVu Sans", Arial, sans-serif;
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 20px;
+            line-height: 1.65;
+            background: #f8f9fa;
+        }
+        h1, h2, h3 { color: #1a1a1a; }
+        h1 { font-size: 2.2em; border-bottom: 3px solid #333; padding-bottom: 10px; }
+        h2 { font-size: 1.6em; margin-top: 45px; border-bottom: 1px solid #ccc; padding-bottom: 6px; }
+        h3 { font-size: 1.25em; margin-top: 30px; }
+        code, pre {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: "DejaVu Sans Mono", monospace;
+        }
+        pre {
+            padding: 14px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th { background: #e9ecef; }
+        .note {
+            background: #fff3cd;
+            border-left: 6px solid #ffc107;
+            padding: 14px 18px;
+            margin: 25px 0;
+        }
+        ul { padding-left: 22px; }
+    </style>
+</head>
+<body>
+
+<h1>Planche-Contact — Manuel complet</h1>
+
+<h2>1. Présentation</h2>
+<p><strong>Planche-Contact</strong> est un outil léger et rapide permettant de générer des planches contact photographiques de haute qualité (300 dpi) sans utiliser de base de données ni de logiciel lourd.</p>
+<p>Il existe sous deux formes :</p>
+<ul>
+    <li><strong>Interface graphique GTK4</strong> (<code>planche-contact-gtk.py</code>)</li>
+    <li><strong>Ligne de commande</strong> (<code>portfolio.py</code>)</li>
+</ul>
+
+<h2>2. Interface Graphique (GTK)</h2>
+
+<h3>2.1 Onglet « Génération »</h3>
+
+<table>
+<tr><th>Champ / Option</th><th>Description</th></tr>
+<tr><td><strong>Titre du projet</strong></td><td>Texte affiché en grand en haut de chaque planche.</td></tr>
+<tr><td><strong>Nom de l’auteur</strong></td><td>Nom affiché en dessous du titre (en gras et plus gros).</td></tr>
+<tr><td><strong>Dossier d’entrée</strong></td><td>Dossier contenant les photographies à traiter (obligatoire).</td></tr>
+<tr><td><strong>Dossier de sortie</strong></td><td>Dossier où seront créés les résultats. Par défaut : <code>Portfolio/</code> dans le dossier source.</td></tr>
+<tr><td><strong>Recherche récursive</strong></td><td>Si coché, analyse aussi tous les sous-dossiers.</td></tr>
+<tr><td><strong>Images par planche</strong></td><td>Nombre de vignettes par page (9, 12, 16, 20 ou 25).</td></tr>
+<tr><td><strong>Format de la planche</strong></td><td>Format papier : A5, A4, A3, A2 ou Letter.</td></tr>
+<tr><td><strong>Filigrane (texte)</strong></td><td>Texte qui sera répété sur toutes les images (ex: © Ton Nom).</td></tr>
+<tr><td><strong>Orientation du filigrane</strong></td><td>
+    <ul>
+        <li><strong>Horizontal</strong> : texte horizontal</li>
+        <li><strong>Diagonale horaire</strong> : texte incliné à ~32°</li>
+        <li><strong>Diagonale anti-horaire</strong> : texte incliné à ~-32°</li>
+    </ul>
+</td></tr>
+<tr><td><strong>Options d’export</strong></td><td>PDF, Galerie HTML paginée, Index CSV.</td></tr>
+</table>
+
+<h3>2.2 Résultats générés</h3>
+<ul>
+    <li><code>planches/</code> → Images JPEG individuelles de chaque planche</li>
+    <li><code>portfolio.pdf</code> → PDF complet de toutes les planches</li>
+    <li><code>gallery/</code> → Galerie HTML auto-contenue (avec miniatures)</li>
+    <li><code>index.csv</code> → Liste des fichiers avec leur numéro</li>
+</ul>
+
+<h2>3. Interface en Ligne de Commande (CLI)</h2>
+
+<h3>3.1 Options principales</h3>
+
+<table>
+<tr><th>Option</th><th>Description</th><th>Exemple</th></tr>
+<tr><td><code>-i, --input</code></td><td>Dossier source (obligatoire)</td><td><code>-i /Photos/Voyage</code></td></tr>
+<tr><td><code>-o, --output</code></td><td>Dossier de sortie</td><td><code>-o ./Resultats</code></td></tr>
+<tr><td><code>-n, --num</code></td><td>Nombre d’images par planche</td><td><code>-n 16</code></td></tr>
+<tr><td><code>--format</code></td><td>Format de page</td><td><code>--format A3</code></td></tr>
+<tr><td><code>--title</code></td><td>Titre du projet</td><td><code>--title "Voyage 2025"</code></td></tr>
+<tr><td><code>--author</code></td><td>Nom de l’auteur</td><td><code>--author "Abel GEZ"</code></td></tr>
+<tr><td><code>--watermark</code></td><td>Texte du filigrane</td><td><code>--watermark "© Abel GEZ"</code></td></tr>
+<tr><td><code>--watermark-orientation</code></td><td>Orientation du filigrane</td><td><code>--watermark-orientation "Diagonale horaire"</code></td></tr>
+<tr><td><code>--pdf</code></td><td>Générer un PDF</td><td></td></tr>
+<tr><td><code>--html</code></td><td>Générer une galerie HTML</td><td></td></tr>
+<tr><td><code>--csv</code></td><td>Générer un index CSV</td><td></td></tr>
+<tr><td><code>-r, --recursive</code></td><td>Analyse récursive</td><td></td></tr>
+</table>
+
+<h3>3.2 Exemples complets</h3>
+
+<pre><code># Génération simple
+python3 portfolio.py -i /Photos/2025 -o ./Sortie --pdf --html
+
+# Version professionnelle avec filigrane diagonal
+python3 portfolio.py \
+  -i /Photos/Islande \
+  -n 16 \
+  --format A3 \
+  --title "Islande 2025" \
+  --author "Abel GEZ" \
+  --watermark "© Abel GEZ" \
+  --watermark-orientation "Diagonale horaire" \
+  --pdf --html --csv
+</code></pre>
+
+<h2>4. Recommandations</h2>
+<ul>
+    <li>Pour un rendu homogène, conservez le même nombre d’images par planche sur tout le projet.</li>
+    <li>Le filigrane en diagonale est généralement plus élégant et moins gênant visuellement.</li>
+    <li>La galerie HTML est autonome (vous pouvez la copier ailleurs sans rien casser).</li>
+</ul>
+
+<h2>5. Fichiers générés</h2>
+<table>
+<tr><th>Dossier / Fichier</th><th>Contenu</th></tr>
+<tr><td><code>planches/</code></td><td>Planche contact individuelles (JPEG)</td></tr>
+<tr><td><code>portfolio.pdf</code></td><td>PDF complet</td></tr>
+<tr><td><code>gallery/</code></td><td>Galerie HTML paginée</td></tr>
+<tr><td><code>index.csv</code></td><td>Liste des images avec leur numéro</td></tr>
+</table>
+
+</body>
+</html>

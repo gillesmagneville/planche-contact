@@ -1,0 +1,3 @@
+Exemple d'utilisation :
+
+python3 portfolio.py -i /chemin/vers/dossier/images -o ./sortie --pdf --html --csv -n 12 --thumb 450 --background gray --sort date -r
