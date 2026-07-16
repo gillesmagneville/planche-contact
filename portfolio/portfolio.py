@@ -7,7 +7,6 @@ import sys
 import time
 import logging
 from pathlib import Path
-from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -18,7 +17,7 @@ from portfolio.contactsheet import ContactSheetGenerator
 from portfolio.pdfexport import PDFExporter
 from portfolio.htmlgallery import HTMLGalleryGenerator
 from portfolio.csvindex import CSVIndexGenerator
-from portfolio.utils import setup_logging, apply_watermark
+from portfolio.utils import setup_logging
 
 
 def parse_args():
@@ -82,40 +81,8 @@ def main():
         logger.warning("Aucune image trouvée.")
         return
 
-    # ======================================================
-    # NOUVELLE ÉTAPE : Générer les images individuelles avec filigrane
-    # ======================================================
-    watermarked_images = images
-
-    if config.watermark_text:
-        logger.info("Génération des images individuelles avec filigrane...")
-        watermarked_dir = output_dir / "watermarked"
-        watermarked_dir.mkdir(parents=True, exist_ok=True)
-
-        watermarked_images = []
-        for img_path in images:
-            try:
-                img = Image.open(img_path)
-                img = apply_watermark(
-                    img,
-                    config.watermark_text,
-                    getattr(config, 'watermark_opacity', 45),
-                    config.watermark_orientation
-                )
-                dest_path = watermarked_dir / img_path.name
-                img.save(dest_path, quality=90)
-                watermarked_images.append(dest_path)
-            except Exception as e:
-                logger.error(f"Erreur lors de l'application du filigrane sur {img_path}: {e}")
-                watermarked_images.append(img_path)  # fallback sur l'originale
-
-        logger.info(f"{len(watermarked_images)} images watermarked générées.")
-
-    # ======================================================
-    # Génération des planches contact
-    # ======================================================
     n = config.num_per_sheet
-    total_pages = (len(watermarked_images) + n - 1) // n
+    total_pages = (len(images) + n - 1) // n
 
     thumb_gen = ThumbnailGenerator(config)
     cs_gen = ContactSheetGenerator(config, thumb_gen)
@@ -125,7 +92,7 @@ def main():
     planche_files = []
 
     for page_idx in range(total_pages):
-        batch = watermarked_images[page_idx * n : (page_idx + 1) * n]
+        batch = images[page_idx * n : (page_idx + 1) * n]
         page_num = page_idx + 1
 
         try:
@@ -138,18 +105,15 @@ def main():
         except Exception as e:
             logger.error(f"Erreur planche {page_num}: {e}")
 
-    # PDF
     if config.generate_pdf and planche_files:
         PDFExporter().create_pdf(planche_files, output_dir / "portfolio.pdf")
 
-    # CSV
     if config.generate_csv:
-        CSVIndexGenerator().create(watermarked_images, output_dir / "index.csv")
+        CSVIndexGenerator().create(images, output_dir / "index.csv")
 
-    # Galerie HTML (utilise maintenant les images déjà watermarked)
     if config.generate_html:
         gdir = output_dir / "gallery"
-        HTMLGalleryGenerator(config, thumb_gen).create_gallery(watermarked_images, gdir)
+        HTMLGalleryGenerator(config, thumb_gen).create_gallery(images, gdir)
 
     logger.info(f"Terminé en {time.time() - start:.1f} secondes")
 

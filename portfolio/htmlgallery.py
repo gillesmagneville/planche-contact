@@ -2,8 +2,6 @@ from pathlib import Path
 import shutil
 from PIL import Image, ImageDraw, ImageFont
 
-from portfolio.utils import apply_watermark   # On garde la version riche pour les images plein format si besoin
-
 
 class HTMLGalleryGenerator:
     def __init__(self, config, thumbnail_generator):
@@ -18,6 +16,38 @@ class HTMLGalleryGenerator:
         self.watermark_opacity = getattr(config, 'watermark_opacity', 50)
         self.watermark_orientation = getattr(config, 'watermark_orientation', 'Horizontal')
 
+    def _apply_light_watermark(self, image: Image.Image, text: str):
+        """Filigrane léger et centré (rapide) pour la galerie"""
+        if not text or image is None:
+            return image
+
+        try:
+            if image.mode != 'RGBA':
+                image = image.convert('RGBA')
+
+            draw = ImageDraw.Draw(image)
+            font_size = max(11, min(image.width, image.height) // 22)
+
+            try:
+                font = ImageFont.truetype(
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size
+                )
+            except:
+                font = ImageFont.load_default()
+
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = bbox[2] - bbox[0]
+            x = (image.width - text_width) // 2
+            y = image.height - bbox[3] - 8
+
+            alpha = int(255 * (self.watermark_opacity / 100))
+            draw.text((x, y), text, font=font, fill=(255, 255, 255, alpha))
+
+            return image.convert('RGB')
+        except Exception as e:
+            print(f"[Filigrane léger] Erreur : {e}")
+            return image
+
     def create_gallery(self, images, output_dir: Path):
         output_dir.mkdir(parents=True, exist_ok=True)
         thumbs_dir = output_dir / "thumbs"
@@ -29,25 +59,20 @@ class HTMLGalleryGenerator:
         folder_name = Path(self.input_dir).name if self.input_dir else ""
         total_pages = (len(images) + self.images_per_page - 1) // self.images_per_page
 
-        # === Images plein format + filigrane (version riche) ===
+        # Images plein format + filigrane léger
         for item in images:
             image_path = item.get('path') if isinstance(item, dict) else item
             if image_path and Path(image_path).exists():
                 try:
                     img = Image.open(image_path)
                     if self.watermark_text:
-                        img = apply_watermark(
-                            img,
-                            self.watermark_text,
-                            self.watermark_opacity,
-                            self.watermark_orientation
-                        )
+                        img = self._apply_light_watermark(img, self.watermark_text)
                     img.save(images_dir / Path(image_path).name, quality=90)
                 except Exception as e:
                     print(f"Erreur sur {image_path}: {e}")
                     shutil.copy2(image_path, images_dir / Path(image_path).name)
 
-        # === Génération des vignettes ===
+        # Vignettes
         thumb_size = 400
         thumbnails = self.thumb_gen.generate_parallel(images, thumb_size)
 
@@ -76,7 +101,6 @@ class HTMLGalleryGenerator:
                        current_page, total_pages, total_images, thumbs_dir):
         thumbs_dir.mkdir(exist_ok=True)
 
-        # En-tête
         header_html = f"<h1>{display_title}</h1>"
         if folder_name:
             header_html += f"<p>{folder_name}</p>"
@@ -130,14 +154,13 @@ class HTMLGalleryGenerator:
             thumb_filename = f"thumb_p{current_page}_{idx:04d}.jpg"
             thumb_path = thumbs_dir / thumb_filename
 
-            # === Filigrane léger et centré sur les vignettes (rapide) ===
+            # Filigrane léger sur les vignettes
             if self.watermark_text and thumb:
                 if thumb.mode != 'RGBA':
                     thumb = thumb.convert('RGBA')
-
                 draw = ImageDraw.Draw(thumb)
-                font_size = max(10, thumb.width // 16)
 
+                font_size = max(10, thumb.width // 16)
                 try:
                     font = ImageFont.truetype(
                         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size
