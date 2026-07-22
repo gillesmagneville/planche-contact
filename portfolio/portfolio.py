@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-portfolio.py - Générateur de planches-contact (version avec progression complète)
+portfolio.py - Générateur de planches-contact
+(Version avec progression correcte + flush)
 """
 
 import sys
@@ -75,14 +76,14 @@ def main():
     )
 
     # Phase 1: Scan
-    print("PROGRESS:0/100 Scan des images...")
+    print("PROGRESS:0/100 Scan des images...", flush=True)
     scanner = ImageScanner(config)
     images = scanner.scan()
-    print(f"PROGRESS:10/100 {len(images)} images trouvées.")
+    print(f"PROGRESS:10/100 {len(images)} images trouvées.", flush=True)
 
     if not images:
         logger.warning("Aucune image trouvée.")
-        print("PROGRESS:100/100 Terminé (aucune image).")
+        print("PROGRESS:100/100 Terminé (aucune image).", flush=True)
         return
 
     n = config.num_per_sheet
@@ -96,7 +97,7 @@ def main():
     planche_files = []
 
     # Phase 2: Contact sheets
-    print("PROGRESS:15/100 Génération des planches contact...")
+    print("PROGRESS:15/100 Génération des planches contact...", flush=True)
     for page_idx in range(total_pages):
         batch = images[page_idx * n : (page_idx + 1) * n]
         page_num = page_idx + 1
@@ -108,31 +109,34 @@ def main():
                 sheet.save(p, "JPEG", quality=95)
                 planche_files.append(p)
                 progress = 15 + int(55 * (page_num / total_pages))
-                print(f"Planche {page_num}/{total_pages} générée")
-                print(f"PROGRESS:{progress}/100")
+                print(f"Planche {page_num}/{total_pages} générée", flush=True)
+                print(f"PROGRESS:{progress}/100", flush=True)
         except Exception as e:
             logger.error(f"Erreur planche {page_num}: {e}")
 
+    # On force le flush avant de commencer le PDF
+    sys.stdout.flush()
+
     # Phase 3: PDF
     if config.generate_pdf and planche_files:
-        print("PROGRESS:75/100 Génération du PDF...")
+        print("PROGRESS:75/100 Génération du PDF...", flush=True)
         PDFExporter().create_pdf(planche_files, output_dir / "portfolio.pdf")
-        print("PROGRESS:80/100 PDF terminé.")
+        print("PROGRESS:80/100 PDF terminé.", flush=True)
 
     # Phase 4: CSV
     if config.generate_csv:
-        print("PROGRESS:82/100 Génération de l'index CSV...")
+        print("PROGRESS:82/100 Génération de l'index CSV...", flush=True)
         CSVIndexGenerator().create(images, output_dir / "index.csv")
-        print("PROGRESS:85/100 CSV terminé.")
+        print("PROGRESS:85/100 CSV terminé.", flush=True)
 
-    # Phase 5: HTML Gallery (étape souvent longue)
+    # Phase 5: HTML Gallery
     if config.generate_html:
-        print("PROGRESS:86/100 Génération de la galerie HTML...")
+        print("PROGRESS:86/100 Génération de la galerie HTML...", flush=True)
         gdir = output_dir / "gallery"
         HTMLGalleryGenerator(config, thumb_gen).create_gallery(images, gdir)
-        print("PROGRESS:98/100 Galerie HTML terminée.")
+        print("PROGRESS:98/100 Galerie HTML terminée.", flush=True)
 
-    print("PROGRESS:100/100 Terminé avec succès !")
+    print("PROGRESS:100/100 Terminé avec succès !", flush=True)
     logger.info(f"Terminé en {time.time() - start:.1f} secondes")
 
 

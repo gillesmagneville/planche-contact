@@ -87,9 +87,8 @@ class ContactSheetGenerator:
         try:
             font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 54)
             font_author = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
-            font_folder = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 30)
         except:
-            font_title = font_author = font_folder = ImageFont.load_default()
+            font_title = font_author = ImageFont.load_default()
 
         y = margin - 30
 
@@ -104,13 +103,6 @@ class ContactSheetGenerator:
             text_w = bbox[2] - bbox[0]
             draw.text(((canvas_w - text_w) / 2, y), self.author, fill="black", font=font_author)
             y += 42
-
-        if self.input_dir:
-            folder_name = Path(self.input_dir).name
-            bbox = draw.textbbox((0, 0), folder_name, font=font_folder)
-            text_w = bbox[2] - bbox[0]
-            draw.text(((canvas_w - text_w) / 2, y), folder_name, fill="black", font=font_folder)
-            y += 38
 
         return y - margin
 
