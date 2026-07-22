@@ -70,6 +70,10 @@ class HTMLGalleryGenerator:
                 pass
 
     def create_gallery(self, images, output_dir: Path):
+        # === Suppression systématique de l'ancienne galerie ===
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+
         output_dir.mkdir(parents=True, exist_ok=True)
         thumbs_dir = output_dir / "thumbs"
         images_dir = output_dir / "images"
