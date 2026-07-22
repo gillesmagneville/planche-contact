@@ -14,6 +14,7 @@ import re
 import webbrowser
 import tempfile
 from pathlib import Path
+from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -384,16 +385,73 @@ class PlancheContactGTK(Gtk.Application):
 
         return box
 
-    def _build_about_tab(self):
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        box.set_margin_top(30)
-        box.set_margin_start(30)
+    # ====================== À PROPOS ======================
 
-        label = Gtk.Label()
-        label.set_markup("<b>Planche-Contact GTK</b>\n\nVersion avec progression complète.")
-        box.append(label)
+    def _build_about_tab(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_top(40)
+        box.set_margin_start(30)
+        box.set_margin_end(30)
+
+        # Titre
+        title = Gtk.Label()
+        title.set_markup("<span size='large'><b>Planche-Contact</b></span>")
+        box.append(title)
+
+        # Version + date de build
+        version_text = self._get_version_info()
+        version_label = Gtk.Label()
+        version_label.set_markup(f"<span size='medium'>{version_text}</span>")
+        version_label.set_margin_top(10)
+        box.append(version_label)
+
+        # Description
+        desc = Gtk.Label()
+        desc.set_markup(
+            "<span size='small'>Générateur de planches contact photographiques\n"
+            "haute qualité (300 dpi)</span>"
+        )
+        desc.set_justify(Gtk.Justification.CENTER)
+        desc.set_margin_top(20)
+        box.append(desc)
+
+        # Auteur
+        author = Gtk.Label()
+        author.set_markup("<span size='small'>Développé par Gilles MAGNEVILLE</span>")
+        author.set_margin_top(25)
+        box.append(author)
 
         return box
+
+    def _get_version_info(self):
+        """Récupère le numéro de version et la date de build"""
+        version = "inconnue"
+        build_date = ""
+
+        possible_paths = [
+            Path(__file__).parent / "VERSION",
+            Path(__file__).parent.parent / "VERSION",
+            Path("/usr/share/planche-contact/VERSION"),
+        ]
+
+        version_file = None
+        for p in possible_paths:
+            if p.exists():
+                version_file = p
+                break
+
+        if version_file:
+            try:
+                version = version_file.read_text().strip()
+                mtime = version_file.stat().st_mtime
+                build_date = datetime.fromtimestamp(mtime).strftime("%d/%m/%Y")
+            except Exception:
+                pass
+
+        if build_date:
+            return f"Version {version}  —  Build du {build_date}"
+        else:
+            return f"Version {version}"
 
 
 if __name__ == "__main__":

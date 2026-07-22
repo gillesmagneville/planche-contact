@@ -181,6 +181,9 @@ echo ">>> Copie des fichiers du projet..."
 cp "$PROJECT_DIR/planche-contact-gtk.py" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
 cp -r "$PROJECT_DIR/portfolio" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
 
+# Copie du fichier VERSION (nécessaire pour l'onglet À propos)
+[ -f "$PROJECT_DIR/VERSION" ] && cp "$PROJECT_DIR/VERSION" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
+
 mkdir -p "$BUILD_DIR/usr/share/$PACKAGE_NAME/docs"
 [ -f "$PROJECT_DIR/docs/planche-contact-manual.html" ] && cp "$PROJECT_DIR/docs/planche-contact-manual.html" "$BUILD_DIR/usr/share/$PACKAGE_NAME/docs/"
 [ -f "$PROJECT_DIR/LICENSE" ] && cp "$PROJECT_DIR/LICENSE" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
