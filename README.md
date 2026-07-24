@@ -1,11 +1,20 @@
 <p align="center">
-  <img src="docs/images/logo-readme.png" alt="Planche-Contact Linux" width="180">
+  <img src="screenshots/github-readme-icon.png" alt="Planche-Contact Linux" width="180">
 </p>
 
 <h1 align="center">Planche-Contact Linux</h1>
 
 <p align="center">
-  <strong>The Open-Source Contact Sheet Generator for Photographers</strong>
+<strong>Professional Contact Sheets from JPEG and RAW Images</strong>
+</p>
+
+<p align="center">
+
+![GitHub release](https://img.shields.io/github/v/release/gillesmagneville/planche-contact-Linux)
+![GitHub stars](https://img.shields.io/github/stars/gillesmagneville/planche-contact-Linux)
+![GitHub forks](https://img.shields.io/github/forks/gillesmagneville/planche-contact-Linux)
+![GitHub issues](https://img.shields.io/github/issues/gillesmagneville/planche-contact-Linux)
+
 </p>
 
 <p align="center">
@@ -20,108 +29,124 @@
 
 <p align="center">
 
-Create professional photographic contact sheets directly from your image folders.
+Create professional-quality contact sheets directly from JPEG and RAW image folders.
 
-Generate high-quality contact sheets, PDF documents, responsive HTML galleries and CSV indexes from JPEG and RAW images — **without any database, catalog or image import**.
+Generate high-resolution contact sheets, PDF documents, responsive HTML galleries and CSV indexes — **without any database, catalog or image import**.
 
 </p>
 
 ---
 
-# Screenshot
-
 <p align="center">
-<img src="screenshots/main-window.png" width="1100">
+<img src="screenshots/main-window.png" width="1100" alt="Main Window">
 </p>
+
+---
+
+# Contents
+
+- [Why Planche-Contact?](#why-planche-contact)
+- [Workflow Comparison](#workflow-comparison)
+- [Example Output](#example-output)
+- [Supported RAW Formats](#supported-raw-formats)
+- [Installation](#installation)
+- [Build from Source](#build-from-source)
+- [Documentation](#documentation)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
 # Why Planche-Contact?
 
-Unlike traditional Digital Asset Management (DAM) software, Planche-Contact focuses on simplicity and efficiency.
+Planche-Contact is designed to generate professional photographic contact sheets quickly and simply.
 
-| Feature | Planche-Contact |
-|:---------|:---------------:|
-| No database | ✅ |
-| No catalog | ✅ |
-| No image import | ✅ |
-| Direct folder processing | ✅ |
-| JPEG support | ✅ |
-| RAW support | ✅ |
-| High-quality contact sheets (300 dpi) | ✅ |
-| PDF export | ✅ |
-| Responsive HTML gallery | ✅ |
-| CSV index | ✅ |
-| GTK 4 interface | ✅ |
-| Free & Open Source (GPL v3) | ✅ |
+Unlike Digital Asset Management (DAM) applications, it does not require importing images into a catalog or maintaining a database. It works directly from existing folders and immediately generates high-quality contact sheets, PDF documents, responsive HTML galleries and CSV indexes.
+
+Ideal for photographers, museums, archives, studios and image collections.
 
 ---
 
-# Main Features
+# Workflow Comparison
 
-- Professional-quality contact sheet generation (300 dpi)
-- JPEG and RAW image support
-- PDF export
-- Responsive HTML gallery generation
-- CSV index generation
-- Direct processing of image folders
-- Modern GTK 4 interface
-- Fast and lightweight
-- No database required
-- No image catalog
-- Open-source (GPL v3)
+| Capability | Planche-Contact | Catalog-based Workflow |
+|:-----------|:---------------:|:----------------------:|
+| Database required | ❌ | ✅ |
+| Image import | ❌ | ✅ |
+| Catalog management | ❌ | ✅ |
+| Direct folder processing | ✅ | ⚠️ |
+| JPEG support | ✅ | ✅ |
+| RAW support | ✅ | ✅ |
+| 300 dpi contact sheets | ✅ | ⚠️ |
+| PDF export | ✅ | ⚠️ |
+| Responsive HTML gallery | ✅ | ⚠️ |
+| CSV index export | ✅ | ❌ |
+| Lightweight workflow | ✅ | ❌ |
+| Free & Open Source (GPL v3) | ✅ | varies |
+
+---
+
+# Example Output
+
+<table>
+<tr>
+
+<td align="center" width="50%">
+
+<b>Generated Contact Sheet</b><br><br>
+
+<img src="screenshots/contact-sheet.png" alt="Contact Sheet">
+
+</td>
+
+<td align="center" width="50%">
+
+<b>Responsive HTML Gallery</b><br><br>
+
+<img src="screenshots/html-gallery.png" alt="HTML Gallery">
+
+</td>
+
+</tr>
+
+<tr>
+
+<td align="center">
+
+<b>Generated PDF</b><br><br>
+
+<img src="screenshots/pdf-preview.png" alt="PDF">
+
+</td>
+
+<td align="center">
+
+<b>Main Window</b><br><br>
+
+<img src="screenshots/main-window.png" alt="Main Window">
+
+</td>
+
+</tr>
+</table>
 
 ---
 
 # Supported RAW Formats
 
-Compatible with RAW formats from most major camera manufacturers.
+Planche-Contact supports RAW files through **LibRaw**, ensuring compatibility with cameras from most major manufacturers.
 
-| | | | |
-|---|---|---|---|
 | Canon | Nikon | Sony | Fujifilm |
-| Panasonic | Olympus | OM System | Pentax |
-| Leica | Hasselblad | Sigma | and many others... |
-
----
-
-# Screenshots
-
-## Main Window
-
-<p align="center">
-<img src="screenshots/main-window.png" width="900">
-</p>
-
----
-
-## Generated Contact Sheet
-
-<p align="center">
-<img src="screenshots/contact-sheet.png" width="900">
-</p>
-
----
-
-## Responsive HTML Gallery
-
-<p align="center">
-<img src="screenshots/html-gallery.png" width="900">
-</p>
-
----
-
-## Generated PDF
-
-<p align="center">
-<img src="screenshots/pdf-preview.png" width="900">
-</p>
+|-------|--------|-------|-----------|
+| Panasonic | Olympus / OM System | Pentax | Leica |
+| Hasselblad | Sigma | Phase One | and many more... |
 
 ---
 
 # Installation
 
-Download the latest release from the **Releases** page.
+Download the latest **.deb** package from the **Releases** page.
 
 ```bash
 sudo apt install ./planche-contact_<version>_amd64.deb
@@ -131,13 +156,13 @@ sudo apt install ./planche-contact_<version>_amd64.deb
 
 # Build from Source
 
-Clone the repository
+Clone the repository.
 
 ```bash
 git clone https://github.com/gillesmagneville/planche-contact-Linux.git
 ```
 
-Go to the project directory
+Enter the project directory.
 
 ```bash
 cd planche-contact-Linux
@@ -151,11 +176,13 @@ Run the application.
 
 # Documentation
 
-- 📖 README
-- 📋 CHANGELOG
-- 🤝 CONTRIBUTING
-- 📜 CODE_OF_CONDUCT
-- ⚖️ LICENSE
+| File | Description |
+|------|-------------|
+| README.md | Project overview |
+| CHANGELOG.md | Release history |
+| CONTRIBUTING.md | Contribution guidelines |
+| CODE_OF_CONDUCT.md | Community rules |
+| LICENSE | GNU GPL v3 |
 
 ---
 
@@ -163,9 +190,9 @@ Run the application.
 
 - Windows version
 - Internationalization (i18n)
-- Additional export options
-- Layout customization
-- Performance improvements
+- Custom contact sheet templates
+- Additional export formats
+- Improved PDF customization
 
 ---
 
@@ -173,7 +200,7 @@ Run the application.
 
 Contributions are welcome.
 
-Whether you would like to report a bug, suggest a feature, improve the documentation or submit code, your help is appreciated.
+Whether you want to report a bug, suggest a feature, improve the documentation or submit code, your help is appreciated.
 
 Please read **CONTRIBUTING.md** before opening an Issue or a Pull Request.
 
@@ -185,8 +212,8 @@ Planche-Contact Linux is distributed under the terms of the **GNU General Public
 
 ---
 
-# Author
+<p align="center">
 
-Developed and maintained by **Gilles Magneville**.
+⭐ <strong>If Planche-Contact is useful to you, please consider giving the project a Star.</strong>
 
-If you find this project useful, don't hesitate to ⭐ the repository.
+</p>
