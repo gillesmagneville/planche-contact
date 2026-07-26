@@ -5,4 +5,62 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true
 fi
 
+# --- Vérification de l'environnement Python embarqué ------------------------
+# Planche-Contact embarque ses dépendances Python (Pillow, reportlab, rawpy,
+# exifread) dans un virtualenv construit au moment du build du paquet. En
+# théorie, ce venv fonctionne à l'identique sur toute machine amd64. En
+# pratique, certaines bibliothèques compilées (rawpy en particulier) peuvent
+# échouer à se charger sur une distribution ou une configuration système
+# inhabituelle. On vérifie donc ici, à l'installation, que tout s'importe
+# correctement plutôt que de laisser l'utilisateur découvrir le problème au
+# premier lancement de l'application.
+
+VENV_PYTHON="/usr/share/planche-contact/venv/bin/python3"
+
+if [ ! -x "$VENV_PYTHON" ]; then
+    echo "" >&2
+    echo "Erreur Planche-Contact : l'environnement Python embarqué est introuvable" >&2
+    echo "($VENV_PYTHON absent ou non exécutable)." >&2
+    echo "" >&2
+    echo "Le paquet .deb semble incomplet ou corrompu." >&2
+    echo "" >&2
+    echo "Solution : téléchargez à nouveau le paquet depuis :" >&2
+    echo "    https://github.com/gillesmagneville/planche-contact-linux/releases" >&2
+    echo "puis réinstallez-le." >&2
+    echo "" >&2
+    echo "L'installation est annulée." >&2
+    exit 1
+fi
+
+CHECK_LOG=$(mktemp)
+if "$VENV_PYTHON" -c "import PIL, reportlab, rawpy, exifread" >"$CHECK_LOG" 2>&1; then
+    rm -f "$CHECK_LOG"
+else
+    echo "" >&2
+    echo "Erreur Planche-Contact : une bibliothèque nécessaire n'a pas pu être" >&2
+    echo "chargée sur ce système." >&2
+    echo "" >&2
+    echo "Détail de l'erreur :" >&2
+    sed 's/^/    /' "$CHECK_LOG" >&2
+    rm -f "$CHECK_LOG"
+    echo "" >&2
+    echo "Cause probable : votre distribution ou votre architecture n'est pas" >&2
+    echo "compatible avec une des bibliothèques précompilées embarquées dans" >&2
+    echo "le paquet (le support des fichiers RAW, en particulier, dépend de" >&2
+    echo "bibliothèques systèmes comme liblcms2 ou libjpeg)." >&2
+    echo "" >&2
+    echo "Pour corriger le problème, essayez dans l'ordre :" >&2
+    echo "" >&2
+    echo "    1) Réinstaller les bibliothèques Python embarquées :" >&2
+    echo "         sudo /usr/share/planche-contact/venv/bin/pip install --force-reinstall rawpy exifread Pillow reportlab" >&2
+    echo "       puis relancez l'installation du paquet." >&2
+    echo "" >&2
+    echo "    2) Si le problème persiste, signalez-le en copiant ce message" >&2
+    echo "       d'erreur dans un ticket ici :" >&2
+    echo "         https://github.com/gillesmagneville/planche-contact-linux/issues" >&2
+    echo "" >&2
+    echo "L'installation est annulée." >&2
+    exit 1
+fi
+
 exit 0

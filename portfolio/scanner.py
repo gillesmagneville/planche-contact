@@ -6,6 +6,13 @@ from typing import Any
 from PIL import Image
 
 from .config import Config
+from .rawloader import is_raw_file
+
+try:
+    import exifread
+    EXIFREAD_AVAILABLE = True
+except ImportError:
+    EXIFREAD_AVAILABLE = False
 
 
 class ImageScanner:
@@ -21,15 +28,28 @@ class ImageScanner:
     def _is_image_file(self, path: Path) -> bool:
         return path.suffix.lower() in self.SUPPORTED_EXTENSIONS
 
-    def _get_sort_key(self, path: Path) -> Any:
-        """Retourne une clé de tri (date EXIF si disponible, sinon date de modification)."""
-        if self.config.sort_by == "name":
-            return path.name.lower()
+    def _get_exif_date(self, path: Path) -> Any:
+        """Extrait la date EXIF la plus pertinente, RAW compris."""
+        if is_raw_file(path):
+            if not EXIFREAD_AVAILABLE:
+                return None
+            try:
+                with open(path, "rb") as f:
+                    tags = exifread.process_file(f, details=False, stop_tag="EXIF DateTimeOriginal")
+                for key in ("EXIF DateTimeOriginal", "EXIF DateTimeDigitized", "Image DateTime"):
+                    date_str = tags.get(key)
+                    if date_str:
+                        try:
+                            return datetime.strptime(str(date_str), "%Y:%m:%d %H:%M:%S")
+                        except ValueError:
+                            continue
+            except Exception:
+                pass
+            return None
 
         try:
             with Image.open(path) as img:
                 exif = img.getexif()
-
                 # Priorité aux dates EXIF les plus pertinentes
                 for tag in (0x9003, 0x9004, 0x0132):  # DateTimeOriginal, DateTimeDigitized, DateTime
                     date_str = exif.get(tag)
@@ -40,6 +60,16 @@ class ImageScanner:
                             continue
         except Exception:
             pass
+        return None
+
+    def _get_sort_key(self, path: Path) -> Any:
+        """Retourne une clé de tri (date EXIF si disponible, sinon date de modification)."""
+        if self.config.sort_by == "name":
+            return path.name.lower()
+
+        exif_date = self._get_exif_date(path)
+        if exif_date is not None:
+            return exif_date
 
         # Fallback : date de modification du fichier
         try:

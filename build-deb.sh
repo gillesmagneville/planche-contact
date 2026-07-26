@@ -150,12 +150,6 @@ fi
 echo ">>> Suppression des paquets .deb existants..."
 rm -f ./*.deb
 
-# Écriture de la nouvelle version AVANT de construire le paquet
-if [ "$NO_VERSION_CHANGE" = false ]; then
-    echo "$NEW_VERSION" > "$VERSION_FILE"
-    echo ">>> Version mise à jour : $NEW_VERSION"
-fi
-
 DEB_FILE="./${PACKAGE_NAME}_${NEW_VERSION}_amd64.deb"
 
 echo ""
@@ -179,15 +173,41 @@ python3 -m venv --system-site-packages "$BUILD_DIR/usr/share/$PACKAGE_NAME/venv"
 echo ">>> Installation des dépendances Python..."
 source "$BUILD_DIR/usr/share/$PACKAGE_NAME/venv/bin/activate"
 pip install --upgrade pip --quiet
-pip install Pillow reportlab --quiet
-deactivate
+
+PIP_LOG=$(mktemp)
+if pip install Pillow reportlab rawpy exifread --quiet >"$PIP_LOG" 2>&1; then
+    rm -f "$PIP_LOG"
+    deactivate
+    echo ">>> Dépendances installées avec succès (Pillow, reportlab, rawpy, exifread)."
+else
+    echo ""
+    echo "Erreur : l'installation des dépendances Python dans le virtualenv a échoué."
+    echo ""
+    echo "Détail de l'erreur pip :"
+    sed 's/^/    /' "$PIP_LOG"
+    rm -f "$PIP_LOG"
+    echo ""
+    echo "Causes possibles : pas de connexion réseau, miroir PyPI inaccessible,"
+    echo "ou architecture non couverte par les roues binaires de rawpy."
+    echo ""
+    echo "Pour corriger le problème :"
+    echo "    1) Vérifiez votre connexion réseau (et vos réglages de proxy éventuels)."
+    echo "    2) Relancez : ./build-deb.sh --no-version-change"
+    echo ""
+    echo "Construction annulée : aucun paquet .deb incomplet n'a été généré."
+    deactivate
+    rm -rf "$BUILD_DIR"
+    exit 1
+fi
 
 echo ">>> Copie des fichiers du projet..."
 cp "$PROJECT_DIR/planche-contact-gtk.py" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
 cp -r "$PROJECT_DIR/portfolio" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
 
-# Copie du fichier VERSION (maintenant à jour)
-[ -f "$PROJECT_DIR/VERSION" ] && cp "$PROJECT_DIR/VERSION" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
+# Le fichier VERSION du paquet reflète toujours NEW_VERSION, même si le
+# fichier VERSION du projet n'est mis à jour qu'après un build réussi
+# (voir plus bas).
+echo "$NEW_VERSION" > "$BUILD_DIR/usr/share/$PACKAGE_NAME/VERSION"
 
 mkdir -p "$BUILD_DIR/usr/share/$PACKAGE_NAME/docs"
 [ -f "$PROJECT_DIR/docs/planche-contact-manual.html" ] && cp "$PROJECT_DIR/docs/planche-contact-manual.html" "$BUILD_DIR/usr/share/$PACKAGE_NAME/docs/"
@@ -227,6 +247,23 @@ cp debian/postinst "$BUILD_DIR/DEBIAN/"
 cp debian/postrm "$BUILD_DIR/DEBIAN/"
 chmod 755 "$BUILD_DIR/DEBIAN/postinst" "$BUILD_DIR/DEBIAN/postrm"
 
+# === Normalisation des permissions --------------------------------------
+# `cp`/`cp -r` appliquent le umask du processus courant à la destination,
+# pas les permissions du fichier source. Si build-deb.sh est lancé avec un
+# umask restrictif (077, 027...), les fichiers embarqués dans le .deb
+# peuvent devenir illisibles pour un utilisateur normal une fois installés
+# (PermissionError au lancement de l'application). On force donc ici des
+# permissions correctes, indépendamment du umask de la machine de build.
+echo ">>> Normalisation des permissions..."
+find "$BUILD_DIR" -type d -exec chmod 755 {} +
+find "$BUILD_DIR" -type f -exec chmod 644 {} +
+
+# Ré-applique les bits d'exécution perdus par le chmod 644 générique
+# ci-dessus, sur tout ce qui doit réellement être exécutable.
+chmod +x "$BUILD_DIR/usr/bin/planche-contact-gtk" "$BUILD_DIR/usr/bin/portfolio"
+chmod 755 "$BUILD_DIR/DEBIAN/postinst" "$BUILD_DIR/DEBIAN/postrm"
+find "$BUILD_DIR/usr/share/$PACKAGE_NAME/venv/bin" -type f -exec chmod 755 {} +
+
 echo ">>> Création du paquet .deb..."
 fpm -s dir -t deb \
     -n "$PACKAGE_NAME" \
@@ -245,8 +282,14 @@ fpm -s dir -t deb \
 echo ""
 echo "✅ Paquet créé avec succès :"
 echo "   $DEB_FILE"
+
+# Le fichier VERSION du projet n'est mis à jour qu'ici, une fois le .deb
+# effectivement construit. Ainsi, un échec de build (venv, pip, fpm...) ne
+# laisse jamais le projet dans un état incohérent (VERSION incrémenté sans
+# .deb correspondant).
 if [ "$NO_VERSION_CHANGE" = true ]; then
     echo "   Version inchangée : $NEW_VERSION"
 else
+    echo "$NEW_VERSION" > "$VERSION_FILE"
     echo "   Version enregistrée : $NEW_VERSION"
 fi

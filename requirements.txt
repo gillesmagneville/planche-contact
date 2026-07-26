@@ -1,0 +1,18 @@
+# Dépendances principales
+Pillow>=10.0
+reportlab>=4.0
+
+# Support des fichiers RAW (.cr2, .cr3, .nef, .dng, .arw...)
+# Optionnel : sans ces paquets, les fichiers RAW sont ignorés (avec un
+# avertissement dans les logs) mais le reste de l'application fonctionne.
+#
+# Note : le paquet .deb installe automatiquement ces deux dépendances
+# (python3-exifread via apt, rawpy via pip dans le script postinst).
+# Cette section ne concerne que les installations depuis les sources.
+rawpy>=2.24
+exifread>=3.0
+
+# Interface graphique : PyGObject (GTK4) n'est pas installable via pip de
+# façon fiable sur toutes les distributions. Installez-le via le gestionnaire
+# de paquets de votre système, par exemple sur Debian/Ubuntu :
+#   sudo apt install python3-gi gir1.2-gtk-4.0

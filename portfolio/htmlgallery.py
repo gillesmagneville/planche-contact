@@ -1,8 +1,92 @@
 from pathlib import Path
 import shutil
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
+import logging
+import multiprocessing
 import os
 from PIL import Image, ImageDraw, ImageFont
+
+from .rawloader import load_image, is_raw_file
+
+# Taille max. (plus grand côté) des images "pleine taille" de la galerie
+# HTML. Une photo RAW de 45 Mpx pleinement dématricée puis enregistrée telle
+# quelle est à la fois très lente à produire et beaucoup plus lourde à
+# charger dans un navigateur qu'utile pour une vue agrandie à l'écran :
+# 2000px de long côté est largement suffisant pour un affichage plein écran.
+GALLERY_FULL_MAX_SIZE = 2000
+
+
+def _init_worker_logging(log_path):
+    """Reconfigure le logging dans les processus enfants (nécessaire avec
+    'spawn', qui ne partage pas la configuration du processus parent)."""
+    if log_path:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(message)s",
+            handlers=[logging.FileHandler(log_path, encoding="utf-8")],
+            force=True,
+        )
+
+
+def _apply_light_watermark_standalone(image, text, opacity):
+    """Version autonome (sans self) de HTMLGalleryGenerator._apply_light_watermark,
+    pour pouvoir être appelée depuis un processus worker séparé."""
+    if not text or image is None:
+        return image
+    if not text.startswith("©"):
+        text = "© " + text
+    try:
+        if image.mode != 'RGBA':
+            image = image.convert('RGBA')
+        draw = ImageDraw.Draw(image)
+        font_size = max(11, min(image.width, image.height) // 22)
+        try:
+            font = ImageFont.truetype(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size
+            )
+        except Exception:
+            font = ImageFont.load_default()
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        x = (image.width - text_width) // 2
+        y = int(image.height * 0.72)
+        alpha = int(255 * (opacity / 100))
+        draw.text((x, y), text, font=font, fill=(180, 180, 180, alpha))
+        return image.convert('RGB')
+    except Exception as e:
+        logging.getLogger(__name__).debug(f"Filigrane léger : {e}")
+        return image
+
+
+def _process_full_image_worker(args):
+    """Fonction worker (picklable, exécutée dans un processus séparé) qui
+    prépare une image "pleine taille" pour la galerie HTML : décodage
+    (en préférant l'aperçu embarqué pour les RAW quand il est assez grand,
+    voir rawloader.load_image), plafonnement à GALLERY_FULL_MAX_SIZE,
+    filigrane éventuel, puis enregistrement en JPEG."""
+    image_path, images_dir_str, watermark_text, watermark_opacity = args
+    images_dir = Path(images_dir_str)
+    path = Path(image_path)
+    if not path.exists():
+        return
+
+    out_name = HTMLGalleryGenerator.display_filename(path)
+    target = (GALLERY_FULL_MAX_SIZE, GALLERY_FULL_MAX_SIZE)
+    try:
+        img = load_image(path, use_embedded_thumb=True, target_size=target)
+        img = img.convert("RGB")
+        img.thumbnail(target, Image.Resampling.LANCZOS)
+        if watermark_text:
+            img = _apply_light_watermark_standalone(img, watermark_text, watermark_opacity)
+        img.save(images_dir / out_name, "JPEG", quality=90)
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"Erreur sur {path.name}: {e}")
+        if not is_raw_file(path):
+            # Pas de fallback utile pour un RAW (illisible par un navigateur).
+            try:
+                shutil.copy2(path, images_dir / out_name)
+            except Exception:
+                pass
 
 
 class HTMLGalleryGenerator:
@@ -53,23 +137,17 @@ class HTMLGalleryGenerator:
             print(f"[Filigrane léger] Erreur : {e}")
             return image
 
-    def _process_full_image(self, item, images_dir: Path):
-        image_path = item.get('path') if isinstance(item, dict) else item
-        if not image_path or not Path(image_path).exists():
-            return
-
-        try:
-            with Image.open(image_path) as img:
-                img = img.convert("RGB")
-                if self.watermark_text:
-                    img = self._apply_light_watermark(img, self.watermark_text)
-                img.save(images_dir / Path(image_path).name, quality=90, optimize=True)
-        except Exception as e:
-            print(f"Erreur sur {image_path}: {e}")
-            try:
-                shutil.copy2(image_path, images_dir / Path(image_path).name)
-            except Exception:
-                pass
+    @staticmethod
+    def display_filename(image_path) -> str:
+        """
+        Nom du fichier tel qu'il sera servi dans la galerie. Les fichiers RAW sont
+        décodés en JPEG (un navigateur ne peut pas afficher un .cr2/.nef/...), donc
+        leur extension est remplacée par .jpg.
+        """
+        path = Path(image_path)
+        if is_raw_file(path):
+            return path.stem + ".jpg"
+        return path.name
 
     def create_gallery(self, images, output_dir: Path):
         if output_dir.exists():
@@ -84,14 +162,35 @@ class HTMLGalleryGenerator:
         display_title = self.project_title or (Path(self.input_dir).name if self.input_dir else "Galerie Photo")
         total_pages = (len(images) + self.images_per_page - 1) // self.images_per_page
 
-        max_workers = min(os.cpu_count() or 4, 8)
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [
-                executor.submit(self._process_full_image, item, images_dir)
-                for item in images
-            ]
-            for future in as_completed(futures):
-                future.result()
+        # Des processus séparés plutôt que des threads : le décodage RAW et
+        # l'encodage JPEG sont des tâches CPU-intensives, et de vrais
+        # processus exploitent mieux plusieurs cœurs qu'un pool de threads
+        # (même si les bibliothèques C sous-jacentes libèrent le GIL). Même
+        # contexte 'spawn' que pour les vignettes (voir thumbnail.py) : rawpy
+        # utilise OpenMP en interne, incompatible avec fork().
+        tasks = []
+        for item in images:
+            image_path = item.get('path') if isinstance(item, dict) else item
+            if image_path:
+                tasks.append((str(image_path), str(images_dir), self.watermark_text, self.watermark_opacity))
+
+        if tasks:
+            max_workers = min(os.cpu_count() or 4, 8)
+            ctx = multiprocessing.get_context("spawn")
+            log_path = None
+            for handler in logging.getLogger().handlers:
+                if isinstance(handler, logging.FileHandler):
+                    log_path = handler.baseFilename
+                    break
+
+            with ProcessPoolExecutor(
+                max_workers=max_workers,
+                mp_context=ctx,
+                initializer=_init_worker_logging,
+                initargs=(log_path,),
+            ) as executor:
+                for _ in executor.map(_process_full_image_worker, tasks):
+                    pass
 
         thumb_size = 400
         thumbnails = self.thumb_gen.generate_parallel(images, thumb_size)
@@ -243,7 +342,7 @@ class HTMLGalleryGenerator:
                 continue
 
             image_path = item.get('path') if isinstance(item, dict) else item
-            filename = Path(image_path).name if image_path else f"image_{idx}"
+            filename = self.display_filename(image_path) if image_path else f"image_{idx}.jpg"
             thumb_filename = f"thumb_p{current_page}_{idx:04d}.jpg"
             thumb_path = thumbs_dir / thumb_filename
 
