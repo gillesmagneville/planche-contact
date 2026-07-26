@@ -46,6 +46,7 @@
             margin: 25px 0;
         }
         ul { padding-left: 22px; }
+        a { color: #0066cc; }
     </style>
 </head>
 <body>
@@ -53,97 +54,152 @@
 <h1>Planche-Contact — Manuel complet</h1>
 
 <h2>1. Présentation</h2>
-<p><strong>Planche-Contact</strong> est un outil léger et rapide permettant de générer des planches contact photographiques de haute qualité (300 dpi) sans utiliser de base de données ni de logiciel lourd.</p>
+<p><strong>Planche-Contact</strong> est un outil léger et rapide permettant de générer des planches contact photographiques de haute qualité (300 dpi), à partir d'un dossier de photos, sans base de données ni logiciel lourd.</p>
 <p>Il existe sous deux formes :</p>
 <ul>
-    <li><strong>Interface graphique GTK4</strong> (<code>planche-contact-gtk.py</code>)</li>
+    <li><strong>Interface graphique GTK4</strong> (<code>planche-contact-gtk.py</code> / <code>planche-contact-gtk</code>)</li>
     <li><strong>Ligne de commande</strong> (<code>portfolio.py</code>)</li>
 </ul>
+<p>À partir d'un même dossier de photos, l'outil peut produire simultanément :</p>
+<ul>
+    <li>des <strong>planches contact</strong> au format JPEG (une ou plusieurs pages) ;</li>
+    <li>un <strong>PDF</strong> assemblant toutes les planches ;</li>
+    <li>une <strong>galerie HTML</strong> paginée, autonome, avec vignettes cliquables ;</li>
+    <li>un <strong>index CSV</strong> listant chaque photo avec son numéro.</li>
+</ul>
 
-<h2>2. Interface Graphique (GTK)</h2>
+<h2>2. Formats de photos pris en charge</h2>
+<table>
+<tr><th>Type</th><th>Extensions</th></tr>
+<tr><td>Formats standards</td><td><code>.jpg</code>, <code>.jpeg</code>, <code>.png</code>, <code>.tif</code>, <code>.tiff</code>, <code>.bmp</code>, <code>.webp</code>, <code>.heic</code>, <code>.heif</code></td></tr>
+<tr><td>Formats RAW</td><td><code>.cr2</code>, <code>.cr3</code> (Canon), <code>.nef</code> (Nikon), <code>.dng</code>, <code>.arw</code> (Sony)</td></tr>
+</table>
+<div class="note">
+Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, installée automatiquement dans le paquet <code>.deb</code> (aucune installation manuelle nécessaire). Pour accélérer le traitement, Planche-Contact utilise en priorité l'aperçu JPEG déjà embarqué dans le fichier RAW par l'appareil photo ; un dématriçage complet (plus lent) n'est déclenché que si cet aperçu est absent ou trop petit pour l'usage demandé (vignette, planche, image "pleine taille" de la galerie).
+</div>
 
-<h3>2.1 Onglet « Génération »</h3>
+<h2>3. Interface graphique (GTK)</h2>
+
+<h3>3.1 Fenêtre principale</h3>
+<p>La fenêtre s'ouvre maximisée par défaut (tout en restant redimensionnable normalement) et propose trois onglets : <strong>Génération</strong>, <strong>Aide</strong> et <strong>À propos</strong>.</p>
+
+<h3>3.2 Onglet « Génération »</h3>
 
 <table>
 <tr><th>Champ / Option</th><th>Description</th></tr>
-<tr><td><strong>Titre du projet</strong></td><td>Texte affiché en grand en haut de chaque planche.</td></tr>
-<tr><td><strong>Nom de l’auteur</strong></td><td>Nom affiché en dessous du titre (en gras et plus gros).</td></tr>
-<tr><td><strong>Dossier d’entrée</strong></td><td>Dossier contenant les photographies à traiter (obligatoire).</td></tr>
-<tr><td><strong>Dossier de sortie</strong></td><td>Dossier où seront créés les résultats. Par défaut : <code>Portfolio/</code> dans le dossier source.</td></tr>
+<tr><td><strong>Titre du projet</strong></td><td>Texte affiché en grand en haut de chaque planche. Sur la même ligne que le nom de l'auteur.</td></tr>
+<tr><td><strong>Nom de l'auteur</strong></td><td>Nom affiché sous le titre (en gras, plus petit).</td></tr>
+<tr><td><strong>Dossier d'entrée</strong></td><td>Dossier contenant les photographies à traiter (obligatoire). Affiche automatiquement un aperçu des photos du dossier (voir §3.3).</td></tr>
+<tr><td><strong>Dossier de sortie</strong></td><td>Dossier où seront créés les résultats. Par défaut : <code>Portfolio/</code> dans le dossier source. Créé automatiquement s'il n'existe pas encore.</td></tr>
 <tr><td><strong>Recherche récursive</strong></td><td>Si coché, analyse aussi tous les sous-dossiers.</td></tr>
-<tr><td><strong>Images par planche</strong></td><td>Nombre de vignettes par page (9, 12, 16, 20 ou 25).</td></tr>
+<tr><td><strong>Images par planche</strong></td><td>Nombre de vignettes par page (8 à 48, par pas de 4). Sur la même ligne que les trois champs suivants.</td></tr>
 <tr><td><strong>Format de la planche</strong></td><td>Format papier : A5, A4, A3, A2 ou Letter.</td></tr>
-<tr><td><strong>Filigrane (texte)</strong></td><td>Texte qui sera répété sur toutes les images (ex: © Ton Nom).</td></tr>
+<tr><td><strong>Filigrane (texte)</strong></td><td>Texte répété en mosaïque sur toutes les images (planches, PDF et galerie HTML) — un « © » est ajouté automatiquement s'il est absent.</td></tr>
 <tr><td><strong>Orientation du filigrane</strong></td><td>
     <ul>
         <li><strong>Horizontal</strong> : texte horizontal</li>
-        <li><strong>Diagonale horaire</strong> : texte incliné à ~32°</li>
-        <li><strong>Diagonale anti-horaire</strong> : texte incliné à ~-32°</li>
+        <li><strong>Diagonale horaire</strong> : texte incliné dans le sens des aiguilles d'une montre</li>
+        <li><strong>Diagonale anti-horaire</strong> : texte incliné dans le sens inverse</li>
     </ul>
 </td></tr>
-<tr><td><strong>Options d’export</strong></td><td>PDF, Galerie HTML paginée, Index CSV.</td></tr>
+<tr><td><strong>Opacité du filigrane</strong></td><td>Curseur de 0 à 100% (défaut : 40%). S'applique de façon identique aux planches, au PDF et à la galerie HTML.</td></tr>
+<tr><td><strong>Options d'export</strong></td><td>Cases à cocher : Générer PDF, Générer Galerie HTML, Générer Index CSV.</td></tr>
 </table>
 
-<h3>2.2 Résultats générés</h3>
+<p>Si aucun des trois champs Titre / Auteur / Filigrane n'est renseigné, l'en-tête des planches affiche par défaut le nom du dossier d'entrée (sans son chemin complet), pour éviter une planche totalement anonyme.</p>
+
+<h3>3.3 Aperçu du dossier d'entrée</h3>
+<p>Dès qu'un dossier d'entrée valide est renseigné (au démarrage si un dossier était déjà mémorisé, ou après saisie/sélection), une bande d'aperçu affiche automatiquement les vignettes des photos qu'il contient, par pages de 10, avec une pagination numérotée (<code>← Précédent 1 … 4 5 6 … 19 Suivant →</code>). Le scan et la génération des vignettes se font en arrière-plan : l'interface ne se fige pas, même sur un dossier contenant des centaines de photos.</p>
+
+<h3>3.4 Sélecteur de dossier personnalisé</h3>
+<p>Le bouton « Choisir... » (dossier d'entrée ou de sortie) ouvre un navigateur de dossiers entièrement construit par l'application, plutôt que la boîte de dialogue native du système :</p>
 <ul>
-    <li><code>planches/</code> → Images JPEG individuelles de chaque planche</li>
-    <li><code>portfolio.pdf</code> → PDF complet de toutes les planches</li>
-    <li><code>gallery/</code> → Galerie HTML auto-contenue (avec miniatures)</li>
-    <li><code>index.csv</code> → Liste des fichiers avec leur numéro</li>
+    <li><strong>Uniquement des dossiers</strong> sont affichés (aucun fichier), pour une navigation épurée.</li>
+    <li>Un <strong>panneau d'aperçu</strong> en bas affiche jusqu'à 20 vignettes (2 lignes de 10) des photos du dossier survolé, avec sa propre pagination.</li>
+    <li>Un <strong>fil d'Ariane</strong> cliquable en haut permet de remonter rapidement dans l'arborescence.</li>
+    <li>Une <strong>barre latérale</strong> propose un raccourci vers le dossier personnel, ainsi que les signets déjà enregistrés dans le système (les mêmes que dans le gestionnaire de fichiers), s'il y en a.</li>
+    <li>Double-cliquer sur un dossier y entre ; le bouton <strong>« Sélectionner ce dossier »</strong> valide le dossier actuellement affiché.</li>
 </ul>
 
-<h2>3. Interface en Ligne de Commande (CLI)</h2>
+<h3>3.5 Bouton « Afficher les résultats »</h3>
+<p>Après une génération réussie, ce bouton (à liste déroulante) permet d'ouvrir directement les résultats avec les applications par défaut du système, sans agrandir la fenêtre principale :</p>
+<table>
+<tr><th>Option</th><th>Action</th></tr>
+<tr><td><strong>Planches contact</strong></td><td>Ouvre toutes les planches en une fois dans la visionneuse d'images par défaut (navigation possible entre les planches avec les flèches).</td></tr>
+<tr><td><strong>Portfolio PDF</strong></td><td>Ouvre le PDF avec le lecteur par défaut.</td></tr>
+<tr><td><strong>Galerie HTML</strong></td><td>Ouvre la galerie dans le navigateur par défaut.</td></tr>
+<tr><td><strong>Index CSV</strong></td><td>Ouvre le fichier CSV avec l'application par défaut (tableur, généralement).</td></tr>
+</table>
+<p>Chaque option n'est activée que si l'élément correspondant a bien été généré (selon les cases cochées lors de la génération). Si aucune application par défaut n'est configurée sur le système pour un type de fichier donné, une fenêtre d'avertissement s'affiche, avec une suggestion d'application à installer.</p>
 
-<h3>3.1 Options principales</h3>
+<h3>3.6 Onglet « À propos »</h3>
+<p>Affiche le numéro de version, la date de build, une courte description, l'auteur, la licence (<strong>GNU GPL v3</strong>) et un lien cliquable vers le dépôt GitHub du projet.</p>
+
+<h2>4. Interface en ligne de commande (CLI)</h2>
+
+<h3>4.1 Options principales</h3>
 
 <table>
 <tr><th>Option</th><th>Description</th><th>Exemple</th></tr>
 <tr><td><code>-i, --input</code></td><td>Dossier source (obligatoire)</td><td><code>-i /Photos/Voyage</code></td></tr>
 <tr><td><code>-o, --output</code></td><td>Dossier de sortie</td><td><code>-o ./Resultats</code></td></tr>
-<tr><td><code>-n, --num</code></td><td>Nombre d’images par planche</td><td><code>-n 16</code></td></tr>
-<tr><td><code>--format</code></td><td>Format de page</td><td><code>--format A3</code></td></tr>
+<tr><td><code>-n, --num</code></td><td>Nombre d'images par planche</td><td><code>-n 16</code></td></tr>
+<tr><td><code>--format</code></td><td>Format de page (A5, A4, A3, A2, Letter)</td><td><code>--format A3</code></td></tr>
 <tr><td><code>--title</code></td><td>Titre du projet</td><td><code>--title "Voyage 2025"</code></td></tr>
-<tr><td><code>--author</code></td><td>Nom de l’auteur</td><td><code>--author "Abel GEZ"</code></td></tr>
-<tr><td><code>--watermark</code></td><td>Texte du filigrane</td><td><code>--watermark "© Abel GEZ"</code></td></tr>
+<tr><td><code>--author</code></td><td>Nom de l'auteur</td><td><code>--author "Abel GEZ"</code></td></tr>
+<tr><td><code>--watermark</code></td><td>Texte du filigrane</td><td><code>--watermark "Abel GEZ"</code></td></tr>
 <tr><td><code>--watermark-orientation</code></td><td>Orientation du filigrane</td><td><code>--watermark-orientation "Diagonale horaire"</code></td></tr>
+<tr><td><code>--watermark-opacity</code></td><td>Opacité du filigrane, de 0 à 100 (défaut : 40)</td><td><code>--watermark-opacity 60</code></td></tr>
 <tr><td><code>--pdf</code></td><td>Générer un PDF</td><td></td></tr>
 <tr><td><code>--html</code></td><td>Générer une galerie HTML</td><td></td></tr>
 <tr><td><code>--csv</code></td><td>Générer un index CSV</td><td></td></tr>
-<tr><td><code>-r, --recursive</code></td><td>Analyse récursive</td><td></td></tr>
+<tr><td><code>-r, --recursive</code></td><td>Analyse récursive des sous-dossiers</td><td></td></tr>
+<tr><td><code>--sort</code></td><td>Tri des photos : <code>date</code> (EXIF) ou <code>name</code></td><td><code>--sort name</code></td></tr>
+<tr><td><code>--html-per-page</code></td><td>Nombre d'images par page dans la galerie HTML (défaut : 48)</td><td><code>--html-per-page 60</code></td></tr>
 </table>
 
-<h3>3.2 Exemples complets</h3>
+<h3>4.2 Exemples complets</h3>
 
 <pre><code># Génération simple
 python3 portfolio.py -i /Photos/2025 -o ./Sortie --pdf --html
 
-# Version professionnelle avec filigrane diagonal
+# Version professionnelle avec filigrane diagonal et opacité personnalisée
 python3 portfolio.py \
   -i /Photos/Islande \
   -n 16 \
   --format A3 \
   --title "Islande 2025" \
   --author "Abel GEZ" \
-  --watermark "© Abel GEZ" \
+  --watermark "Abel GEZ" \
   --watermark-orientation "Diagonale horaire" \
+  --watermark-opacity 55 \
   --pdf --html --csv
 </code></pre>
 
-<h2>4. Recommandations</h2>
-<ul>
-    <li>Pour un rendu homogène, conservez le même nombre d’images par planche sur tout le projet.</li>
-    <li>Le filigrane en diagonale est généralement plus élégant et moins gênant visuellement.</li>
-    <li>La galerie HTML est autonome (vous pouvez la copier ailleurs sans rien casser).</li>
-</ul>
+<h2>5. Filigrane</h2>
+<p>Le filigrane utilise un <strong>rendu unique et identique</strong> quel que soit le support de sortie : planches contact, PDF (qui réutilise directement les images de planches) et galerie HTML (vignettes de la grille et images « pleine taille »). Le texte est répété en mosaïque sur toute l'image, avec l'orientation et l'opacité choisies — aucune différence de rendu entre les trois sorties.</p>
 
-<h2>5. Fichiers générés</h2>
+<h2>6. Fichiers générés</h2>
 <table>
 <tr><th>Dossier / Fichier</th><th>Contenu</th></tr>
-<tr><td><code>planches/</code></td><td>Planche contact individuelles (JPEG)</td></tr>
-<tr><td><code>portfolio.pdf</code></td><td>PDF complet</td></tr>
-<tr><td><code>gallery/</code></td><td>Galerie HTML paginée</td></tr>
+<tr><td><code>planches/</code></td><td>Planches contact individuelles (JPEG, 300 dpi)</td></tr>
+<tr><td><code>portfolio.pdf</code></td><td>PDF complet assemblant toutes les planches</td></tr>
+<tr><td><code>gallery/</code></td><td>Galerie HTML paginée et autonome (avec ses propres vignettes et images « pleine taille »)</td></tr>
 <tr><td><code>index.csv</code></td><td>Liste des images avec leur numéro</td></tr>
+<tr><td><code>generation.log</code></td><td>Journal détaillé de la génération</td></tr>
 </table>
+
+<h2>7. Recommandations</h2>
+<ul>
+    <li>Pour un rendu homogène, conservez le même nombre d'images par planche sur tout le projet.</li>
+    <li>Le filigrane en diagonale est généralement plus élégant et moins gênant visuellement.</li>
+    <li>La galerie HTML est autonome : vous pouvez copier tout le dossier <code>gallery/</code> ailleurs (clé USB, serveur web...) sans rien casser.</li>
+    <li>Sur les dossiers volumineux (plusieurs centaines de photos), le traitement exploite automatiquement tous les cœurs disponibles de la machine : plus la machine dispose de cœurs, plus la génération est rapide.</li>
+</ul>
+
+<h2>8. À propos</h2>
+<p>Planche-Contact est distribué sous licence <strong>GNU GPL v3</strong>.</p>
+<p>Dépôt GitHub : <a href="https://github.com/gillesmagneville/planche-contact-linux">github.com/gillesmagneville/planche-contact-linux</a></p>
 
 </body>
 </html>

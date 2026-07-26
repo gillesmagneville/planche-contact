@@ -262,6 +262,8 @@ class PlancheContactGTK(Gtk.Application):
         self.last_input_dir = ""
         self.last_output_dir = ""
         self._preview_debounce_id = None
+        self._last_result = None
+        self._pending_result = None
         self.load_settings()
 
     def load_settings(self):
@@ -462,6 +464,18 @@ class PlancheContactGTK(Gtk.Application):
         self.watermark_orient_combo.set_selected(0)
         grid.attach(self.watermark_orient_combo, 7, 1, 1, 1)
 
+        # Opacité du filigrane (0-100%), valeur par défaut alignée sur celle
+        # utilisée par le générateur (voir portfolio/config.py).
+        opacity_label = Gtk.Label(label="Opacité du filigrane :")
+        grid.attach(opacity_label, 0, 2, 1, 1)
+        self.watermark_opacity_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+        self.watermark_opacity_scale.set_value(40)
+        self.watermark_opacity_scale.set_draw_value(True)
+        self.watermark_opacity_scale.set_value_pos(Gtk.PositionType.RIGHT)
+        self.watermark_opacity_scale.set_hexpand(False)
+        self.watermark_opacity_scale.set_size_request(220, -1)
+        grid.attach(self.watermark_opacity_scale, 1, 2, 3, 1)
+
         self.pdf_check = Gtk.CheckButton(label="Générer PDF")
         self.html_check = Gtk.CheckButton(label="Générer Galerie HTML")
         self.csv_check = Gtk.CheckButton(label="Générer Index CSV")
@@ -469,9 +483,9 @@ class PlancheContactGTK(Gtk.Application):
         self.html_check.set_active(True)
         self.csv_check.set_active(True)
 
-        grid.attach(self.pdf_check, 0, 2, 2, 1)
-        grid.attach(self.html_check, 0, 3, 2, 1)
-        grid.attach(self.csv_check, 0, 4, 2, 1)
+        grid.attach(self.pdf_check, 0, 3, 2, 1)
+        grid.attach(self.html_check, 0, 4, 2, 1)
+        grid.attach(self.csv_check, 0, 5, 2, 1)
 
         box.append(grid)
 
@@ -484,12 +498,52 @@ class PlancheContactGTK(Gtk.Application):
         reset_btn = Gtk.Button(label="Réinitialiser")
         reset_btn.connect("clicked", self._reset_form)
 
+        # Bouton à liste déroulante pour ouvrir les résultats (planches,
+        # PDF, galerie) dans les applications par défaut du système - pas
+        # d'aperçu intégré, donc la fenêtre principale ne grandit pas.
+        # Désactivé tant qu'aucune génération n'a réussi ; chaque option
+        # individuelle n'est activée que si l'élément correspondant a
+        # effectivement été produit lors de la dernière génération.
+        self.view_results_btn = Gtk.MenuButton(label="Afficher les résultats")
+        self.view_results_btn.set_sensitive(False)
+
+        view_popover = Gtk.Popover()
+        view_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        view_box.set_margin_top(6)
+        view_box.set_margin_bottom(6)
+        view_box.set_margin_start(6)
+        view_box.set_margin_end(6)
+
+        def make_view_item(label_text, handler):
+            btn = Gtk.Button(label=label_text)
+            btn.add_css_class("flat")
+            child = btn.get_child()
+            if child is not None:
+                child.set_xalign(0)
+
+            def on_clicked(b):
+                view_popover.popdown()
+                handler()
+
+            btn.connect("clicked", on_clicked)
+            view_box.append(btn)
+            return btn
+
+        self.view_planches_btn = make_view_item("Planches contact", self._open_planches)
+        self.view_pdf_btn = make_view_item("Portfolio PDF", self._open_pdf)
+        self.view_gallery_btn = make_view_item("Galerie HTML", self._open_gallery)
+        self.view_csv_btn = make_view_item("Index CSV", self._open_csv)
+
+        view_popover.set_child(view_box)
+        self.view_results_btn.set_popover(view_popover)
+
         quit_btn = Gtk.Button(label="Quitter")
         quit_btn.connect("clicked", lambda b: self.quit())
 
         left_box = Gtk.Box(spacing=10)
         left_box.append(self.run_button)
         left_box.append(reset_btn)
+        left_box.append(self.view_results_btn)
 
         spacer = Gtk.Box()
         spacer.set_hexpand(True)
@@ -527,12 +581,15 @@ class PlancheContactGTK(Gtk.Application):
         self.num_combo.set_selected(1)
         self.format_combo.set_selected(1)
         self.watermark_orient_combo.set_selected(0)
+        self.watermark_opacity_scale.set_value(40)
         self.pdf_check.set_active(True)
         self.html_check.set_active(True)
         self.csv_check.set_active(True)
         self.log_buffer.set_text("")
         self.status_label.set_text("")
         self.progress.set_fraction(0.0)
+        self._last_result = None
+        self.view_results_btn.set_sensitive(False)
 
     def _choose_folder(self, button, entry, folder_type):
         """Sélecteur de dossier personnalisé, avec aperçu des vignettes.
@@ -823,6 +880,7 @@ class PlancheContactGTK(Gtk.Application):
         author = self.author_entry.get_text().strip() or None
         watermark = self.watermark_entry.get_text().strip() or None
         orientation = self.watermark_orient_combo.get_selected_item().get_string()
+        opacity = int(self.watermark_opacity_scale.get_value())
 
         cli_path = str(Path(__file__).parent / "portfolio" / "portfolio.py")
 
@@ -841,6 +899,7 @@ class PlancheContactGTK(Gtk.Application):
         if watermark:
             cmd.extend(["--watermark", watermark])
             cmd.extend(["--watermark-orientation", orientation])
+            cmd.extend(["--watermark-opacity", str(opacity)])
         if self.recursive_check.get_active():
             cmd.append("-r")
         if self.pdf_check.get_active():
@@ -852,8 +911,20 @@ class PlancheContactGTK(Gtk.Application):
 
         self._log("Démarrage de la génération...")
         self.run_button.set_sensitive(False)
+        self.view_results_btn.set_sensitive(False)
         self.progress.set_fraction(0.0)
         self.status_label.set_text("Génération en cours...")
+
+        # Mémorise ce qui est demandé dans CETTE génération (indépendamment
+        # de l'état futur des cases à cocher, qui pourrait changer avant la
+        # fin du traitement) : sert à activer les bons éléments du menu
+        # "Afficher les résultats" une fois terminé.
+        self._pending_result = {
+            "output_dir": Path(output_dir),
+            "pdf": self.pdf_check.get_active(),
+            "html": self.html_check.get_active(),
+            "csv": self.csv_check.get_active(),
+        }
 
         threading.Thread(target=self._run_cli, args=(cmd,), daemon=True).start()
 
@@ -891,6 +962,7 @@ class PlancheContactGTK(Gtk.Application):
                 GLib.idle_add(self._log, "✅ Génération terminée avec succès !")
                 GLib.idle_add(self.status_label.set_text, "Terminé avec succès")
                 GLib.idle_add(self.progress.set_fraction, 1.0)
+                GLib.idle_add(self._on_generation_success)
             else:
                 GLib.idle_add(self._log, f"❌ Erreur (code {process.returncode})")
                 GLib.idle_add(self.status_label.set_text, "Erreur pendant la génération")
@@ -904,6 +976,138 @@ class PlancheContactGTK(Gtk.Application):
         self.log_buffer.insert(self.log_buffer.get_end_iter(), message + "\n")
         mark = self.log_buffer.get_insert()
         self.log_view.scroll_mark_onscreen(mark)
+
+    # ====================== AFFICHAGE DES RÉSULTATS ======================
+    # Ouvre les résultats (planches, PDF, galerie) avec les applications par
+    # défaut du système (visionneuse d'images/gestionnaire de fichiers,
+    # lecteur PDF, navigateur web) plutôt que dans un aperçu intégré : la
+    # fenêtre principale ne s'agrandit donc jamais pour ça.
+
+    def _on_generation_success(self):
+        self._last_result = self._pending_result
+        output_dir = self._last_result["output_dir"]
+
+        planches_dir = output_dir / "planches"
+        self.view_planches_btn.set_sensitive(planches_dir.is_dir())
+
+        pdf_path = output_dir / "portfolio.pdf"
+        self.view_pdf_btn.set_sensitive(self._last_result["pdf"] and pdf_path.is_file())
+
+        gallery_index = output_dir / "gallery" / "index.html"
+        self.view_gallery_btn.set_sensitive(self._last_result["html"] and gallery_index.is_file())
+
+        csv_path = output_dir / "index.csv"
+        self.view_csv_btn.set_sensitive(self._last_result["csv"] and csv_path.is_file())
+
+        self.view_results_btn.set_sensitive(True)
+        return False
+
+    def _show_no_viewer_dialog(self, message, detail):
+        dialog = Gtk.AlertDialog()
+        dialog.set_modal(True)
+        dialog.set_message(message)
+        dialog.set_detail(detail)
+        dialog.set_buttons(["OK"])
+        dialog.show(self.win)
+
+    def _open_planches(self):
+        if not self._last_result:
+            return
+        planches_dir = self._last_result["output_dir"] / "planches"
+        if not planches_dir.is_dir():
+            return
+
+        planche_files = sorted(
+            p for p in planches_dir.iterdir()
+            if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg", ".png")
+        )
+        if not planche_files:
+            return
+
+        gfiles = [Gio.File.new_for_path(str(p)) for p in planche_files]
+
+        # On ouvre toutes les planches EN UNE FOIS dans le visualiseur
+        # d'images par défaut du système : la plupart des visionneuses
+        # (Loupe, eog, gThumb...) permettent alors de naviguer entre elles
+        # avec les flèches, comme dans une vraie visionneuse - contrairement
+        # à ouvrir le dossier dans le gestionnaire de fichiers.
+        content_type, _ = Gio.content_type_guess(str(planche_files[0]), None)
+        app_info = Gio.AppInfo.get_default_for_type(content_type, False) if content_type else None
+
+        if app_info is not None:
+            try:
+                app_info.launch(gfiles, None)
+                return
+            except Exception:
+                pass
+
+        # Repli : aucun visualiseur par défaut trouvé (ou son lancement a
+        # échoué) - on tente d'ouvrir au moins la première planche avec
+        # l'application par défaut associée aux fichiers image.
+        try:
+            Gio.AppInfo.launch_default_for_uri(gfiles[0].get_uri(), None)
+        except Exception:
+            self._show_no_viewer_dialog(
+                "Aucune visionneuse d'images disponible",
+                "Aucune application par défaut n'est configurée pour ouvrir des images "
+                "sur ce système.\n\nInstallez une visionneuse d'images (par exemple : "
+                "Loupe, eog, ou gThumb) puis réessayez."
+            )
+
+    def _open_pdf(self):
+        if not self._last_result:
+            return
+        pdf_path = self._last_result["output_dir"] / "portfolio.pdf"
+        if not pdf_path.is_file():
+            return
+        uri = Gio.File.new_for_path(str(pdf_path)).get_uri()
+        try:
+            Gio.AppInfo.launch_default_for_uri(uri, None)
+        except Exception:
+            self._show_no_viewer_dialog(
+                "Aucun lecteur PDF disponible",
+                "Aucune application par défaut n'est configurée pour ouvrir les fichiers "
+                "PDF sur ce système.\n\nInstallez un lecteur PDF (par exemple : "
+                "Evince / Visionneur de documents, ou Okular) puis réessayez."
+            )
+
+    def _open_gallery(self):
+        if not self._last_result:
+            return
+        gallery_index = self._last_result["output_dir"] / "gallery" / "index.html"
+        if not gallery_index.is_file():
+            return
+        # Gio.AppInfo (comme pour le PDF/CSV) plutôt que le module webbrowser
+        # de Python : ce dernier ne remonte pas fidèlement un échec (il lance
+        # xdg-open en arrière-plan et considère souvent l'opération réussie
+        # même si aucun navigateur n'a en réalité pu être trouvé).
+        uri = Gio.File.new_for_path(str(gallery_index)).get_uri()
+        try:
+            Gio.AppInfo.launch_default_for_uri(uri, None)
+        except Exception:
+            self._show_no_viewer_dialog(
+                "Aucun navigateur web disponible",
+                "Aucune application par défaut n'est configurée pour ouvrir les pages "
+                "web sur ce système.\n\nInstallez un navigateur web (par exemple : "
+                "Firefox ou Chromium) puis réessayez."
+            )
+
+    def _open_csv(self):
+        if not self._last_result:
+            return
+        csv_path = self._last_result["output_dir"] / "index.csv"
+        if not csv_path.is_file():
+            return
+        uri = Gio.File.new_for_path(str(csv_path)).get_uri()
+        try:
+            Gio.AppInfo.launch_default_for_uri(uri, None)
+        except Exception:
+            self._show_no_viewer_dialog(
+                "Aucune application disponible pour les fichiers CSV",
+                "Aucune application par défaut n'est configurée pour ouvrir les fichiers "
+                "CSV sur ce système.\n\nInstallez un tableur (par exemple : LibreOffice "
+                "Calc) ou un éditeur de texte, puis réessayez."
+            )
 
     # ====================== AIDE ======================
 
@@ -980,6 +1184,23 @@ class PlancheContactGTK(Gtk.Application):
         author.set_markup("<span size='small'>Développé par Gilles MAGNEVILLE</span>")
         author.set_margin_top(25)
         box.append(author)
+
+        # Licence
+        license_label = Gtk.Label()
+        license_label.set_markup("<span size='small'>Distribué sous licence GNU GPL v3</span>")
+        license_label.set_margin_top(10)
+        box.append(license_label)
+
+        # Dépôt GitHub (lien cliquable, ouvre le navigateur par défaut)
+        github_label = Gtk.Label()
+        github_label.set_markup(
+            '<span size="small">'
+            '<a href="https://github.com/gillesmagneville/planche-contact-linux">'
+            'github.com/gillesmagneville/planche-contact-linux</a>'
+            '</span>'
+        )
+        github_label.set_margin_top(4)
+        box.append(github_label)
 
         return box
 

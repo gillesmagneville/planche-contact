@@ -4,9 +4,10 @@ from concurrent.futures import ProcessPoolExecutor
 import logging
 import multiprocessing
 import os
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
 from .rawloader import load_image, is_raw_file
+from .utils import apply_watermark
 
 # Taille max. (plus grand côté) des images "pleine taille" de la galerie
 # HTML. Une photo RAW de 45 Mpx pleinement dématricée puis enregistrée telle
@@ -28,47 +29,25 @@ def _init_worker_logging(log_path):
         )
 
 
-def _apply_light_watermark_standalone(image, text, opacity):
-    """Version autonome (sans self) de HTMLGalleryGenerator._apply_light_watermark,
-    pour pouvoir être appelée depuis un processus worker séparé."""
-    if not text or image is None:
-        return image
-    if not text.startswith("©"):
-        text = "© " + text
-    try:
-        if image.mode != 'RGBA':
-            image = image.convert('RGBA')
-        draw = ImageDraw.Draw(image)
-        font_size = max(11, min(image.width, image.height) // 22)
-        try:
-            font = ImageFont.truetype(
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size
-            )
-        except Exception:
-            font = ImageFont.load_default()
-        bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = bbox[2] - bbox[0]
-        x = (image.width - text_width) // 2
-        y = int(image.height * 0.72)
-        alpha = int(255 * (opacity / 100))
-        draw.text((x, y), text, font=font, fill=(180, 180, 180, alpha))
-        return image.convert('RGB')
-    except Exception as e:
-        logging.getLogger(__name__).debug(f"Filigrane léger : {e}")
-        return image
-
-
 def _process_full_image_worker(args):
     """Fonction worker (picklable, exécutée dans un processus séparé) qui
-    prépare une image "pleine taille" pour la galerie HTML : décodage
-    (en préférant l'aperçu embarqué pour les RAW quand il est assez grand,
-    voir rawloader.load_image), plafonnement à GALLERY_FULL_MAX_SIZE,
-    filigrane éventuel, puis enregistrement en JPEG."""
-    image_path, images_dir_str, watermark_text, watermark_opacity = args
+    prépare à la fois l'image "pleine taille" ET la vignette de la galerie
+    HTML à partir d'un seul et même décodage (au lieu de deux décodages
+    séparés comme auparavant) : décodage (en préférant l'aperçu embarqué
+    pour les RAW quand il est assez grand, voir rawloader.load_image),
+    plafonnement à GALLERY_FULL_MAX_SIZE, dérivation de la vignette 400px
+    par simple redimensionnement (pas un nouveau décodage), filigrane
+    éventuel sur les deux (mosaïque identique aux planches contact / au
+    PDF, voir utils.apply_watermark), puis enregistrement des deux JPEG -
+    le tout dans le processus worker, sans repasser par le processus
+    principal."""
+    (image_path, images_dir_str, thumbs_dir_str, thumb_filename,
+     watermark_text, watermark_opacity, watermark_orientation) = args
     images_dir = Path(images_dir_str)
+    thumbs_dir = Path(thumbs_dir_str)
     path = Path(image_path)
     if not path.exists():
-        return
+        return False
 
     out_name = HTMLGalleryGenerator.display_filename(path)
     target = (GALLERY_FULL_MAX_SIZE, GALLERY_FULL_MAX_SIZE)
@@ -76,9 +55,19 @@ def _process_full_image_worker(args):
         img = load_image(path, use_embedded_thumb=True, target_size=target)
         img = img.convert("RGB")
         img.thumbnail(target, Image.Resampling.LANCZOS)
+
+        # Vignette dérivée de l'image déjà décodée ci-dessus : simple
+        # redimensionnement, aucun nouveau décodage du fichier source.
+        thumb = img.copy()
+        thumb.thumbnail((400, 400), Image.Resampling.LANCZOS)
+
         if watermark_text:
-            img = _apply_light_watermark_standalone(img, watermark_text, watermark_opacity)
+            img = apply_watermark(img, watermark_text, watermark_opacity, watermark_orientation)
+            thumb = apply_watermark(thumb, watermark_text, watermark_opacity, watermark_orientation)
+
         img.save(images_dir / out_name, "JPEG", quality=90)
+        thumb.save(thumbs_dir / thumb_filename, "JPEG", quality=85)
+        return True
     except Exception as e:
         logging.getLogger(__name__).warning(f"Erreur sur {path.name}: {e}")
         if not is_raw_file(path):
@@ -87,6 +76,7 @@ def _process_full_image_worker(args):
                 shutil.copy2(path, images_dir / out_name)
             except Exception:
                 pass
+        return False
 
 
 class HTMLGalleryGenerator:
@@ -99,43 +89,8 @@ class HTMLGalleryGenerator:
         self.images_per_page = getattr(config, 'html_images_per_page', 48)
 
         self.watermark_text = getattr(config, 'watermark_text', None)
-        self.watermark_opacity = getattr(config, 'watermark_opacity', 50)
+        self.watermark_opacity = getattr(config, 'watermark_opacity', 40)
         self.watermark_orientation = getattr(config, 'watermark_orientation', 'Horizontal')
-
-    def _apply_light_watermark(self, image: Image.Image, text: str):
-        if not text or image is None:
-            return image
-
-        # Ajout automatique du symbole copyright
-        if not text.startswith("©"):
-            text = "© " + text
-
-        try:
-            if image.mode != 'RGBA':
-                image = image.convert('RGBA')
-
-            draw = ImageDraw.Draw(image)
-            font_size = max(11, min(image.width, image.height) // 22)
-
-            try:
-                font = ImageFont.truetype(
-                    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size
-                )
-            except:
-                font = ImageFont.load_default()
-
-            bbox = draw.textbbox((0, 0), text, font=font)
-            text_width = bbox[2] - bbox[0]
-            x = (image.width - text_width) // 2
-            y = int(image.height * 0.72)
-
-            alpha = int(255 * (self.watermark_opacity / 100))
-            draw.text((x, y), text, font=font, fill=(180, 180, 180, alpha))
-
-            return image.convert('RGB')
-        except Exception as e:
-            print(f"[Filigrane léger] Erreur : {e}")
-            return image
 
     @staticmethod
     def display_filename(image_path) -> str:
@@ -168,14 +123,26 @@ class HTMLGalleryGenerator:
         # (même si les bibliothèques C sous-jacentes libèrent le GIL). Même
         # contexte 'spawn' que pour les vignettes (voir thumbnail.py) : rawpy
         # utilise OpenMP en interne, incompatible avec fork().
+        # Une seule passe parallèle par image : chaque worker produit à la
+        # fois l'image "pleine taille" ET la vignette de la galerie (voir
+        # _process_full_image_worker). Le nom de vignette est précalculé
+        # ici pour rester cohérent avec le numéro de page utilisé plus bas
+        # par _generate_page.
         tasks = []
-        for item in images:
+        for i, item in enumerate(images):
             image_path = item.get('path') if isinstance(item, dict) else item
             if image_path:
-                tasks.append((str(image_path), str(images_dir), self.watermark_text, self.watermark_opacity))
+                page_num = i // self.images_per_page + 1
+                idx_in_page = i % self.images_per_page
+                thumb_filename = f"thumb_p{page_num}_{idx_in_page:04d}.jpg"
+                tasks.append((
+                    str(image_path), str(images_dir), str(thumbs_dir), thumb_filename,
+                    self.watermark_text, self.watermark_opacity, self.watermark_orientation
+                ))
 
+        results = [False] * len(images)
         if tasks:
-            max_workers = min(os.cpu_count() or 4, 8)
+            max_workers = min(os.cpu_count() or 4, 64)
             ctx = multiprocessing.get_context("spawn")
             log_path = None
             for handler in logging.getLogger().handlers:
@@ -189,54 +156,18 @@ class HTMLGalleryGenerator:
                 initializer=_init_worker_logging,
                 initargs=(log_path,),
             ) as executor:
-                for _ in executor.map(_process_full_image_worker, tasks):
-                    pass
-
-        thumb_size = 400
-        thumbnails = self.thumb_gen.generate_parallel(images, thumb_size)
-
-        if self.watermark_text:
-            wm_text = self.watermark_text
-            if not wm_text.startswith("©"):
-                wm_text = "© " + wm_text
-
-            for i, thumb in enumerate(thumbnails):
-                if thumb is None:
-                    continue
-                try:
-                    if thumb.mode != 'RGBA':
-                        thumb = thumb.convert('RGBA')
-                    draw = ImageDraw.Draw(thumb)
-
-                    font_size = max(10, thumb.width // 16)
-                    try:
-                        font = ImageFont.truetype(
-                            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size
-                        )
-                    except:
-                        font = ImageFont.load_default()
-
-                    bbox = draw.textbbox((0, 0), wm_text, font=font)
-                    text_width = bbox[2] - bbox[0]
-                    x = (thumb.width - text_width) // 2
-                    y = int(thumb.height * 0.72)
-
-                    alpha = int(255 * (self.watermark_opacity / 100))
-                    draw.text((x, y), wm_text, font=font, fill=(180, 180, 180, alpha))
-                    thumbnails[i] = thumb.convert('RGB')
-                except Exception:
-                    pass
+                results = list(executor.map(_process_full_image_worker, tasks))
 
         for page_num in range(1, total_pages + 1):
             start = (page_num - 1) * self.images_per_page
             page_images = images[start : start + self.images_per_page]
-            page_thumbs = thumbnails[start : start + self.images_per_page]
+            page_results = results[start : start + self.images_per_page]
 
             html_path = output_dir / ("index.html" if page_num == 1 else f"page_{page_num:03d}.html")
 
             self._generate_page(
                 page_images=page_images,
-                page_thumbs=page_thumbs,
+                page_results=page_results,
                 html_path=html_path,
                 display_title=display_title,
                 current_page=page_num,
@@ -247,7 +178,7 @@ class HTMLGalleryGenerator:
 
         print(f"Galerie HTML créée : {total_pages} page(s) dans {output_dir}")
 
-    def _generate_page(self, page_images, page_thumbs, html_path, display_title,
+    def _generate_page(self, page_images, page_results, html_path, display_title,
                        current_page, total_pages, total_images, thumbs_dir):
         thumbs_dir.mkdir(exist_ok=True)
 
@@ -337,19 +268,16 @@ class HTMLGalleryGenerator:
 {nav_html}
 <div class="gallery">
 """
-        for idx, (item, thumb) in enumerate(zip(page_images, page_thumbs)):
-            if thumb is None:
+        for idx, (item, ok) in enumerate(zip(page_images, page_results)):
+            if not ok:
                 continue
 
             image_path = item.get('path') if isinstance(item, dict) else item
             filename = self.display_filename(image_path) if image_path else f"image_{idx}.jpg"
             thumb_filename = f"thumb_p{current_page}_{idx:04d}.jpg"
-            thumb_path = thumbs_dir / thumb_filename
-
-            try:
-                thumb.save(thumb_path, "JPEG", quality=85, optimize=True)
-            except Exception:
-                continue
+            # Le fichier de vignette a déjà été écrit par le worker parallèle
+            # (voir _process_full_image_worker) : on référence juste son nom
+            # ici, sans nouvelle écriture ni nouveau décodage.
 
             html += f''' <a href="images/{filename}" target="_blank">
         <img src="thumbs/{thumb_filename}" alt="">

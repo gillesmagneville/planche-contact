@@ -42,6 +42,8 @@ def parse_args():
     parser.add_argument("--watermark-orientation", default="Horizontal",
                         choices=["Horizontal", "Diagonale horaire", "Diagonale anti-horaire"],
                         help="Orientation du filigrane")
+    parser.add_argument("--watermark-opacity", type=int, default=40,
+                        help="Opacité du filigrane, de 0 à 100 (défaut : 40)")
 
     return parser.parse_args()
 
@@ -51,6 +53,7 @@ def main():
     start = time.time()
 
     output_dir = args.output or (args.input / "Portfolio")
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     setup_logging(output_dir / "generation.log")
     logger = logging.getLogger(__name__)
@@ -73,6 +76,7 @@ def main():
         html_images_per_page=args.html_per_page,
         watermark_text=args.watermark,
         watermark_orientation=args.watermark_orientation,
+        watermark_opacity=args.watermark_opacity,
     )
 
     # Phase 1: Scan

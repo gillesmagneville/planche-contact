@@ -2,6 +2,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 import math
 from pathlib import Path
 
+from .utils import apply_watermark
+
 
 class ContactSheetGenerator:
     def __init__(self, config, thumbnail_generator):
@@ -58,18 +60,22 @@ class ContactSheetGenerator:
         sheet = Image.new("RGB", (canvas_w, canvas_h), "white")
         draw = ImageDraw.Draw(sheet)
 
-        header_height = self._draw_header(draw, canvas_w, margin)
-        y_start = margin + header_height + 42
+        header_bottom_y = self._draw_header(draw, canvas_w)
+        # Espace entre le bas de l'en-tête et la grille de vignettes : plus
+        # généreux que la version précédente, aligné sur la même valeur que
+        # les marges latérales/basse pour une composition équilibrée.
+        content_gap = margin
+        y_start = header_bottom_y + content_gap
 
         for idx, thumb in enumerate(thumbnails):
             if thumb is None:
                 continue
 
             if self.config.watermark_text:
-                thumb = self._apply_watermark(
+                thumb = apply_watermark(
                     thumb,
                     self.config.watermark_text,
-                    getattr(self.config, 'watermark_opacity', 70),
+                    getattr(self.config, 'watermark_opacity', 40),
                     getattr(self.config, 'watermark_orientation', 'Horizontal')
                 )
 
@@ -82,19 +88,31 @@ class ContactSheetGenerator:
         self._draw_page_number(draw, canvas_w, canvas_h, page_num, total_pages)
         return sheet
 
-    def _draw_header(self, draw, canvas_w, margin):
+    def _draw_header(self, draw, canvas_w):
         try:
             font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 54)
             font_author = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
         except:
             font_title = font_author = ImageFont.load_default()
 
-        y = margin - 30
+        # Marge haute réduite avant l'en-tête (6 mm, contre ~9,5 mm
+        # auparavant) : le titre démarre nettement plus près du haut de la
+        # planche/page.
+        y = int(6 * 300 / 25.4)
 
-        if self.project_title:
-            bbox = draw.textbbox((0, 0), self.project_title, font=font_title)
+        # Si aucun champ (titre, auteur, filigrane) n'a été renseigné, la
+        # planche serait totalement anonyme : on affiche alors par défaut
+        # le nom du dossier source (sans son chemin complet) en guise de
+        # titre.
+        watermark_text = getattr(self.config, 'watermark_text', None)
+        display_title = self.project_title
+        if not display_title and not self.author and not watermark_text and self.input_dir:
+            display_title = Path(self.input_dir).name
+
+        if display_title:
+            bbox = draw.textbbox((0, 0), display_title, font=font_title)
             text_w = bbox[2] - bbox[0]
-            draw.text(((canvas_w - text_w) / 2, y), self.project_title, fill="black", font=font_title)
+            draw.text(((canvas_w - text_w) / 2, y), display_title, fill="black", font=font_title)
             y += 58
 
         if self.author:
@@ -103,7 +121,7 @@ class ContactSheetGenerator:
             draw.text(((canvas_w - text_w) / 2, y), self.author, fill="black", font=font_author)
             y += 42
 
-        return y - margin
+        return y
 
     def _draw_page_number(self, draw, canvas_w, canvas_h, page_num, total_pages):
         try:
@@ -121,46 +139,3 @@ class ContactSheetGenerator:
         bbox = draw.textbbox((0, 0), credit, font=font_small)
         credit_w = bbox[2] - bbox[0]
         draw.text(((canvas_w - credit_w) / 2, canvas_h - 50), credit, fill="#555555", font=font_small)
-
-    def _apply_watermark(self, image, text, opacity=70, orientation="Horizontal"):
-        if not text:
-            return image
-
-        # Ajout automatique du symbole copyright
-        if not text.startswith("©"):
-            text = "© " + text
-
-        img = image.convert("RGBA")
-        overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-        draw = ImageDraw.Draw(overlay)
-
-        try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
-        except:
-            font = ImageFont.load_default()
-
-        text_color = (255, 255, 255, opacity)
-
-        if orientation == "Diagonale horaire":
-            angle = -32
-        elif orientation == "Diagonale anti-horaire":
-            angle = 32
-        else:
-            angle = 0
-
-        bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-
-        x_spacing = text_width + 220
-        y_spacing = text_height + 160
-
-        for y in range(-text_height, img.height + text_height, y_spacing):
-            for x in range(-text_width, img.width + text_width, x_spacing):
-                offset_x = (y // y_spacing) * 50 if angle != 0 else 0
-                draw.text((x + offset_x, y), text, font=font, fill=text_color)
-
-        if angle != 0:
-            overlay = overlay.rotate(angle, resample=Image.BICUBIC, expand=False, center=(img.width/2, img.height/2))
-
-        return Image.alpha_composite(img, overlay).convert("RGB")

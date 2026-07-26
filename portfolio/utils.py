@@ -41,26 +41,39 @@ def apply_watermark(
     orientation: str = "Horizontal"
 ) -> Image.Image:
     """
-    Filigrane identique à celui utilisé dans les planches contact.
-    Respecte l'opacité et l'orientation demandées.
+    Filigrane en mosaïque répétée, utilisé de façon identique par les
+    planches contact (et donc le PDF, qui réutilise ces mêmes images) et la
+    galerie HTML - une seule implémentation, pour garantir un rendu
+    strictement identique partout.
+
+    `opacity` est un pourcentage (0-100), converti ici en canal alpha
+    (0-255).
     """
     if not text:
         return image
+
+    # Ajout automatique du symbole copyright (comportement des deux
+    # implémentations d'origine, conservé ici).
+    if not text.startswith("©"):
+        text = "© " + text
 
     try:
         img = image.convert("RGBA")
         overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
         draw = ImageDraw.Draw(overlay)
 
-        font = get_font(20, bold=True)
+        font = get_font(14, bold=True)
 
-        text_color = (255, 255, 255, opacity)
+        alpha = max(0, min(255, int(255 * (opacity / 100))))
+        text_color = (255, 255, 255, alpha)
 
-        # Gestion de l'orientation
+        # Gestion de l'orientation. PIL fait pivoter dans le sens
+        # anti-horaire pour un angle positif : "horaire" correspond donc à
+        # un angle négatif, et inversement.
         if orientation == "Diagonale horaire":
-            angle = 32
-        elif orientation == "Diagonale anti-horaire":
             angle = -32
+        elif orientation == "Diagonale anti-horaire":
+            angle = 32
         else:
             angle = 0
 
@@ -84,5 +97,5 @@ def apply_watermark(
         return Image.alpha_composite(img, overlay).convert("RGB")
 
     except Exception as e:
-        print(f"[utils.apply_watermark] Erreur : {e}")
+        logging.getLogger(__name__).warning(f"Filigrane impossible : {e}")
         return image

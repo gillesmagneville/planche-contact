@@ -31,4 +31,4 @@ class Config:
     # Watermark
     watermark_text: Optional[str] = None
     watermark_orientation: str = "Horizontal"
-    watermark_opacity: int = 70
+    watermark_opacity: int = 40

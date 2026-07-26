@@ -74,7 +74,7 @@ class ThumbnailGenerator:
         if not tasks:
             return []
 
-        max_workers = min(os.cpu_count() or 4, 8)
+        max_workers = min(os.cpu_count() or 4, 64)
 
         # 'spawn' plutôt que le 'fork' par défaut sous Linux : rawpy utilise
         # OpenMP en interne, et OpenMP + fork() peut provoquer des deadlocks
