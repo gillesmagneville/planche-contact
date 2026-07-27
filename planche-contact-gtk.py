@@ -376,6 +376,14 @@ class PlancheContactGTK(Gtk.Application):
         preview_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
         preview_scroll.set_min_content_height(PREVIEW_THUMB_SIZE + 10)
         preview_scroll.set_max_content_height(PREVIEW_THUMB_SIZE + 10)
+        # set_size_request en complément : min/max_content_height ne semblent
+        # pas s'appliquer tant que le contenu (les vignettes) n'a pas encore
+        # été chargé (la zone reste alors quasi invisible, ~2px), ce qui fait
+        # grandir la fenêtre après coup une fois l'aperçu chargé - et
+        # perturbe le centrage vertical fait par le gestionnaire de
+        # fenêtres à l'ouverture. set_size_request agit dès le premier
+        # affichage, sans attendre le contenu.
+        preview_scroll.set_size_request(-1, PREVIEW_THUMB_SIZE + 10)
         preview_scroll.set_child(self.input_preview_flow)
         box.append(preview_scroll)
 
@@ -385,6 +393,12 @@ class PlancheContactGTK(Gtk.Application):
         self.preview_prev_btn = Gtk.Button(label="← Précédent")
         self.preview_prev_btn.set_sensitive(False)
         self.preview_pages_box = Gtk.Box(spacing=4)
+        # Hauteur réservée dès le départ (avant même qu'un dossier ne soit
+        # scanné) : sans ça, cette zone est vide au premier affichage puis
+        # se remplit de boutons de pagination une fois le scan terminé, ce
+        # qui agrandit la fenêtre après coup - et perturbe le centrage
+        # vertical fait par le gestionnaire de fenêtres à l'ouverture.
+        self.preview_pages_box.set_size_request(-1, 34)
         self.preview_next_btn = Gtk.Button(label="Suivant →")
         self.preview_next_btn.set_sensitive(False)
         preview_nav.append(self.preview_prev_btn)
