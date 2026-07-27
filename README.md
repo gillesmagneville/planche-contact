@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="screenshots/github-readme-icon.png" alt="Planche-Contact Linux" width="180">
+  <img src="screenshots/github-readme-icon.png" alt="Planche-Contact" width="180">
 </p>
 
-<h1 align="center">Planche-Contact Linux</h1>
+<h1 align="center">Planche-Contact</h1>
 
 <p align="center">
 <strong>Professional Contact Sheets from JPEG and RAW Images</strong>
@@ -235,7 +235,7 @@ Please read **CONTRIBUTING.md** before opening an Issue or a Pull Request.
 
 # License
 
-Planche-Contact Linux is developed by **Gilles MAGNEVILLE**.
+Planche-Contact is developed by **Gilles MAGNEVILLE**.
 
 Distributed under the terms of the **GNU General Public License v3.0**.
 
