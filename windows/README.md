@@ -12,10 +12,20 @@ ajustements — voir la section Dépannage plus bas.
 
 ## Utilisation
 
-Depuis une invite PowerShell, à la racine du dépôt :
+⚠️ **Premier lancement** : par défaut, Windows bloque l'exécution des
+scripts PowerShell locaux (erreur du type *"l'exécution de scripts est
+désactivée sur ce système"*). Autorisez-la, pour la session en cours
+uniquement (ne change rien de façon permanente) :
 
 ```powershell
-cd windows
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+Puis, depuis une invite PowerShell, **à la racine du dépôt** (pas besoin
+d'entrer dans `windows\`, un script relais `build-windows.ps1` y est
+disponible, symétrique à `build-deb.sh`) :
+
+```powershell
 .\build-windows.ps1
 ```
 
@@ -63,6 +73,10 @@ normalement, ce n'est pas bloquant).
 | `build-windows.ps1` | Script principal, équivalent Windows de `build-deb.sh` |
 | `planche-contact.spec` | Fichier de configuration PyInstaller (embarque GTK4) |
 | `installer.nsi` | Script NSIS générant l'installeur `.exe` |
+
+Un second `build-windows.ps1`, minuscule, existe **à la racine du dépôt** :
+il ne fait que relayer vers celui-ci (symétrique à `build-deb.sh`, qui se
+lance aussi depuis la racine) — c'est celui-là qu'on lance en pratique.
 
 ## Comment ça marche (pour comprendre ou dépanner)
 

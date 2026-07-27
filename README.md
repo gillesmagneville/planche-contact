@@ -188,7 +188,6 @@ a real Windows machine or published as an official release. Testing and
 feedback are very welcome.
 
 ```powershell
-cd windows
 .\build-windows.ps1
 ```
 
