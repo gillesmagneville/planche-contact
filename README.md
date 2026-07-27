@@ -10,10 +10,10 @@
 
 <p align="center">
 
-![GitHub release](https://img.shields.io/github/v/release/gillesmagneville/planche-contact-Linux)
-![GitHub stars](https://img.shields.io/github/stars/gillesmagneville/planche-contact-Linux)
-![GitHub forks](https://img.shields.io/github/forks/gillesmagneville/planche-contact-Linux)
-![GitHub issues](https://img.shields.io/github/issues/gillesmagneville/planche-contact-Linux)
+![GitHub release](https://img.shields.io/github/v/release/gillesmagneville/planche-contact)
+![GitHub stars](https://img.shields.io/github/stars/gillesmagneville/planche-contact)
+![GitHub forks](https://img.shields.io/github/forks/gillesmagneville/planche-contact)
+![GitHub issues](https://img.shields.io/github/issues/gillesmagneville/planche-contact)
 
 </p>
 
@@ -161,13 +161,13 @@ sudo apt install ./planche-contact_<version>_amd64.deb
 Clone the repository.
 
 ```bash
-git clone https://github.com/gillesmagneville/planche-contact-Linux.git
+git clone https://github.com/gillesmagneville/planche-contact.git
 ```
 
 Enter the project directory.
 
 ```bash
-cd planche-contact-Linux
+cd planche-contact
 ```
 
 Install the required dependencies.

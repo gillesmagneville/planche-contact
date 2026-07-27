@@ -25,7 +25,7 @@ if [ ! -x "$VENV_PYTHON" ]; then
     echo "Le paquet .deb semble incomplet ou corrompu." >&2
     echo "" >&2
     echo "Solution : téléchargez à nouveau le paquet depuis :" >&2
-    echo "    https://github.com/gillesmagneville/planche-contact-linux/releases" >&2
+    echo "    https://github.com/gillesmagneville/planche-contact/releases" >&2
     echo "puis réinstallez-le." >&2
     echo "" >&2
     echo "L'installation est annulée." >&2
@@ -57,7 +57,7 @@ else
     echo "" >&2
     echo "    2) Si le problème persiste, signalez-le en copiant ce message" >&2
     echo "       d'erreur dans un ticket ici :" >&2
-    echo "         https://github.com/gillesmagneville/planche-contact-linux/issues" >&2
+    echo "         https://github.com/gillesmagneville/planche-contact/issues" >&2
     echo "" >&2
     echo "L'installation est annulée." >&2
     exit 1
