@@ -21,6 +21,7 @@
 
 ![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![Platform](https://img.shields.io/badge/Linux-Debian%20%7C%20Ubuntu-orange)
+![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011%20(build%20from%20source)-0078D6)
 ![GTK](https://img.shields.io/badge/GTK-4-3584E4)
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB)
 ![Status](https://img.shields.io/badge/Status-Stable-success)
@@ -51,6 +52,7 @@ Generate high-resolution contact sheets, PDF documents, responsive HTML gallerie
 - [Supported RAW Formats](#supported-raw-formats)
 - [Installation](#installation)
 - [Build from Source](#build-from-source)
+- [Windows Version](#windows-version)
 - [Documentation](#documentation)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
@@ -174,11 +176,36 @@ Run the application.
 
 ---
 
+# Windows Version
+
+Planche-Contact is being ported to Windows 10/11, sharing the exact same
+core engine (`portfolio/`) and GTK4 interface (`planche-contact-gtk.py`) as
+the Linux version — no separate codebase to maintain.
+
+**Status:** build scripts are available and produce both a portable `.zip`
+and an installer `.exe`, but this has not yet been validated end-to-end on
+a real Windows machine or published as an official release. Testing and
+feedback are very welcome.
+
+```powershell
+cd windows
+.\build-windows.ps1
+```
+
+The script checks prerequisites (Python 64-bit, GTK4 via
+[gvsbuild](https://github.com/wingtk/gvsbuild), PyInstaller, NSIS) and
+offers to install anything missing automatically. See
+[`windows/README.md`](windows/README.md) for full details, requirements
+and troubleshooting.
+
+---
+
 # Documentation
 
 | File | Description |
 |------|-------------|
 | README.md | Project overview |
+| [windows/README.md](windows/README.md) | Windows build instructions, requirements, troubleshooting |
 | CHANGELOG.md | Release history |
 | CONTRIBUTING.md | Contribution guidelines |
 | CODE_OF_CONDUCT.md | Community rules |
@@ -188,7 +215,7 @@ Run the application.
 
 # Roadmap
 
-- Windows version
+- Windows version — build scripts available, official binary release pending real-world testing
 - Internationalization (i18n)
 - Custom contact sheet templates
 - Additional export formats

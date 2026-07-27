@@ -2,11 +2,37 @@
 """
 Planche-Contact GTK - Interface Graphique
 """
+import sys
+import os
+from pathlib import Path
+
+# --- Bootstrap Windows (paquet gelé PyInstaller) ---------------------------
+# Quand l'application tourne comme exécutable Windows gelé par PyInstaller
+# (voir windows/planche-contact.spec), GTK4 et ses typelibs sont embarqués à
+# côté de l'exécutable plutôt qu'installés dans le système : il faut donc
+# indiquer explicitement à PyGObject où les trouver, avant le tout premier
+# `import gi`. Sans effet sur Linux/macOS, ni en exécution depuis les
+# sources (getattr(sys, "frozen", False) n'est vrai que dans un exécutable
+# gelé par PyInstaller).
+if sys.platform == "win32" and getattr(sys, "frozen", False):
+    _app_dir = Path(sys.executable).parent
+    _typelib_dir = _app_dir / "gi_typelibs"
+    if _typelib_dir.is_dir():
+        os.environ["GI_TYPELIB_PATH"] = str(_typelib_dir)
+    # Les DLL de GTK4 (bin/ de gvsbuild) sont embarquées à la racine du
+    # paquet, à côté de l'exécutable : on l'ajoute explicitement au chemin
+    # de recherche des DLL (nécessaire depuis Python 3.8 sous Windows,
+    # modifier PATH seul ne suffit plus).
+    if hasattr(os, "add_dll_directory"):
+        try:
+            os.add_dll_directory(str(_app_dir))
+        except OSError:
+            pass
+
 import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, GLib, Gio, Gdk, GdkPixbuf
 
-import sys
 import subprocess
 import threading
 import json
@@ -14,7 +40,6 @@ import re
 import io
 import webbrowser
 import tempfile
-from pathlib import Path
 from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -1018,6 +1043,26 @@ class PlancheContactGTK(Gtk.Application):
         dialog.set_buttons(["OK"])
         dialog.show(self.win)
 
+    def _open_path_with_default_app(self, path: Path) -> bool:
+        """Ouvre un fichier avec l'application par défaut du système
+        d'exploitation. Sous Windows, os.startfile() est l'API native pour
+        ça (aucune dépendance supplémentaire) ; sous Linux/macOS, on utilise
+        Gio.AppInfo. Retourne True en cas de succès, False sinon (à charge
+        de l'appelant d'afficher un message adapté)."""
+        if sys.platform == "win32":
+            try:
+                os.startfile(str(path))  # nosec - ouverture normale de fichier
+                return True
+            except OSError:
+                return False
+        else:
+            try:
+                uri = Gio.File.new_for_path(str(path)).get_uri()
+                Gio.AppInfo.launch_default_for_uri(uri, None)
+                return True
+            except Exception:
+                return False
+
     def _open_planches(self):
         if not self._last_result:
             return
@@ -1030,6 +1075,20 @@ class PlancheContactGTK(Gtk.Application):
             if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg", ".png")
         )
         if not planche_files:
+            return
+
+        if sys.platform == "win32":
+            # os.startfile() ne prend qu'un seul chemin ; on ouvre donc la
+            # première planche - l'appli Photos de Windows détecte
+            # automatiquement les autres images du même dossier et permet
+            # d'y naviguer avec les flèches, comme sous Linux/macOS.
+            if not self._open_path_with_default_app(planche_files[0]):
+                self._show_no_viewer_dialog(
+                    "Aucune visionneuse d'images disponible",
+                    "Aucune application par défaut n'est configurée pour ouvrir des "
+                    "images sur ce système.\n\nInstallez une visionneuse d'images "
+                    "(par exemple l'appli Photos de Windows) puis réessayez."
+                )
             return
 
         gfiles = [Gio.File.new_for_path(str(p)) for p in planche_files]
@@ -1052,9 +1111,7 @@ class PlancheContactGTK(Gtk.Application):
         # Repli : aucun visualiseur par défaut trouvé (ou son lancement a
         # échoué) - on tente d'ouvrir au moins la première planche avec
         # l'application par défaut associée aux fichiers image.
-        try:
-            Gio.AppInfo.launch_default_for_uri(gfiles[0].get_uri(), None)
-        except Exception:
+        if not self._open_path_with_default_app(planche_files[0]):
             self._show_no_viewer_dialog(
                 "Aucune visionneuse d'images disponible",
                 "Aucune application par défaut n'est configurée pour ouvrir des images "
@@ -1068,10 +1125,7 @@ class PlancheContactGTK(Gtk.Application):
         pdf_path = self._last_result["output_dir"] / "portfolio.pdf"
         if not pdf_path.is_file():
             return
-        uri = Gio.File.new_for_path(str(pdf_path)).get_uri()
-        try:
-            Gio.AppInfo.launch_default_for_uri(uri, None)
-        except Exception:
+        if not self._open_path_with_default_app(pdf_path):
             self._show_no_viewer_dialog(
                 "Aucun lecteur PDF disponible",
                 "Aucune application par défaut n'est configurée pour ouvrir les fichiers "
@@ -1085,14 +1139,12 @@ class PlancheContactGTK(Gtk.Application):
         gallery_index = self._last_result["output_dir"] / "gallery" / "index.html"
         if not gallery_index.is_file():
             return
-        # Gio.AppInfo (comme pour le PDF/CSV) plutôt que le module webbrowser
-        # de Python : ce dernier ne remonte pas fidèlement un échec (il lance
-        # xdg-open en arrière-plan et considère souvent l'opération réussie
-        # même si aucun navigateur n'a en réalité pu être trouvé).
-        uri = Gio.File.new_for_path(str(gallery_index)).get_uri()
-        try:
-            Gio.AppInfo.launch_default_for_uri(uri, None)
-        except Exception:
+        # Gio.AppInfo / os.startfile (comme pour le PDF/CSV) plutôt que le
+        # module webbrowser de Python : ce dernier ne remonte pas fidèlement
+        # un échec (il lance xdg-open en arrière-plan et considère souvent
+        # l'opération réussie même si aucun navigateur n'a en réalité pu
+        # être trouvé).
+        if not self._open_path_with_default_app(gallery_index):
             self._show_no_viewer_dialog(
                 "Aucun navigateur web disponible",
                 "Aucune application par défaut n'est configurée pour ouvrir les pages "
@@ -1106,10 +1158,7 @@ class PlancheContactGTK(Gtk.Application):
         csv_path = self._last_result["output_dir"] / "index.csv"
         if not csv_path.is_file():
             return
-        uri = Gio.File.new_for_path(str(csv_path)).get_uri()
-        try:
-            Gio.AppInfo.launch_default_for_uri(uri, None)
-        except Exception:
+        if not self._open_path_with_default_app(csv_path):
             self._show_no_viewer_dialog(
                 "Aucune application disponible pour les fichiers CSV",
                 "Aucune application par défaut n'est configurée pour ouvrir les fichiers "
