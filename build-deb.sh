@@ -164,7 +164,10 @@ echo ">>> Création de l'arborescence..."
 mkdir -p "$BUILD_DIR/usr/bin"
 mkdir -p "$BUILD_DIR/usr/share/$PACKAGE_NAME"
 mkdir -p "$BUILD_DIR/usr/share/applications"
+mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/48x48/apps"
+mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/64x64/apps"
 mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/128x128/apps"
+mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/256x256/apps"
 mkdir -p "$BUILD_DIR/DEBIAN"
 
 echo ">>> Création du virtualenv..."
@@ -213,8 +216,25 @@ mkdir -p "$BUILD_DIR/usr/share/$PACKAGE_NAME/docs"
 [ -f "$PROJECT_DIR/docs/planche-contact-manual.html" ] && cp "$PROJECT_DIR/docs/planche-contact-manual.html" "$BUILD_DIR/usr/share/$PACKAGE_NAME/docs/"
 [ -f "$PROJECT_DIR/LICENSE" ] && cp "$PROJECT_DIR/LICENSE" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
 
-if [ -f "$PROJECT_DIR/planche-contact.png" ]; then
-    cp "$PROJECT_DIR/planche-contact.png" "$BUILD_DIR/usr/share/icons/hicolor/128x128/apps/planche-contact.png"
+ICON_SOURCE="$PROJECT_DIR/screenshots/application-icon.png"
+if [ -f "$ICON_SOURCE" ]; then
+    echo ">>> Installation de l'icône de l'application (plusieurs tailles)..."
+    # On utilise le python3 du venv qu'on vient de construire : Pillow y est
+    # garanti présent (installé juste au-dessus), pas besoin de dépendre
+    # d'un outil externe (ImageMagick...) sur la machine de build.
+    "$BUILD_DIR/usr/share/$PACKAGE_NAME/venv/bin/python3" - "$ICON_SOURCE" "$BUILD_DIR" << 'PYEOF'
+import sys
+from PIL import Image
+
+source, build_dir = sys.argv[1], sys.argv[2]
+img = Image.open(source).convert("RGBA")
+for size in (48, 64, 128, 256):
+    resized = img.resize((size, size), Image.LANCZOS)
+    resized.save(f"{build_dir}/usr/share/icons/hicolor/{size}x{size}/apps/planche-contact.png", "PNG")
+PYEOF
+    echo ">>> Icône installée aux tailles 48, 64, 128 et 256 px."
+else
+    echo "Attention : icône introuvable ($ICON_SOURCE) - le paquet sera construit sans icône personnalisée." >&2
 fi
 
 echo ">>> Création des scripts d'exécution..."

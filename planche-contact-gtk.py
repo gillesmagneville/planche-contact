@@ -288,10 +288,11 @@ class PlancheContactGTK(Gtk.Application):
     def do_activate(self):
         self.win = Gtk.ApplicationWindow(application=self)
         self.win.set_title("Planche-Contact")
-        # 1050x750 -> +50% en largeur, nettement plus haut (marge pour les
-        # informations de progression en bas de fenêtre : la zone de log
-        # a maintenant une hauteur minimale garantie de 260px, voir plus bas).
-        self.win.set_default_size(1575, 1050)
+        # Pas de set_default_size() : la fenêtre s'ouvre à la taille la plus
+        # réduite possible (celle nécessaire pour afficher son contenu sans
+        # rien couper), déterminée automatiquement par GTK à partir des
+        # tailles minimales des widgets. Elle reste normalement
+        # redimensionnable (agrandissable) par l'utilisateur ensuite.
         self.win.set_icon_name("image-x-generic")
 
         notebook = Gtk.Notebook()
@@ -302,13 +303,6 @@ class PlancheContactGTK(Gtk.Application):
         notebook.append_page(self._build_about_tab(), Gtk.Label(label="À propos"))
 
         self.win.present()
-        # Ouverture en plein écran par défaut (la fenêtre reste
-        # redimensionnable/restaurable normalement par l'utilisateur).
-        # La demande de maximisation est différée d'un cycle de boucle
-        # principale : certains gestionnaires de fenêtres l'ignorent si
-        # elle arrive avant que la fenêtre soit pleinement réalisée par
-        # present().
-        GLib.idle_add(self.win.maximize)
 
         # Le set_text() initial du champ dossier d'entrée a lieu avant la
         # connexion du signal "changed" : on déclenche donc l'aperçu ici
