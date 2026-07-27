@@ -208,7 +208,9 @@ Please read **CONTRIBUTING.md** before opening an Issue or a Pull Request.
 
 # License
 
-Planche-Contact Linux is distributed under the terms of the **GNU General Public License v3.0**.
+Planche-Contact Linux is developed by **Gilles MAGNEVILLE**.
+
+Distributed under the terms of the **GNU General Public License v3.0**.
 
 ---
 
