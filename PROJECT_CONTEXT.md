@@ -147,12 +147,11 @@ planche-contact/
 └── PROJECT_CONTEXT.md              # Ce fichier
 ```
 
-**Note** : `portfolio/Utilisation` et `docs/screenshots/placeholder` sont des
-fichiers résiduels antérieurs à ce travail collaboratif (le premier contient
-des exemples d'arguments CLI obsolètes, `--thumb`/`--background`, qui
-n'existent plus dans `portfolio.py`) — à nettoyer/supprimer à l'occasion,
-ils ne sont pas documentés ici comme faisant partie de l'architecture
-actuelle.
+**Note** : `docs/screenshots/` n'existe plus depuis longtemps (retiré du
+dépôt), il ne faut plus le mentionner comme faisant partie de
+l'arborescence. `portfolio/Utilisation` a été corrigé (seul `--background`
+était réellement obsolète parmi ses arguments d'exemple ; `--thumb` existe
+bel et bien dans `portfolio.py` actuel).
 
 ---
 
@@ -255,7 +254,7 @@ en cause sans en connaître la raison) :
 | Build Windows non testable directement par Claude | Tous les correctifs du portage Windows ont été validés par itération réelle avec le mainteneur (aucun accès à une machine Windows pour Claude) — un nouveau problème peut resurgir à tout moment sur un point non encore couvert |
 | `console=True` dans `windows/planche-contact.spec` | Activé temporairement pour le diagnostic (affiche une fenêtre console). À repasser à `False` une fois la stabilité du build Windows confirmée sur la durée |
 | Lignes `[DIAG]` dans `planche-contact-gtk.py` (`FolderPreviewController`) | Ajoutées pour diagnostiquer le blocage sur "Analyse du dossier..." (résolu). À retirer une fois le build Windows pleinement validé |
-| `portfolio/Utilisation` et `docs/screenshots/placeholder` | Fichiers résiduels obsolètes (voir §3), à nettoyer |
+| `portfolio/fonts/` (police embarquée) absent du dépôt réel au 01/08/2026 | Correctif livré pour l'en-tête/pied de page trop petits sous Windows (voir §6), à vérifier s'il a bien été appliqué |
 
 ---
 
@@ -263,8 +262,8 @@ en cause sans en connaître la raison) :
 
 - Retirer `console=True` et les lignes `[DIAG]` une fois le build Windows
   validé sur la durée (voir §7).
-- Nettoyer les fichiers résiduels obsolètes (`portfolio/Utilisation`,
-  `docs/screenshots/placeholder`).
+- Vérifier que `portfolio/fonts/` (police embarquée) est bien appliqué sur
+  le dépôt réel.
 - Publier une release binaire Windows officielle une fois les tests
   utilisateur réels concluants.
 - Internationalisation (i18n) — l'interface et les messages sont
