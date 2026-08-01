@@ -6,6 +6,26 @@ import sys
 import os
 from pathlib import Path
 
+# --- Interception des processus de travail multiprocessing (AVANT tout
+# import GTK) -----------------------------------------------------------
+# Dans un exécutable gelé (PyInstaller), chaque worker de ProcessPoolExecutor
+# (utilisé pour les planches contact et la galerie HTML, jusqu'à 64 workers
+# en parallèle) relance ce même exécutable. Sans cette interception TRÈS TÔT
+# - avant même `import gi` -, chaque worker chargerait inutilement toute la
+# pile GTK4 (DLL, typelibs...) avant d'atteindre multiprocessing.freeze_
+# support() plus bas, alors qu'un worker ne fait que du traitement d'image
+# et n'a jamais besoin de GTK. Un gaspillage de temps non négligeable,
+# multiplié par le nombre de workers. Sans effet en exécution depuis les
+# sources (Linux/macOS, non gelé) : freeze_support() n'y fait rien de toute
+# façon dans ce cas normal (pas un worker), et l'exécution continue
+# normalement plus bas.
+if getattr(sys, "frozen", False):
+    import multiprocessing
+    multiprocessing.freeze_support()
+    # Si l'exécution arrive jusqu'ici, ce n'est pas un worker multiprocessing
+    # (sinon freeze_support() aurait déjà appelé sys.exit() ci-dessus) : on
+    # continue normalement vers le chargement de l'application GTK.
+
 # --- Bootstrap Windows (paquet gelé PyInstaller) ---------------------------
 # Quand l'application tourne comme exécutable Windows gelé par PyInstaller
 # (voir windows/planche-contact.spec), GTK4 et ses typelibs sont embarqués à
@@ -47,6 +67,27 @@ sys.path.insert(0, str(Path(__file__).parent))
 from portfolio.config import Config
 from portfolio.scanner import ImageScanner
 from portfolio.rawloader import load_image
+
+
+def glib_idle_add(function, *args):
+    """Enveloppe autour de GLib.idle_add(), tolérante à deux conventions
+    d'appel possibles selon la version/le binding de PyGObject :
+    - GLib.idle_add(function, *args)               (forme pythonique
+      habituelle, fournie par le module de surcharge Python de GLib)
+    - GLib.idle_add(priorite, function, *args)      (signature brute de la
+      fonction C sous-jacente, utilisée si ce module de surcharge n'est
+      pas chargé - observé sur un exécutable gelé par PyInstaller avec la
+      pile GTK4 gvsbuild sous Windows : "TypeError: Must be number, not
+      method").
+    Cette fonction essaie d'abord la forme pythonique ; en cas d'échec
+    précisément pour cette raison, elle retente avec la priorité en tête.
+    Aucun effet sur Linux/macOS, où la forme pythonique fonctionne toujours
+    du premier coup."""
+    try:
+        return GLib.idle_add(function, *args)
+    except TypeError:
+        return GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, function, *args)
+
 
 PREVIEW_PAGE_SIZE = 10
 PREVIEW_THUMB_SIZE = 90
@@ -112,6 +153,7 @@ class FolderPreviewController:
             return
 
         self.status_label.set_text("Analyse du dossier...")
+        print(f"[DIAG] refresh() : demarrage du thread de scan pour {folder_path!r} (token={token})", flush=True)
         threading.Thread(
             target=self._scan_files,
             args=(folder_path, token),
@@ -129,17 +171,23 @@ class FolderPreviewController:
         """Exécuté en arrière-plan : liste uniquement les fichiers (rapide,
         pas de décodage d'image ici) pour connaître le nombre total de
         photos et permettre la pagination."""
+        print(f"[DIAG] _scan_files() : le thread a bien demarre (token={token})", flush=True)
         try:
             folder = Path(folder_path)
             image_files = sorted(
                 p for p in folder.iterdir()
                 if p.is_file() and p.suffix.lower() in ImageScanner.SUPPORTED_EXTENSIONS
             )
-        except Exception:
+            print(f"[DIAG] _scan_files() : scan termine, {len(image_files)} fichier(s) trouve(s)", flush=True)
+        except Exception as e:
+            print(f"[DIAG] _scan_files() : EXCEPTION pendant le scan : {e!r}", flush=True)
             image_files = []
-        GLib.idle_add(self._apply_file_list, token, image_files)
+        print(f"[DIAG] _scan_files() : appel de GLib.idle_add (token={token})", flush=True)
+        glib_idle_add(self._apply_file_list, token, image_files)
+        print(f"[DIAG] _scan_files() : glib_idle_add() est revenu, fin du thread (token={token})", flush=True)
 
     def _apply_file_list(self, token, image_files):
+        print(f"[DIAG] _apply_file_list() : callback invoque par la boucle principale (token={token}, attendu={self._token})", flush=True)
         if token != self._token:
             return False  # Un scan plus récent a été lancé entre-temps.
 
@@ -242,7 +290,7 @@ class FolderPreviewController:
                 thumbs.append(buf.getvalue())
             except Exception:
                 continue
-        GLib.idle_add(self._apply_thumbs, token, page_index, thumbs, start, end, total)
+        glib_idle_add(self._apply_thumbs, token, page_index, thumbs, start, end, total)
 
     def _apply_thumbs(self, token, page_index, thumb_bytes_list, start, end, total):
         if token != self._token:
@@ -658,6 +706,24 @@ class PlancheContactGTK(Gtk.Application):
         breadcrumb_scroll.set_margin_bottom(4)
         root_box.append(breadcrumb_scroll)
 
+        # --- Saisie directe d'un chemin --------------------------------------
+        # Utile en particulier pour les partages réseau (ex: \\serveur\partage)
+        # qui n'apparaissent pas forcément dans la barre latérale ou dont la
+        # lettre de lecteur n'est pas mappée en permanence.
+        path_entry_box = Gtk.Box(spacing=6)
+        path_entry_box.set_margin_start(10)
+        path_entry_box.set_margin_end(10)
+        path_entry_box.set_margin_bottom(6)
+        path_entry = Gtk.Entry()
+        path_entry.set_hexpand(True)
+        path_entry.set_placeholder_text(
+            "Saisir un chemin (ex: \\\\serveur\\partage) et appuyer sur Entrée..."
+        )
+        path_go_btn = Gtk.Button(label="Aller")
+        path_entry_box.append(path_entry)
+        path_entry_box.append(path_go_btn)
+        root_box.append(path_entry_box)
+
         # --- Corps principal : barre latérale + liste de dossiers ----------
         body = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         body.set_vexpand(True)
@@ -689,8 +755,17 @@ class PlancheContactGTK(Gtk.Application):
         dir_filter = Gtk.CustomFilter.new(only_visible_folders)
         filtered_model = Gtk.FilterListModel(model=dir_list, filter=dir_filter)
 
-        def compare_names(a, b, *args):
-            na, nb = a.get_name().lower(), b.get_name().lower()
+        def compare_names(*args):
+            # Sur certaines plateformes/liaisons, le comparateur peut être
+            # invoqué avec des arguments supplémentaires (observé sous
+            # Windows : un argument numérique en plus des deux éléments à
+            # comparer) - on ne garde donc que les arguments qui
+            # ressemblent réellement à des Gio.FileInfo (qui exposent
+            # get_name()), plutôt que de supposer un ordre positionnel fixe.
+            items = [x for x in args if hasattr(x, "get_name")]
+            if len(items) < 2:
+                return 0
+            na, nb = items[0].get_name().lower(), items[1].get_name().lower()
             if na < nb:
                 return -1
             if na > nb:
@@ -819,6 +894,21 @@ class PlancheContactGTK(Gtk.Application):
             build_breadcrumb(path)
             preview.refresh(path)
 
+        def on_path_entry_activate(entry_widget):
+            typed = entry_widget.get_text().strip()
+            if typed and Path(typed).is_dir():
+                navigate_to(typed)
+            else:
+                # Chemin invalide/inaccessible : retour visuel temporaire.
+                entry_widget.add_css_class("error")
+                GLib.timeout_add(
+                    1500,
+                    lambda: (entry_widget.remove_css_class("error"), False)[1]
+                )
+
+        path_entry.connect("activate", on_path_entry_activate)
+        path_go_btn.connect("clicked", lambda b: on_path_entry_activate(path_entry))
+
         def on_row_activated(list_view, position):
             file_info = selection_model.get_item(position)
             if file_info is None:
@@ -840,6 +930,25 @@ class PlancheContactGTK(Gtk.Application):
 
         home_path = str(Path.home())
         add_sidebar_button("Dossier personnel", home_path, "user-home-symbolic")
+
+        # "Ce PC" : lettres de lecteur disponibles sous Windows (disques
+        # locaux ET lecteurs réseau mappés - os.listdrives() ne fait pas la
+        # différence, il liste tout ce qui a une lettre assignée). Sans
+        # effet sur Linux/macOS, où cette fonction n'existe pas.
+        if hasattr(os, "listdrives"):
+            try:
+                drives = os.listdrives()
+            except OSError:
+                drives = []
+            if drives:
+                sep_label = Gtk.Label(label="Ce PC")
+                sep_label.add_css_class("dim-label")
+                sep_label.set_xalign(0)
+                sep_label.set_margin_top(10)
+                sidebar.append(sep_label)
+                for drive in drives:
+                    if Path(drive).is_dir():
+                        add_sidebar_button(drive, drive, "drive-harddisk-symbolic")
 
         # Réutilise les signets GTK existants de l'utilisateur (partagés
         # avec Nautilus et les autres applis GTK), s'il y en a.
@@ -915,10 +1024,22 @@ class PlancheContactGTK(Gtk.Application):
         orientation = self.watermark_orient_combo.get_selected_item().get_string()
         opacity = int(self.watermark_opacity_scale.get_value())
 
-        cli_path = str(Path(__file__).parent / "portfolio" / "portfolio.py")
+        if getattr(sys, "frozen", False):
+            # Exécutable gelé (PyInstaller, build Windows) : sys.executable
+            # pointe vers l'application elle-même (planche-contact-gtk.exe),
+            # pas vers un interpréteur Python générique capable d'exécuter
+            # un script portfolio.py séparé. On relance donc ce même exe
+            # avec un indicateur spécial (--run-cli), intercepté tout en
+            # bas de ce fichier pour déléguer directement à la logique CLI
+            # de portfolio.py, sans jamais instancier l'application GTK.
+            cmd = [sys.executable, "--run-cli"]
+        else:
+            # Exécution depuis les sources : sys.executable est un vrai
+            # interpréteur Python, auquel on passe le script CLI à exécuter.
+            cli_path = str(Path(__file__).parent / "portfolio" / "portfolio.py")
+            cmd = [sys.executable, cli_path]
 
-        cmd = [
-            sys.executable, cli_path,
+        cmd += [
             "-i", input_dir,
             "-o", output_dir,
             "-n", str(num_per_sheet),
@@ -973,13 +1094,13 @@ class PlancheContactGTK(Gtk.Application):
             for line in process.stdout:
                 line = line.strip()
                 if line:
-                    GLib.idle_add(self._log, line)
-                    GLib.idle_add(self.status_label.set_text, line)
+                    glib_idle_add(self._log, line)
+                    glib_idle_add(self.status_label.set_text, line)
 
                     progress_match = re.search(r"PROGRESS:(\d+)/100", line)
                     if progress_match:
                         fraction = int(progress_match.group(1)) / 100.0
-                        GLib.idle_add(self.progress.set_fraction, fraction)
+                        glib_idle_add(self.progress.set_fraction, fraction)
                         continue
 
                     match = re.search(r"Planche (\d+)/(\d+)", line)
@@ -987,26 +1108,34 @@ class PlancheContactGTK(Gtk.Application):
                         current = int(match.group(1))
                         total = int(match.group(2))
                         fraction = min(0.70, 0.15 + (current / total) * 0.55)
-                        GLib.idle_add(self.progress.set_fraction, fraction)
+                        glib_idle_add(self.progress.set_fraction, fraction)
 
             process.wait()
 
             if process.returncode == 0:
-                GLib.idle_add(self._log, "✅ Génération terminée avec succès !")
-                GLib.idle_add(self.status_label.set_text, "Terminé avec succès")
-                GLib.idle_add(self.progress.set_fraction, 1.0)
-                GLib.idle_add(self._on_generation_success)
+                glib_idle_add(self._log, "✅ Génération terminée avec succès !")
+                glib_idle_add(self.status_label.set_text, "Terminé avec succès")
+                glib_idle_add(self.progress.set_fraction, 1.0)
+                glib_idle_add(self._on_generation_success)
             else:
-                GLib.idle_add(self._log, f"❌ Erreur (code {process.returncode})")
-                GLib.idle_add(self.status_label.set_text, "Erreur pendant la génération")
+                glib_idle_add(self._log, f"❌ Erreur (code {process.returncode})")
+                glib_idle_add(self.status_label.set_text, "Erreur pendant la génération")
         except Exception as e:
-            GLib.idle_add(self._log, f"❌ Erreur : {e}")
-            GLib.idle_add(self.status_label.set_text, "Erreur")
+            glib_idle_add(self._log, f"❌ Erreur : {e}")
+            glib_idle_add(self.status_label.set_text, "Erreur")
         finally:
-            GLib.idle_add(self.run_button.set_sensitive, True)
+            glib_idle_add(self.run_button.set_sensitive, True)
 
     def _log(self, message):
-        self.log_buffer.insert(self.log_buffer.get_end_iter(), message + "\n")
+        text = message + "\n"
+        end_iter = self.log_buffer.get_end_iter()
+        try:
+            self.log_buffer.insert(end_iter, text)
+        except TypeError:
+            # Repli sur la signature C brute (buffer, iter, texte, longueur)
+            # si le module de surcharge Python de Gtk n'est pas charge -
+            # voir le commentaire dans windows/planche-contact.spec.
+            self.log_buffer.insert(end_iter, text, -1)
         mark = self.log_buffer.get_insert()
         self.log_view.scroll_mark_onscreen(mark)
 
@@ -1293,5 +1422,20 @@ class PlancheContactGTK(Gtk.Application):
 
 
 if __name__ == "__main__":
-    app = PlancheContactGTK()
-    app.run(sys.argv)
+    # multiprocessing.freeze_support() est désormais appelé bien plus tôt,
+    # tout en haut du fichier (avant même `import gi`) - voir le
+    # commentaire à cet endroit. Rien à refaire ici.
+
+    if len(sys.argv) > 1 and sys.argv[1] == "--run-cli":
+        # Relance de l'exécutable gelé lui-même en mode CLI (voir
+        # _on_generate ci-dessus, nécessaire car sys.executable pointe vers
+        # cette même application dans un exécutable gelé PyInstaller, pas
+        # vers un interpréteur Python générique). On délègue directement au
+        # point d'entrée CLI de portfolio.py, sans jamais instancier
+        # l'application GTK.
+        from portfolio.portfolio import main as portfolio_cli_main
+        sys.argv = [sys.argv[0]] + sys.argv[2:]  # retire "--run-cli" avant argparse
+        portfolio_cli_main()
+    else:
+        app = PlancheContactGTK()
+        app.run(sys.argv)

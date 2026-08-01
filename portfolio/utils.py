@@ -1,3 +1,4 @@
+import functools
 import logging
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
@@ -15,20 +16,35 @@ def setup_logging(log_path: Path) -> None:
     )
 
 
+# Police embarquée avec le projet (portfolio/fonts/, licence Bitstream Vera
+# - voir portfolio/fonts/LICENSE.txt), utilisée en priorité : garantit un
+# rendu strictement identique sur toutes les plateformes, plutôt que de
+# dépendre d'une police système trouvée à un chemin devinable (ex:
+# C:/Windows/Fonts/arial.ttf), qui peut échouer silencieusement selon la
+# machine et faire retomber sur la police minuscule intégrée à Pillow.
+_BUNDLED_FONTS_DIR = Path(__file__).parent / "fonts"
+
+
+@functools.lru_cache(maxsize=32)
 def get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     """
     Charge une police TrueType de manière cross-platform.
     Retourne la police par défaut si aucune police système n'est trouvée.
+    Mise en cache : évite de relire/reparser le fichier de police à chaque
+    appel (des centaines de fois sur une galerie de centaines de photos
+    avec filigrane).
     """
+    suffix = "-Bold" if bold else ""
     candidates = [
-        f"/usr/share/fonts/truetype/dejavu/DejaVuSans{'-Bold' if bold else ''}.ttf",
+        _BUNDLED_FONTS_DIR / f"DejaVuSans{suffix}.ttf",
+        f"/usr/share/fonts/truetype/dejavu/DejaVuSans{suffix}.ttf",
         f"C:/Windows/Fonts/arial{'bd' if bold else ''}.ttf",
         "/System/Library/Fonts/Helvetica.ttc",
         "/Library/Fonts/Arial.ttf",
     ]
     for path in candidates:
         try:
-            return ImageFont.truetype(path, size)
+            return ImageFont.truetype(str(path), size)
         except (OSError, IOError):
             continue
     return ImageFont.load_default()

@@ -20,6 +20,7 @@ important qu'économiser quelques dizaines de Mo.
 
 import os
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_submodules
 
 work_dir = Path(os.environ.get("PLANCHE_WORK_DIR", "."))
 gtk_dir = Path(os.environ.get("PLANCHE_GTK_DIR", r"C:\gtk"))
@@ -90,7 +91,17 @@ a = Analysis(
         "rawpy",
         "exifread",
         "reportlab",
-    ],
+    ] + collect_submodules("gi.overrides"),
+    # Les modules "gi.overrides.*" (GLib.py, Gtk.py, Gdk.py...) fournissent
+    # les signatures pythoniques habituelles (arguments par defaut,
+    # simplification des callbacks...) par-dessus les liaisons brutes issues
+    # de l'introspection GObject. PyGObject les charge dynamiquement au
+    # runtime (jamais via un "import" explicite visible dans le code), donc
+    # l'analyse statique de PyInstaller ne peut pas les detecter toute
+    # seule : sans cette ligne, ils sont absents du paquet gele, et le code
+    # retombe alors sur les signatures C brutes, plus strictes (observe :
+    # GLib.idle_add exigeant une priorite numerique en premier argument,
+    # Gtk.TextBuffer.insert() exigeant une longueur explicite...).
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -110,7 +121,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=False,
+    console=True,  # DIAGNOSTIC TEMPORAIRE : remettre a False une fois le probleme resolu
     icon=icon_file if icon_file and os.path.isfile(icon_file) else None,
     # Désactive le sous-dossier "_internal" (comportement par défaut de
     # PyInstaller 6+) : les DLL/typelibs GTK4 se retrouvent directement à

@@ -152,4 +152,9 @@ def main():
 
 
 if __name__ == "__main__":
+    # Voir le commentaire équivalent dans planche-contact-gtk.py : nécessaire
+    # pour que multiprocessing.ProcessPoolExecutor fonctionne correctement
+    # dans un contexte gelé (PyInstaller). Sans effet depuis les sources.
+    import multiprocessing
+    multiprocessing.freeze_support()
     main()

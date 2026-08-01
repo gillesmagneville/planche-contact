@@ -77,15 +77,48 @@ class ImageScanner:
         except Exception:
             return datetime.min
 
+    def _is_within(self, path: Path, ancestor: Path) -> bool:
+        try:
+            path.relative_to(ancestor)
+            return True
+        except ValueError:
+            return False
+
     def scan(self) -> list[dict]:
         images = []
         pattern = "**/*" if self.config.recursive else "*"
 
         self.logger.info(f"Scan du dossier : {self.config.input_dir} (récursif={self.config.recursive})")
 
+        # Sous-dossiers générés par une exécution précédente (planches/,
+        # gallery/) à exclure du scan : sinon, une nouvelle génération en
+        # mode récursif - en particulier quand le dossier de sortie est
+        # imbriqué dans le dossier d'entrée, ou identique à lui - retrouve
+        # et retraite ses propres images déjà générées. portfolio.pdf et
+        # index.csv n'ont pas besoin d'exclusion équivalente : leur
+        # extension ne correspond à aucun format image pris en charge.
+        excluded_dirs = []
+        output_dir = getattr(self.config, "output_dir", None)
+        if output_dir:
+            try:
+                output_dir_resolved = Path(output_dir).resolve()
+                excluded_dirs = [
+                    output_dir_resolved / "planches",
+                    output_dir_resolved / "gallery",
+                ]
+            except Exception:
+                excluded_dirs = []
+
+        skipped_output = 0
         for path in self.config.input_dir.glob(pattern):
             if not path.is_file() or not self._is_image_file(path):
                 continue
+
+            if excluded_dirs:
+                resolved_path = path.resolve()
+                if any(self._is_within(resolved_path, excl) for excl in excluded_dirs):
+                    skipped_output += 1
+                    continue
 
             try:
                 sort_key = self._get_sort_key(path)
@@ -104,5 +137,10 @@ class ImageScanner:
         for i, item in enumerate(images, 1):
             item["num"] = f"{i:03d}"
 
+        if skipped_output:
+            self.logger.info(
+                f"{skipped_output} fichier(s) ignoré(s) car situé(s) dans le dossier "
+                f"de sortie (planches/gallery d'une génération précédente)."
+            )
         self.logger.info(f"{len(images)} images trouvées et triées.")
         return images

@@ -42,9 +42,18 @@ $ErrorActionPreference = "Stop"
 # ====================== CONFIGURATION ======================
 $PackageName = "planche-contact"
 $Publisher   = "Gilles MAGNEVILLE"
-# Ce script vit dans windows/ : le projet est un niveau au-dessus.
-$ProjectDir  = Split-Path -Parent $PSScriptRoot
-$WindowsDir  = $PSScriptRoot
+
+# Localisation du script : $MyInvocation.MyCommand.Path (avec repli sur
+# $PSCommandPath) plutot que $PSScriptRoot, ce dernier s'etant avere peu
+# fiable lorsque ce script est invoque indirectement depuis le petit script
+# relais place a la racine du depot (build-windows.ps1 -> windows\build-
+# windows.ps1). Ce dossier vit dans windows/ : le projet est un niveau
+# au-dessus.
+$ScriptPath = $MyInvocation.MyCommand.Path
+if (-not $ScriptPath) { $ScriptPath = $PSCommandPath }
+$WindowsDir  = Split-Path -Parent $ScriptPath
+$ProjectDir  = Split-Path -Parent $WindowsDir
+
 $BuildRoot   = "$env:LOCALAPPDATA\planche-contact-build"
 $GtkDir      = "C:\gtk"
 $VenvDir     = "$BuildRoot\venv"
@@ -90,10 +99,18 @@ if ($Clean) {
 }
 
 # === Lecture de la version actuelle ===
+Write-Host ">>> Dossier du projet detecte : $ProjectDir"
 if (Test-Path $VersionFile) {
     $CurrentVersion = (Get-Content $VersionFile -Raw).Trim()
+    Write-Host ">>> Fichier VERSION trouve ($VersionFile) : $CurrentVersion"
 } else {
     $CurrentVersion = "1.0.0"
+    Write-Host ""
+    Write-Host "Attention : fichier VERSION introuvable a l'emplacement attendu :" -ForegroundColor Yellow
+    Write-Host "    $VersionFile"
+    Write-Host "Version de repli utilisee : $CurrentVersion (probablement incorrect - verifiez"
+    Write-Host "que le depot est complet a cet emplacement)."
+    Write-Host ""
 }
 
 $versionParts = $CurrentVersion.Split(".")
@@ -202,9 +219,16 @@ if ($pythonArch -ne "64") {
 Write-Host "  Architecture Python : 64 bits (OK)"
 
 # --- GTK4 (pile gvsbuild) ---
-$gtkMarker1 = "$GtkDir\bin\libgtk-4-1.dll"
-$gtkMarker2 = "$GtkDir\wheels"
-if (-not (Test-Path $gtkMarker1) -or -not (Test-Path $gtkMarker2)) {
+# On verifie la presence generique de DLL dans bin/ et des roues
+# PyGObject/pycairo dans wheels/, plutot qu'un nom de fichier DLL precis :
+# gvsbuild etant compile avec MSVC (pas MinGW), ses DLL n'ont pas forcement
+# le prefixe "lib" (ex: gtk-4-1.dll, pas libgtk-4-1.dll) - verifier un nom
+# exact au'on ne peut pas garantir a l'avance provoquait un retelechargement
+# a chaque lancement, meme quand C:\gtk etait deja complet et valide.
+$gtkBinHasDlls = (Test-Path "$GtkDir\bin") -and
+    ((Get-ChildItem "$GtkDir\bin\*.dll" -ErrorAction SilentlyContinue | Measure-Object).Count -gt 0)
+$gtkWheelsPresent = (Test-Path "$GtkDir\wheels\PyGObject*.whl") -and (Test-Path "$GtkDir\wheels\pycairo*.whl")
+if (-not $gtkBinHasDlls -or -not $gtkWheelsPresent) {
     Write-Host ""
     Write-Host "GTK4 (pile gvsbuild) est introuvable dans $GtkDir."
     $installGtk = Read-Host "Le telecharger et l'installer automatiquement maintenant ? [o/N]"
@@ -248,6 +272,102 @@ if (-not (Test-Path $gtkMarker1) -or -not (Test-Path $gtkMarker2)) {
     }
 } else {
     Write-Host "  GTK4 trouve dans $GtkDir"
+}
+
+# --- Compatibilite Python <-> roues PyGObject/pycairo de gvsbuild -----------
+# Les roues fournies par gvsbuild sont compilees pour UNE version precise de
+# Python (ex: cp314 = Python 3.14), pas "Python 3" en general. Si la version
+# detectee plus haut ne correspond pas, pip echoue avec un message peu clair
+# ("is not a supported wheel on this platform") bien plus loin dans le
+# script : on le detecte et on le corrige (ou on l'explique clairement) tout
+# de suite, avant de continuer.
+$PythonForVenv = @($pythonCmd)
+
+$pygobjectWheelCheck = Get-ChildItem "$GtkDir\wheels\PyGObject*.whl" -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($pygobjectWheelCheck -and $pygobjectWheelCheck.Name -match "-cp3(\d+)-") {
+    $requiredMinor = $matches[1]
+    $requiredVersion = "3.$requiredMinor"
+
+    $currentVersionOutput = & $pythonCmd --version 2>&1
+    $currentMinor = $null
+    if ($currentVersionOutput -match "Python 3\.(\d+)") {
+        $currentMinor = $matches[1]
+    }
+
+    if ($currentMinor -ne $requiredMinor) {
+        Write-Host ""
+        Write-Host "Le paquet GTK4 telecharge (gvsbuild) est compile pour Python $requiredVersion," -ForegroundColor Yellow
+        Write-Host "mais l'interpreteur detecte est Python 3.$currentMinor ($pythonCmd)."
+
+        # Le lanceur "py" permet d'avoir plusieurs versions de Python
+        # installees en parallele et d'en choisir une precisement : on
+        # verifie si la version requise est disponible par ce biais avant
+        # de demander a l'utilisateur d'installer quoi que ce soit.
+        $foundViaLauncher = $false
+        if (Get-Command py -ErrorAction SilentlyContinue) {
+            try {
+                $launcherTest = & py "-$requiredVersion" --version 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    $foundViaLauncher = $true
+                }
+            } catch {
+                $foundViaLauncher = $false
+            }
+        }
+
+        if ($foundViaLauncher) {
+            Write-Host "Python $requiredVersion trouve via le lanceur 'py' : on l'utilise pour ce build." -ForegroundColor Green
+            $PythonForVenv = @("py", "-$requiredVersion")
+        } else {
+            Write-Host ""
+            Write-Host "Python $requiredVersion n'est pas installe (necessaire pour ce paquet GTK4)." -ForegroundColor Yellow
+            $installPy = Read-Host "L'installer automatiquement via winget maintenant ? [o/N]"
+            if ($installPy -match '^[oOyY]$') {
+                try {
+                    winget install --id "Python.Python.$requiredVersion" -e --accept-source-agreements --accept-package-agreements
+                } catch {
+                    Write-Host "Echec de l'installation automatique via winget." -ForegroundColor Yellow
+                }
+
+                # Reverification : le lanceur 'py' peut avoir besoin d'un
+                # court instant pour voir la nouvelle version installee.
+                $foundViaLauncher = $false
+                if (Get-Command py -ErrorAction SilentlyContinue) {
+                    try {
+                        $launcherTest = & py "-$requiredVersion" --version 2>&1
+                        if ($LASTEXITCODE -eq 0) {
+                            $foundViaLauncher = $true
+                        }
+                    } catch {
+                        $foundViaLauncher = $false
+                    }
+                }
+            }
+
+            if ($foundViaLauncher) {
+                Write-Host "Python $requiredVersion installe et detecte avec succes." -ForegroundColor Green
+                $PythonForVenv = @("py", "-$requiredVersion")
+            } else {
+                Write-Host ""
+                Write-Host "Erreur : Python $requiredVersion n'est toujours pas disponible." -ForegroundColor Red
+                Write-Host ""
+                Write-Host "Installation manuelle :"
+                Write-Host "    winget install --id Python.Python.$requiredVersion -e"
+                Write-Host "ou depuis https://python.org (version $requiredVersion, 64 bits)."
+                Write-Host ""
+                Write-Host "Si vous venez de l'installer, une nouvelle fenetre PowerShell peut"
+                Write-Host "etre necessaire pour que le lanceur 'py' la detecte (le PATH n'est"
+                Write-Host "relu qu'a l'ouverture d'une fenetre). Relancez alors ce script depuis"
+                Write-Host "cette nouvelle fenetre."
+                exit 1
+            }
+        }
+    } else {
+        Write-Host "  Version Python compatible avec les roues gvsbuild (3.$requiredMinor)."
+    }
+} else {
+    Write-Host "Attention : impossible de determiner la version Python requise par les" -ForegroundColor Yellow
+    Write-Host "roues gvsbuild (nom de fichier inattendu) - poursuite avec $pythonCmd tel quel."
 }
 
 # --- NSIS (facultatif : uniquement pour l'installeur .exe) ---
@@ -302,7 +422,24 @@ New-Item -ItemType Directory -Path $VenvDir -Force | Out-Null
 New-Item -ItemType Directory -Path $WorkDir -Force | Out-Null
 
 Write-Host ">>> Creation de l'environnement virtuel..."
-& $pythonCmd -m venv $VenvDir
+# Construction explicite plutot que par decoupage de tableau par plage
+# d'indices (l'ancienne version pouvait, selon le contexte, ne pas
+# transmettre correctement "-m venv" a l'interpreteur, qui demarrait alors
+# en mode interactif au lieu de creer le venv).
+if ($PythonForVenv.Count -gt 1) {
+    Write-Host "    Commande : $($PythonForVenv[0]) $($PythonForVenv[1]) -m venv $VenvDir"
+    & $PythonForVenv[0] $PythonForVenv[1] -m venv $VenvDir
+} else {
+    Write-Host "    Commande : $($PythonForVenv[0]) -m venv $VenvDir"
+    & $PythonForVenv[0] -m venv $VenvDir
+}
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path "$VenvDir\Scripts\python.exe")) {
+    Write-Host ""
+    Write-Host "Erreur : la creation de l'environnement virtuel a echoue (venv absent apres" -ForegroundColor Red
+    Write-Host "l'execution de la commande ci-dessus)."
+    exit 1
+}
+Write-Host ">>> Environnement virtuel cree avec succes."
 
 $venvPython = "$VenvDir\Scripts\python.exe"
 $venvPip = "$VenvDir\Scripts\pip.exe"
@@ -327,6 +464,14 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 Write-Host ">>> Dependances Python installees (Pillow, reportlab, rawpy, exifread, pyinstaller)."
+
+# Ajout de C:\gtk\bin au PATH pour toute la duree du build : recommande par
+# gvsbuild lui-meme, necessaire pour que "import gi" fonctionne dans les
+# sous-processus que PyInstaller lance pour introspecter les modules GTK
+# (sans ca, PyInstaller se rabat sur un mode moins precis, avec des
+# avertissements "Failed to query GI module" - pas bloquant, mais plus
+# propre a corriger).
+$env:Path = "$GtkDir\bin;$env:Path"
 
 Write-Host ">>> Installation de PyGObject/PyCairo (roues gvsbuild)..."
 $pygobjectWheel = Get-ChildItem "$GtkDir\wheels\PyGObject*.whl" -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -417,10 +562,22 @@ Write-Host ">>> Version portable creee : $portableZip"
 # --- Installeur (.exe, si NSIS disponible) ---
 if ($buildInstaller) {
     Write-Host ">>> Creation de l'installeur (.exe) avec NSIS..."
-    $env:PLANCHE_VERSION = $NewVersion
-    $env:PLANCHE_DIST_DIR = $appDistDir
-    $env:PLANCHE_OUTPUT = "$ProjectDir\${PackageName}_${NewVersion}_windows-setup.exe"
-    $env:PLANCHE_ICON_FILE = $iconIco
+    $installerOutput = "$ProjectDir\${PackageName}_${NewVersion}_windows-setup.exe"
+
+    # NSIS n'a pas de directive "!getenv" (contrairement a ce qu'une
+    # version precedente de ce script supposait) : la methode standard et
+    # documentee pour transmettre des valeurs depuis l'exterieur est /D en
+    # ligne de commande (equivalent a !define). On passe ici par un fichier
+    # .nsh genere plutot que par /D directement sur la ligne de commande,
+    # pour eviter tout probleme d'echappement avec des chemins contenant
+    # des espaces (ex: "C:\Users\Jean Dupont\...").
+    $nshContent = @"
+!define PC_VERSION "$NewVersion"
+!define PC_DIST_DIR "$appDistDir"
+!define PC_OUTPUT "$installerOutput"
+!define PC_ICON "$iconIco"
+"@
+    Set-Content -Path "$WindowsDir\build-vars.nsh" -Value $nshContent -Encoding UTF8
 
     & $nsisCmd "$WindowsDir\installer.nsi"
     if ($LASTEXITCODE -ne 0) {
@@ -428,8 +585,9 @@ if ($buildInstaller) {
         Write-Host "Attention : NSIS a echoue (code $LASTEXITCODE) - l'installeur .exe n'a pas ete cree." -ForegroundColor Yellow
         Write-Host "La version portable (.zip) reste disponible."
     } else {
-        Write-Host ">>> Installeur cree : $($env:PLANCHE_OUTPUT)"
+        Write-Host ">>> Installeur cree : $installerOutput"
     }
+    Remove-Item "$WindowsDir\build-vars.nsh" -Force -ErrorAction SilentlyContinue
 }
 
 # ====================== FIN ======================
