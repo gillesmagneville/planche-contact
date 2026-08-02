@@ -80,7 +80,7 @@ Section "Planche-Contact (obligatoire)" SecMain
     ; aberrantes ou n'affiche rien du tout. Doit être calculée après que
     ; tous les fichiers ont été copiés (File /r ci-dessus).
     ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
-    IntFmt $0 "0xX" $0
+    IntFmt $0 "0x%X" $0
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PlancheContact" \
                   "EstimatedSize" "$0"
 

@@ -178,7 +178,7 @@ source "$BUILD_DIR/usr/share/$PACKAGE_NAME/venv/bin/activate"
 pip install --upgrade pip --quiet
 
 PIP_LOG=$(mktemp)
-if pip install Pillow reportlab rawpy exifread --quiet >"$PIP_LOG" 2>&1; then
+if pip install --ignore-installed Pillow reportlab rawpy exifread --quiet >"$PIP_LOG" 2>&1; then
     rm -f "$PIP_LOG"
     deactivate
     echo ">>> Dépendances installées avec succès (Pillow, reportlab, rawpy, exifread)."
