@@ -183,9 +183,10 @@ core engine (`portfolio/`) and GTK4 interface (`planche-contact-gtk.py`) as
 the Linux version — no separate codebase to maintain.
 
 **Status:** build scripts are available and produce both a portable `.zip`
-and an installer `.exe`, but this has not yet been validated end-to-end on
-a real Windows machine or published as an official release. Testing and
-feedback are very welcome.
+and an installer `.exe`. Real-machine testing is underway — several issues
+found during testing have already been fixed — but the Windows version has
+not yet been fully validated end-to-end or published as an official
+release. Testing and feedback are very welcome.
 
 ```powershell
 .\build-windows.ps1

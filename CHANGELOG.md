@@ -17,6 +17,8 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 - Onglet "À propos" : mention de la licence GNU GPL v3, nom du développeur et lien vers le dépôt GitHub.
 - Portage Windows 10/11 (`windows/`) : script de build PowerShell, fichier `.spec` PyInstaller, installeur NSIS, à partir du même code source que la version Linux (le moteur `portfolio/` est strictement identique ; l'interface graphique ne reçoit que quelques ajouts ciblés et sans effet sous Linux/macOS : bloc de démarrage indiquant à GTK4 où trouver ses bibliothèques embarquées, et repli sur `os.startfile` pour ouvrir un fichier avec l'application par défaut du système).
 - Documentation utilisateur entièrement réécrite (`docs/planche-contact-manual.html`) et guide de build Windows dédié (`windows/README.md`).
+- Curseur "Images par page" pour la galerie HTML dans l'interface (12 à 64 par pas de 4, sur la même ligne que la case "Générer Galerie HTML"), ainsi que l'argument `--html-per-page` en ligne de commande.
+- Métadonnées AppStream (`metainfo/planche-contact.metainfo.xml`), installées dans `/usr/share/metainfo/` : permet à App Center (PackageKit + AppStream, depuis Ubuntu 26.04) de reconnaître pleinement le paquet.
 
 ### Modifié
 
@@ -28,6 +30,7 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 - Marge haute des planches contact et du PDF réduite, espace entre l'en-tête et la grille de vignettes agrandi.
 - Chargement des polices rendu multiplateforme (Linux/Windows/macOS) au lieu d'un chemin Linux codé en dur.
 - Nom du projet uniformisé en "Planche-Contact" (au lieu de "Planche-Contact Linux") dans le README et ce journal, le projet n'étant plus limité à Linux.
+- Bouton "Planches contact" du menu "Afficher les résultats" : ouvre désormais le dossier `planches/` (gestionnaire de fichiers) plutôt qu'une image individuelle — comportement identique quel que soit le nombre de planches générées.
 
 ### Corrigé
 
@@ -36,6 +39,11 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 - Icône de l'application absente du `.deb` (le script cherchait un fichier à un chemin inexistant) ; installée désormais en plusieurs tailles (48 à 256 px).
 - Fichier `VERSION` du projet pouvant être incrémenté même en cas d'échec de build, désynchronisant le numéro de version affiché du contenu réellement publié.
 - Fenêtre principale agrandie de ~90 px juste après son affichage (le temps que l'aperçu du dossier d'entrée se charge), empêchant un centrage vertical correct par le gestionnaire de fenêtres à l'ouverture.
+- Police embarquée non appliquée sur les planches contact ni le PDF (fonctionnait uniquement pour la galerie HTML) : l'en-tête et le pied de page des planches chargeaient un chemin de police codé en dur au lieu de passer par `utils.get_font()`.
+- Galerie HTML : orientation EXIF non respectée, toutes les photos affichées en paysage à la taille du capteur quel que soit leur cadrage réel — `ImageOps.exif_transpose()` n'était plus appelé depuis le passage au décodage unique (image pleine taille + vignette).
+- `.deb` : les scripts `postinst`/`postrm` n'étaient en réalité jamais exécutés par dpkg (ils atterrissaient comme simples fichiers de données inertes à `/DEBIAN/`, `fpm` ne reconnaissant pas ce dossier comme `dpkg-deb --build` natif le ferait) — aucune vérification de l'environnement Python embarqué n'avait donc jamais lieu à l'installation.
+- `.deb` : venv embarqué pouvant être incomplet (ex : `reportlab` manquant) selon ce qui se trouvait déjà installé au niveau système sur la machine de build, `pip install` sautant silencieusement la copie locale dans un venv `--system-site-packages` sans `--ignore-installed`.
+- Windows : taille de l'application non affichée dans *Paramètres > Applications > Applications installées* — `IntFmt $0 "0xX" $0` (syntaxe NSIS 2.x non fonctionnelle en NSIS 3.x) ne convertissait pas la taille calculée en hexadécimal, `EstimatedSize` retombait systématiquement à 0.
 
 ### Performances
 

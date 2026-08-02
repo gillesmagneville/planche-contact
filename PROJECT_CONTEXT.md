@@ -58,7 +58,7 @@ interactive, options `-Major/-Minor/-Patch`).
 | `thumbnail.py` | Génération de vignettes en parallèle (`ProcessPoolExecutor`, contexte `spawn` forcé) |
 | `contactsheet.py` | Génère les planches contact (en-tête, grille de vignettes, pied de page, numéro de page) |
 | `pdfexport.py` | Assemble les planches en PDF (`reportlab`) ; marge haute réduite indépendamment des autres marges |
-| `htmlgallery.py` | Galerie HTML paginée ; **une seule passe de décodage** par photo (la vignette est dérivée de l'image pleine taille déjà décodée, pas un second décodage) |
+| `htmlgallery.py` | Galerie HTML paginée ; **une seule passe de décodage** par photo (la vignette est dérivée de l'image pleine taille déjà décodée, pas un second décodage) ; `ImageOps.exif_transpose()` appliqué systématiquement pour respecter l'orientation (voir §5) |
 | `csvindex.py` | Génère l'index CSV |
 | `utils.py` | `get_font()` (police embarquée, mise en cache), `apply_watermark()` (filigrane en mosaïque, **fonction unique** utilisée par les planches, le PDF et la galerie), `setup_logging()` |
 | `portfolio.py` | Point d'entrée CLI (`argparse`), orchestre tout ce qui précède, affiche des lignes `PROGRESS:X/100 message` sur stdout (lues par l'interface graphique) |
@@ -71,7 +71,9 @@ Un seul fichier, structuré autour de la classe `PlancheContactGTK(Gtk.Applicati
 Composants principaux :
 - **Formulaire de génération** : titre/auteur, dossiers d'entrée/sortie,
   images par planche, format de page, filigrane (texte, orientation,
-  curseur d'opacité), cases PDF/HTML/CSV.
+  curseur d'opacité), cases PDF/HTML/CSV, curseur d'images par page pour la
+  galerie HTML (12 à 64 par pas de 4, sur la même ligne que la case
+  "Générer Galerie HTML").
 - **Sélecteur de dossier personnalisé** (`_choose_folder`) : entièrement
   construit à la main (`Gtk.DirectoryList` + `Gtk.FilterListModel` +
   `Gtk.CustomFilter`), pas la boîte de dialogue native (peu fiable selon
@@ -89,7 +91,11 @@ Composants principaux :
 - **Menu "Afficher les résultats"** : ouvre chaque livrable avec
   l'application par défaut du système (`Gio.AppInfo` sur Linux/macOS,
   `os.startfile()` sur Windows), avec fenêtre d'avertissement claire si
-  aucune application n'est configurée.
+  aucune application n'est configurée. Les planches contact ouvrent le
+  **dossier** `planches/` (gestionnaire de fichiers), pas un fichier
+  individuel — comportement identique quel que soit le nombre de planches
+  générées, contrairement à l'ancienne approche (visionneuse multi-images
+  avec repli sur la première planche seule).
 - **`glib_idle_add()`** : enveloppe autour de `GLib.idle_add()` tolérante à
   deux conventions d'appel différentes selon la plateforme/le binding (voir
   §6, bug PyGObject/Windows).
@@ -133,6 +139,9 @@ planche-contact/
 │   ├── installer.nsi               # Script NSIS (installeur .exe)
 │   └── README.md                   # Prérequis, dépannage, détail du pipeline
 │
+├── metainfo/
+│   └── planche-contact.metainfo.xml # Métadonnées AppStream (App Center, PackageKit)
+│
 ├── docs/
 │   └── planche-contact-manual.html # Manuel utilisateur complet
 ├── screenshots/
@@ -172,6 +181,7 @@ bel et bien dans `portfolio.py` actuel).
 - `python3-gi`, `gir1.2-gtk-4.0` (paquets système, prérequis avant d'utiliser l'interface graphique depuis les sources)
 - `fpm` (gem Ruby) pour la construction du `.deb`
 - `python3-exifread` (apt) + `rawpy` (pip) installés automatiquement dans le venv embarqué par `build-deb.sh`
+- `metainfo/planche-contact.metainfo.xml` (métadonnées AppStream), installé par `build-deb.sh` dans `/usr/share/metainfo/` — nécessaire pour qu'App Center (PackageKit + AppStream, depuis Ubuntu 26.04) reconnaisse pleinement le paquet (taille, description enrichie) au lieu de se limiter au `.desktop`
 
 ### 4.3 Spécifiques Windows
 
@@ -202,6 +212,18 @@ bel et bien dans `portfolio.py` actuel).
 - **Chargement de police** : toujours via `utils.get_font()` (mise en
   cache, police embarquée en priorité) — jamais de chemin de police codé
   en dur ailleurs dans le code.
+- **Orientation EXIF** : toujours appliquer `ImageOps.exif_transpose()`
+  juste après `rawloader.load_image()`, avant tout traitement ultérieur
+  (redimensionnement, filigrane...) — y compris dans les chemins de
+  décodage optimisés/fusionnés (voir §7, bug corrigé sur la galerie HTML
+  qui avait perdu cet appel lors du passage au décodage unique).
+- **`pip install` dans le venv embarqué (Linux, `build-deb.sh`)** :
+  toujours avec `--ignore-installed`. Le venv est créé avec
+  `--system-site-packages` ; sans ce flag, `pip` saute silencieusement la
+  copie locale d'un paquet déjà visible au niveau système sur la machine
+  de build, produisant un venv qui fonctionne par accident sur cette
+  machine mais est réellement incomplet une fois le `.deb` installé
+  ailleurs (voir §7).
 - **Filigrane** : toujours via `utils.apply_watermark()` — fonction
   unique, jamais de logique de filigrane dupliquée localement.
 - **Compatibilité GTK/Windows** : pattern défensif systématique pour les
@@ -241,6 +263,9 @@ en cause sans en connaître la raison) :
 | `contents_directory='.'` dans le `.spec` PyInstaller | PyInstaller 6+ place par défaut tout dans un sous-dossier `_internal/` ; le code de démarrage Windows s'attend à trouver les DLL/typelibs directement à côté de l'exécutable |
 | Dépôt renommé `planche-contact-linux` → `planche-contact` | Le projet n'est plus Linux-only depuis le portage Windows |
 | `windows/build-windows.ps1` + relais à la racine | Symétrie avec `build-deb.sh` (lancement depuis la racine) sans dupliquer la logique de build elle-même |
+| `fpm` (`build-deb.sh`) : scripts de maintenance via `--after-install`/`--after-remove`, jamais un dossier `DEBIAN/` dans les sources `-C` | Contrairement à `dpkg-deb --build` natif, `fpm` ne traite jamais spécialement un dossier nommé `DEBIAN/` parmi ses sources : un tel dossier finit comme contenu de données inerte (installé tel quel sur la machine cible), jamais reconnu comme scripts de maintenance ni exécuté par dpkg |
+| `IntFmt` NSIS : toujours le style printf (`"0x%X"`), jamais la syntaxe mnémonique (`"0xX"`) | `"0xX"` est documentée sur le wiki NSIS (valable en NSIS 2.x) mais ne convertit plus rien en NSIS 3.x — elle retourne la chaîne littérale inchangée, faisant silencieusement échouer tout `WriteRegDWORD` qui en dépend (ex : `EstimatedSize`, repli à 0) |
+| `makensis` + Wine installables via `apt` dans le bac à sable Linux de Claude | Permet de **compiler ET exécuter** un vrai installeur NSIS pour reproduire/valider un bug Windows sans accès à une machine Windows réelle. Nécessite `nsis` (paquet universe), et pour un installeur NSIS 32 bits par défaut : `dpkg --add-architecture i386` + `wine32:i386` (le simple `wine64` ne suffit pas). Les écritures registre sont vérifiables avec `wine reg query`. Ne remplace pas un vrai test utilisateur (thème visuel, UAC réel, etc.) mais permet de confirmer/infirmer un correctif de logique avant de le transmettre |
 
 ---
 
@@ -251,10 +276,9 @@ en cause sans en connaître la raison) :
 | Couleurs GTK4 différentes du thème Windows choisi | **Limitation inhérente**, pas un bug : GTK4 utilise son propre système de thème (Adwaita), indépendant du thème natif de l'OS. Aucune correction simple possible sans un chantier de theming dédié (interroger l'API/le registre Windows et générer du CSS GTK dynamiquement) |
 | Avertissement SmartScreen ("Windows a protégé votre PC") à l'installation | **Pas de correctif de code possible** : nécessite un certificat de signature de code payant (~100-500 €/an) ou l'accumulation naturelle de réputation avec le temps |
 | Version Python Windows figée sur celle de la dernière publication gvsbuild | Contrainte externe, pas un bug : si gvsbuild publie une nouvelle version ciblant une autre version de Python, il faudra installer cette nouvelle version (le script la détecte et propose de l'installer automatiquement) |
-| Build Windows non testable directement par Claude | Tous les correctifs du portage Windows ont été validés par itération réelle avec le mainteneur (aucun accès à une machine Windows pour Claude) — un nouveau problème peut resurgir à tout moment sur un point non encore couvert |
+| Build Windows non testable directement par Claude sur machine réelle | Aucun accès direct à une machine Windows. Cela dit, `makensis` + Wine (voir §6) permettent désormais de compiler et d'exécuter un vrai installeur NSIS dans le bac à sable Linux pour reproduire/valider un correctif de logique avant transmission — plusieurs bugs (voir historique dans `CHANGELOG.md`) ont ainsi été confirmés puis corrigés avec certitude plutôt que par déduction. Un test réel sur machine Windows par le mainteneur reste néanmoins la validation finale (thème visuel, UAC, SmartScreen...) |
 | `console=True` dans `windows/planche-contact.spec` | Activé temporairement pour le diagnostic (affiche une fenêtre console). À repasser à `False` une fois la stabilité du build Windows confirmée sur la durée |
 | Lignes `[DIAG]` dans `planche-contact-gtk.py` (`FolderPreviewController`) | Ajoutées pour diagnostiquer le blocage sur "Analyse du dossier..." (résolu). À retirer une fois le build Windows pleinement validé |
-| `portfolio/fonts/` (police embarquée) absent du dépôt réel au 01/08/2026 | Correctif livré pour l'en-tête/pied de page trop petits sous Windows (voir §6), à vérifier s'il a bien été appliqué |
 
 ---
 
@@ -262,8 +286,6 @@ en cause sans en connaître la raison) :
 
 - Retirer `console=True` et les lignes `[DIAG]` une fois le build Windows
   validé sur la durée (voir §7).
-- Vérifier que `portfolio/fonts/` (police embarquée) est bien appliqué sur
-  le dépôt réel.
 - Publier une release binaire Windows officielle une fois les tests
   utilisateur réels concluants.
 - Internationalisation (i18n) — l'interface et les messages sont

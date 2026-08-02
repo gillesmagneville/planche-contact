@@ -1228,53 +1228,17 @@ class PlancheContactGTK(Gtk.Application):
         if not planches_dir.is_dir():
             return
 
-        planche_files = sorted(
-            p for p in planches_dir.iterdir()
-            if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg", ".png")
-        )
-        if not planche_files:
-            return
-
-        if sys.platform == "win32":
-            # os.startfile() ne prend qu'un seul chemin ; on ouvre donc la
-            # première planche - l'appli Photos de Windows détecte
-            # automatiquement les autres images du même dossier et permet
-            # d'y naviguer avec les flèches, comme sous Linux/macOS.
-            if not self._open_path_with_default_app(planche_files[0]):
-                self._show_no_viewer_dialog(
-                    "Aucune visionneuse d'images disponible",
-                    "Aucune application par défaut n'est configurée pour ouvrir des "
-                    "images sur ce système.\n\nInstallez une visionneuse d'images "
-                    "(par exemple l'appli Photos de Windows) puis réessayez."
-                )
-            return
-
-        gfiles = [Gio.File.new_for_path(str(p)) for p in planche_files]
-
-        # On ouvre toutes les planches EN UNE FOIS dans le visualiseur
-        # d'images par défaut du système : la plupart des visionneuses
-        # (Loupe, eog, gThumb...) permettent alors de naviguer entre elles
-        # avec les flèches, comme dans une vraie visionneuse - contrairement
-        # à ouvrir le dossier dans le gestionnaire de fichiers.
-        content_type, _ = Gio.content_type_guess(str(planche_files[0]), None)
-        app_info = Gio.AppInfo.get_default_for_type(content_type, False) if content_type else None
-
-        if app_info is not None:
-            try:
-                app_info.launch(gfiles, None)
-                return
-            except Exception:
-                pass
-
-        # Repli : aucun visualiseur par défaut trouvé (ou son lancement a
-        # échoué) - on tente d'ouvrir au moins la première planche avec
-        # l'application par défaut associée aux fichiers image.
-        if not self._open_path_with_default_app(planche_files[0]):
+        # Ouvre le DOSSIER des planches (gestionnaire de fichiers), pas une
+        # planche individuelle : contrairement à une visionneuse d'images
+        # unique, ça fonctionne de façon identique quel que soit le nombre
+        # de planches, et laisse l'utilisateur choisir laquelle regarder -
+        # même mécanisme que pour le PDF/la galerie/le CSV, appliqué ici à
+        # un dossier plutôt qu'à un fichier.
+        if not self._open_path_with_default_app(planches_dir):
             self._show_no_viewer_dialog(
-                "Aucune visionneuse d'images disponible",
-                "Aucune application par défaut n'est configurée pour ouvrir des images "
-                "sur ce système.\n\nInstallez une visionneuse d'images (par exemple : "
-                "Loupe, eog, ou gThumb) puis réessayez."
+                "Aucun gestionnaire de fichiers disponible",
+                "Aucune application par défaut n'est configurée pour ouvrir des "
+                "dossiers sur ce système."
             )
 
     def _open_pdf(self):

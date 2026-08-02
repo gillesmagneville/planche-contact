@@ -5,10 +5,11 @@ Windows (version portable `.zip` et installeur `.exe`) à partir du même
 code source que la version Linux (`portfolio/` et `planche-contact-gtk.py`
 à la racine du dépôt ne sont **pas** dupliqués — ce sont les mêmes fichiers).
 
-⚠️ **Ces scripts n'ont pas pu être testés sur une vraie machine Windows au
-moment de leur rédaction** (l'environnement utilisé pour les écrire est
-Linux uniquement). Un premier essai réel demandera très probablement des
-ajustements — voir la section Dépannage plus bas.
+⚠️ **Portage en cours de validation sur machine Windows réelle.** Plusieurs
+problèmes déjà rencontrés lors de tests réels ont été corrigés (voir
+`CHANGELOG.md`), mais l'ensemble n'a pas encore été validé de bout en bout
+ni publié comme release officielle. D'autres ajustements restent possibles
+— voir la section Dépannage plus bas.
 
 ## Utilisation
 
@@ -131,6 +132,17 @@ débogage, puis relancez `pyinstaller` manuellement).
 Vérifiez que `screenshots/application-icon.png` existe bien à la racine du
 dépôt, et que la conversion `.png` → `.ico` (faite par `build-windows.ps1`
 via Pillow) s'est bien déroulée sans erreur dans la sortie du script.
+
+**Taille de l'application absente dans *Paramètres > Applications***
+Corrigé (voir `CHANGELOG.md`) : `installer.nsi` utilisait `IntFmt $0
+"0xX" $0`, une syntaxe documentée sur le wiki NSIS mais non fonctionnelle
+en NSIS 3.x (ne convertit rien, renvoie la chaîne littérale inchangée),
+faisant retomber `EstimatedSize` à 0 silencieusement. Si ce symptôme
+réapparaît après une modification de ce bloc, vérifier que la conversion
+utilise bien le style printf (`"0x%X"`). Ce correctif a été validé en
+compilant et en **exécutant** réellement l'installeur via `makensis` +
+Wine dans un environnement Linux (voir §6 de `PROJECT_CONTEXT.md`),
+sans nécessiter de machine Windows.
 
 ## Ce qui est partagé avec la version Linux (aucune duplication)
 
