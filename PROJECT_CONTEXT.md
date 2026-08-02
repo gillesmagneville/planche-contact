@@ -129,7 +129,7 @@ planche-contact/
 │       └── LICENSE.txt
 │
 ├── debian/                         # Empaquetage Linux (.deb) uniquement
-│   ├── control, changelog, compat, copyright, rules
+│   ├── control, compat, copyright, rules
 │   ├── postinst                    # Vérifie l'environnement Python embarqué à l'installation
 │   └── postrm
 │

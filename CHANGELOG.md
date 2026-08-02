@@ -6,6 +6,12 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 ## [Non publié]
 
+## [1.5.0] - 2026-08-02
+
+Consolide l'ensemble des évolutions depuis la 1.2.2-rc.1 (portage Windows,
+sélecteur de dossier personnalisé, filigrane unifié, RAW, curseur d'images
+par page HTML, métadonnées AppStream, et tous les correctifs associés).
+
 ### Ajouté
 
 - Prise en charge des fichiers RAW (`.cr2`, `.cr3`, `.nef`, `.dng`, `.arw`), via `rawpy` — installé et embarqué automatiquement dans le `.deb`, sans étape manuelle.
@@ -76,8 +82,56 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 ---
 
-## À venir
+## [1.2.1] - 2026-07-22
 
-### [1.2.2]
+- Modification de l'onglet "À propos" et amélioration de `build-deb.sh`.
+- Correction du numéro de version affiché dans le `.deb` et dans l'onglet "À propos".
 
-Première version stable officielle.
+## [1.2.0] - 2026-07-22
+
+- Nettoyage des champs de l'interface, correction de l'orientation du filigrane, ajout du symbole copyright au filigrane.
+
+## [1.1.20] - 2026-07-22
+
+- Changement du nombre d'images par planche, ajout d'une mention en bas de page sur les planches, correction de l'orientation du filigrane, amélioration du script de build.
+
+## [1.1.17] - 2026-07-22
+
+- Effacement de la galerie avant une nouvelle génération.
+
+## [1.1.16] - 2026-07-22
+
+- Optimisation de la génération de la galerie et de la navigation.
+
+## [1.1.11] - 2026-07-22
+
+- Précision dans la description.
+- Amélioration des indicateurs de progression.
+
+## [1.1.10] - 2026-07-17
+
+- Amélioration de la galerie : filigrane, format des photos, mise en page.
+
+## [1.1.8] - 2026-07-16
+
+- Optimisation du filigrane de la galerie.
+
+## [1.1.5] - 2026-07-16
+
+- Correctif sur la galerie.
+
+## [1.1.3] - 2026-07-16
+
+- Optimisation de la création de la galerie et nouveau script `build-deb.sh`.
+
+## [1.1.2] - 2026-07-16
+
+- Premier import du projet sous sa forme actuelle.
+
+## [1.0.1] - 2026-07-15
+
+### Version initiale publique
+
+- Ajout de l'interface graphique GTK4.
+- Ajout de l'export PDF et HTML.
+- Packaging Debian amélioré.
