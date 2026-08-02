@@ -4,7 +4,7 @@ from concurrent.futures import ProcessPoolExecutor
 import logging
 import multiprocessing
 import os
-from PIL import Image
+from PIL import Image, ImageOps
 
 from .rawloader import load_image, is_raw_file
 from .utils import apply_watermark
@@ -53,6 +53,7 @@ def _process_full_image_worker(args):
     target = (GALLERY_FULL_MAX_SIZE, GALLERY_FULL_MAX_SIZE)
     try:
         img = load_image(path, use_embedded_thumb=True, target_size=target)
+        img = ImageOps.exif_transpose(img)
         img = img.convert("RGB")
         img.thumbnail(target, Image.Resampling.LANCZOS)
 

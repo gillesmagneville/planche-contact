@@ -568,6 +568,25 @@ class PlancheContactGTK(Gtk.Application):
         grid.attach(self.html_check, 0, 4, 2, 1)
         grid.attach(self.csv_check, 0, 5, 2, 1)
 
+        # Nombre d'images par page de la galerie HTML : sur la même ligne
+        # que la case à cocher correspondante (voir portfolio/htmlgallery.py,
+        # HTMLGalleryGenerator.images_per_page, défaut 48).
+        html_per_page_label = Gtk.Label(label="Images par page :")
+        html_per_page_label.set_margin_start(20)
+        grid.attach(html_per_page_label, 2, 4, 1, 1)
+        self.html_per_page_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 12, 64, 4)
+        self.html_per_page_scale.set_value(48)
+        self.html_per_page_scale.set_digits(0)
+        self.html_per_page_scale.set_draw_value(True)
+        self.html_per_page_scale.set_value_pos(Gtk.PositionType.RIGHT)
+        self.html_per_page_scale.set_hexpand(False)
+        self.html_per_page_scale.set_size_request(220, -1)
+        # GtkScale ne cale pas nativement le glissé à la souris sur le pas
+        # fourni à new_with_range (celui-ci ne régit que le clavier/molette) :
+        # on arrondit donc manuellement au multiple de 4 le plus proche.
+        self.html_per_page_scale.connect("value-changed", self._snap_html_per_page)
+        grid.attach(self.html_per_page_scale, 3, 4, 3, 1)
+
         box.append(grid)
 
         # Boutons
@@ -652,6 +671,13 @@ class PlancheContactGTK(Gtk.Application):
 
         return box
 
+    def _snap_html_per_page(self, scale):
+        value = scale.get_value()
+        snapped = round((value - 12) / 4) * 4 + 12
+        snapped = max(12, min(64, snapped))
+        if snapped != value:
+            scale.set_value(snapped)
+
     def _reset_form(self, button):
         self.input_entry.set_text("")
         self.output_entry.set_text("")
@@ -663,6 +689,7 @@ class PlancheContactGTK(Gtk.Application):
         self.format_combo.set_selected(1)
         self.watermark_orient_combo.set_selected(0)
         self.watermark_opacity_scale.set_value(40)
+        self.html_per_page_scale.set_value(48)
         self.pdf_check.set_active(True)
         self.html_check.set_active(True)
         self.csv_check.set_active(True)
@@ -1023,6 +1050,7 @@ class PlancheContactGTK(Gtk.Application):
         watermark = self.watermark_entry.get_text().strip() or None
         orientation = self.watermark_orient_combo.get_selected_item().get_string()
         opacity = int(self.watermark_opacity_scale.get_value())
+        html_per_page = int(self.html_per_page_scale.get_value())
 
         if getattr(sys, "frozen", False):
             # Exécutable gelé (PyInstaller, build Windows) : sys.executable
@@ -1043,7 +1071,8 @@ class PlancheContactGTK(Gtk.Application):
             "-i", input_dir,
             "-o", output_dir,
             "-n", str(num_per_sheet),
-            "--format", page_format
+            "--format", page_format,
+            "--html-per-page", str(html_per_page)
         ]
 
         if title:
