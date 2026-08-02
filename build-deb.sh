@@ -168,7 +168,7 @@ mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/48x48/apps"
 mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/64x64/apps"
 mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/128x128/apps"
 mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/256x256/apps"
-mkdir -p "$BUILD_DIR/DEBIAN"
+mkdir -p "$BUILD_DIR/usr/share/metainfo"
 
 echo ">>> Création du virtualenv..."
 python3 -m venv --system-site-packages "$BUILD_DIR/usr/share/$PACKAGE_NAME/venv"
@@ -216,6 +216,15 @@ mkdir -p "$BUILD_DIR/usr/share/$PACKAGE_NAME/docs"
 [ -f "$PROJECT_DIR/docs/planche-contact-manual.html" ] && cp "$PROJECT_DIR/docs/planche-contact-manual.html" "$BUILD_DIR/usr/share/$PACKAGE_NAME/docs/"
 [ -f "$PROJECT_DIR/LICENSE" ] && cp "$PROJECT_DIR/LICENSE" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
 
+# Métadonnées AppStream : nécessaires pour qu'App Center (PackageKit +
+# AppStream, depuis Ubuntu 26.04) reconnaisse pleinement le paquet - taille
+# et description enrichie incluses - au lieu de se limiter au .desktop.
+if [ -f "$PROJECT_DIR/metainfo/planche-contact.metainfo.xml" ]; then
+    cp "$PROJECT_DIR/metainfo/planche-contact.metainfo.xml" "$BUILD_DIR/usr/share/metainfo/"
+else
+    echo "Attention : metainfo/planche-contact.metainfo.xml introuvable - le paquet sera construit sans métadonnées AppStream." >&2
+fi
+
 ICON_SOURCE="$PROJECT_DIR/screenshots/application-icon.png"
 if [ -f "$ICON_SOURCE" ]; then
     echo ">>> Installation de l'icône de l'application (plusieurs tailles)..."
@@ -262,11 +271,6 @@ Type=Application
 Categories=Graphics;Photography;
 EOF
 
-echo ">>> Copie des scripts Debian..."
-cp debian/postinst "$BUILD_DIR/DEBIAN/"
-cp debian/postrm "$BUILD_DIR/DEBIAN/"
-chmod 755 "$BUILD_DIR/DEBIAN/postinst" "$BUILD_DIR/DEBIAN/postrm"
-
 # === Normalisation des permissions --------------------------------------
 # `cp`/`cp -r` appliquent le umask du processus courant à la destination,
 # pas les permissions du fichier source. Si build-deb.sh est lancé avec un
@@ -281,10 +285,16 @@ find "$BUILD_DIR" -type f -exec chmod 644 {} +
 # Ré-applique les bits d'exécution perdus par le chmod 644 générique
 # ci-dessus, sur tout ce qui doit réellement être exécutable.
 chmod +x "$BUILD_DIR/usr/bin/planche-contact-gtk" "$BUILD_DIR/usr/bin/portfolio"
-chmod 755 "$BUILD_DIR/DEBIAN/postinst" "$BUILD_DIR/DEBIAN/postrm"
 find "$BUILD_DIR/usr/share/$PACKAGE_NAME/venv/bin" -type f -exec chmod 755 {} +
 
 echo ">>> Création du paquet .deb..."
+# NOTE : contrairement à dpkg-deb --build natif, fpm ne traite jamais un
+# dossier nommé "DEBIAN/" de façon spéciale au sein de ses sources -C. Un tel
+# dossier, s'il est listé ici, finit comme simple contenu de données installé
+# tel quel à /DEBIAN/ sur la machine cible - jamais exécuté par dpkg. Les
+# scripts de maintenance doivent être déclarés via --after-install /
+# --after-remove pour que dpkg les exécute réellement à l'installation et à
+# la suppression du paquet.
 fpm -s dir -t deb \
     -n "$PACKAGE_NAME" \
     -v "$NEW_VERSION" \
@@ -296,8 +306,10 @@ fpm -s dir -t deb \
     --depends python3-gi \
     --depends gir1.2-gtk-4.0 \
     --depends libgtk-4-1 \
+    --after-install "$PROJECT_DIR/debian/postinst" \
+    --after-remove "$PROJECT_DIR/debian/postrm" \
     -C "$BUILD_DIR" \
-    usr/ DEBIAN/
+    usr/
 
 echo ""
 echo "✅ Paquet créé avec succès :"

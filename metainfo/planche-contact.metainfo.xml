@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Métadonnées AppStream de Planche-Contact.
+
+  Sans ce fichier, les gestionnaires logiciels modernes qui s'appuient sur
+  PackageKit + AppStream (dont l'App Center d'Ubuntu depuis la 26.04) ne
+  reconnaissent l'application que partiellement via son .desktop, avec un
+  affichage incomplet (taille, description enrichie, etc.).
+
+  L'<id> doit correspondre au nom du fichier lui-même
+  (planche-contact.metainfo.xml) et le <launchable> doit correspondre au
+  nom du fichier .desktop installé (planche-contact.desktop).
+-->
+<component type="desktop-application">
+  <id>planche-contact</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <name>Planche-Contact</name>
+  <summary>Génère des planches contact photographiques haute qualité</summary>
+
+  <description>
+    <p>
+      Planche-Contact crée des planches contact professionnelles (300 dpi),
+      des documents PDF, des galeries HTML paginées et des index CSV à
+      partir d'un dossier de photos JPEG ou RAW, sans base de données ni
+      catalogue.
+    </p>
+    <p>
+      Fonctionne directement sur les dossiers existants : aucune importation
+      ni gestion de catalogue n'est nécessaire.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">planche-contact.desktop</launchable>
+
+  <url type="homepage">https://github.com/gillesmagneville/planche-contact</url>
+  <url type="bugtracker">https://github.com/gillesmagneville/planche-contact/issues</url>
+
+  <provides>
+    <binary>planche-contact-gtk</binary>
+    <binary>portfolio</binary>
+  </provides>
+
+  <categories>
+    <category>Graphics</category>
+    <category>Photography</category>
+  </categories>
+
+  <content_rating type="oars-1.1"/>
+
+  <developer id="gillesmagneville">
+    <name>Gilles MAGNEVILLE</name>
+  </developer>
+</component>

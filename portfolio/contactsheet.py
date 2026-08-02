@@ -1,8 +1,8 @@
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageOps
 import math
 from pathlib import Path
 
-from .utils import apply_watermark
+from .utils import apply_watermark, get_font
 
 
 class ContactSheetGenerator:
@@ -89,11 +89,8 @@ class ContactSheetGenerator:
         return sheet
 
     def _draw_header(self, draw, canvas_w):
-        try:
-            font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 54)
-            font_author = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
-        except:
-            font_title = font_author = ImageFont.load_default()
+        font_title = get_font(54, bold=True)
+        font_author = get_font(36, bold=True)
 
         # Marge haute réduite avant l'en-tête (6 mm, contre ~9,5 mm
         # auparavant) : le titre démarre nettement plus près du haut de la
@@ -124,11 +121,8 @@ class ContactSheetGenerator:
         return y
 
     def _draw_page_number(self, draw, canvas_w, canvas_h, page_num, total_pages):
-        try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 26)
-            font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
-        except:
-            font = font_small = ImageFont.load_default()
+        font = get_font(26)
+        font_small = get_font(20)
 
         page_text = f"Planche {page_num}/{total_pages}"
         bbox = draw.textbbox((0, 0), page_text, font=font)
