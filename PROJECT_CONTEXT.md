@@ -53,7 +53,7 @@ interactive, options `-Major/-Minor/-Patch`).
 | Module | Rôle |
 |---|---|
 | `config.py` | Dataclass `Config` : tous les paramètres d'une génération |
-| `scanner.py` | Scan du dossier (récursif ou non), tri par date EXIF ou nom, exclut `planches/` et `gallery/` du dossier de sortie configuré pour éviter de re-scanner ses propres fichiers générés |
+| `scanner.py` | Scan du dossier (récursif ou non), tri par date EXIF ou nom, exclut `planches/` et `gallery/` du dossier de sortie configuré pour éviter de re-scanner ses propres fichiers générés (comparaison par identité réelle de fichier via `os.path.samefile()`, pas par texte — voir §5) |
 | `rawloader.py` | Chargement unifié image/RAW : aperçu JPEG embarqué en priorité (rapide), dématriçage complet (`rawpy`) uniquement si cet aperçu est absent ou trop petit |
 | `thumbnail.py` | Génération de vignettes en parallèle (`ProcessPoolExecutor`, contexte `spawn` forcé) |
 | `contactsheet.py` | Génère les planches contact (en-tête, grille de vignettes, pied de page, numéro de page) |
@@ -215,15 +215,30 @@ bel et bien dans `portfolio.py` actuel).
 - **Orientation EXIF** : toujours appliquer `ImageOps.exif_transpose()`
   juste après `rawloader.load_image()`, avant tout traitement ultérieur
   (redimensionnement, filigrane...) — y compris dans les chemins de
-  décodage optimisés/fusionnés (voir §7, bug corrigé sur la galerie HTML
-  qui avait perdu cet appel lors du passage au décodage unique).
+  décodage optimisés/fusionnés (voir `CHANGELOG.md`, bug corrigé sur la
+  galerie HTML qui avait perdu cet appel lors du passage au décodage
+  unique).
 - **`pip install` dans le venv embarqué (Linux, `build-deb.sh`)** :
   toujours avec `--ignore-installed`. Le venv est créé avec
   `--system-site-packages` ; sans ce flag, `pip` saute silencieusement la
   copie locale d'un paquet déjà visible au niveau système sur la machine
   de build, produisant un venv qui fonctionne par accident sur cette
   machine mais est réellement incomplet une fois le `.deb` installé
-  ailleurs (voir §7).
+  ailleurs (voir `CHANGELOG.md`).
+- **Comparaison de chemins (exclusion de dossiers)** : toujours comparer
+  l'identité réelle du fichier via `os.path.samefile()`, jamais une
+  comparaison textuelle (`Path.resolve()` + `relative_to()`/`==`). Un même
+  dossier physique peut avoir plusieurs représentations textuelles
+  différentes selon le chemin emprunté — un lecteur réseau mappé
+  (`Z:\photos`) et son équivalent en chemin UNC
+  (`\\serveur\partage\photos`) sous Windows en sont l'exemple le plus
+  courant. `Path.resolve()` ne les unifie pas, contrairement à
+  `os.path.samefile()` (voir `CHANGELOG.md`, bug de récursivité sous
+  Windows). `os.path.samefile()` fait un appel système par comparaison :
+  toujours borner la remontée des dossiers parents (paramètre `boundary`
+  de `_is_within()` dans `scanner.py`) plutôt que de remonter jusqu'à la
+  racine du système de fichiers à chaque fichier — sensible sur un
+  partage réseau.
 - **Filigrane** : toujours via `utils.apply_watermark()` — fonction
   unique, jamais de logique de filigrane dupliquée localement.
 - **Compatibilité GTK/Windows** : pattern défensif systématique pour les

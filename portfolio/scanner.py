@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -77,12 +78,39 @@ class ImageScanner:
         except Exception:
             return datetime.min
 
-    def _is_within(self, path: Path, ancestor: Path) -> bool:
-        try:
-            path.relative_to(ancestor)
-            return True
-        except ValueError:
+    def _is_within(self, path: Path, ancestor: Path, boundary: Path | None = None) -> bool:
+        """Vrai si un des dossiers parents de `path` (jusqu'à `boundary`
+        inclus, sans aller plus haut) est physiquement le même dossier que
+        `ancestor`, en comparant l'identité réelle du fichier (via
+        os.path.samefile) plutôt qu'une simple comparaison textuelle des
+        chemins. Nécessaire notamment sous Windows : un lecteur réseau
+        mappé (ex: Z:\\photos) et son équivalent en chemin UNC (ex:
+        \\\\serveur\\partage\\photos) désignent le même dossier physique
+        mais ont une représentation textuelle totalement différente, que
+        Path.resolve() ne unifie pas - une comparaison purement textuelle
+        laisse alors passer les fichiers déjà générés lors d'une exécution
+        précédente.
+
+        `boundary` (typiquement le dossier d'entrée scanné) arrête la
+        remontée dès qu'elle en sort : samefile() fait un appel système par
+        niveau, coûteux sur un partage réseau, et inutile au-delà du
+        dossier d'entrée puisque aucun fichier candidat ne peut s'y
+        trouver. La comparaison de frontière reste purement textuelle
+        (elle ne sert qu'à optimiser, jamais à décider de l'exclusion) :
+        en cas d'échec elle ne fait que remonter un peu plus haut, sans
+        jamais compromettre la justesse du résultat.
+        """
+        if not ancestor.exists():
             return False
+        for parent in path.parents:
+            try:
+                if os.path.samefile(parent, ancestor):
+                    return True
+            except OSError:
+                continue
+            if boundary is not None and parent == boundary:
+                break
+        return False
 
     def scan(self) -> list[dict]:
         images = []
@@ -109,6 +137,11 @@ class ImageScanner:
             except Exception:
                 excluded_dirs = []
 
+        try:
+            input_dir_resolved = self.config.input_dir.resolve()
+        except OSError:
+            input_dir_resolved = None
+
         skipped_output = 0
         for path in self.config.input_dir.glob(pattern):
             if not path.is_file() or not self._is_image_file(path):
@@ -116,7 +149,10 @@ class ImageScanner:
 
             if excluded_dirs:
                 resolved_path = path.resolve()
-                if any(self._is_within(resolved_path, excl) for excl in excluded_dirs):
+                if any(
+                    self._is_within(resolved_path, excl, input_dir_resolved)
+                    for excl in excluded_dirs
+                ):
                     skipped_output += 1
                     continue
 

@@ -10,6 +10,10 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 - Statut du portage Windows mis à jour : validé sur machine réelle, sans bug apparent, publié comme release officielle (`README.md`, `windows/README.md`, `PROJECT_CONTEXT.md`).
 
+### Corrigé
+
+- Récursivité sous Windows : les images déjà générées lors d'une exécution précédente (`planches/`, `gallery/`) pouvaient être re-détectées comme photos sources (ex : 185 images comptées pour 60 réelles), l'exclusion basée sur une comparaison textuelle des chemins (`Path.resolve()` + `relative_to()`) échouant lorsqu'un même dossier physique est atteint par deux chemins textuellement différents — cas typique d'un lecteur réseau mappé vs son équivalent en chemin UNC. Comparaison désormais basée sur l'identité réelle du fichier (`os.path.samefile()`), bornée au dossier d'entrée pour éviter un appel système par niveau jusqu'à la racine du système de fichiers sur chaque photo (sensible sur un partage réseau).
+
 ## [1.5.3] - 2026-08-03
 
 ### Ajouté
