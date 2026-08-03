@@ -6,6 +6,12 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 ## [Non publié]
 
+### Modifié
+
+- Statut du portage Windows mis à jour : validé sur machine réelle, sans bug apparent, publié comme release officielle (`README.md`, `windows/README.md`, `PROJECT_CONTEXT.md`).
+
+## [1.5.3] - 2026-08-03
+
 ### Ajouté
 
 - Procédure de contournement de l'avertissement SmartScreen Windows à l'installation, documentée pour l'utilisateur final (`windows/README.md`, `README.md`, manuel utilisateur).

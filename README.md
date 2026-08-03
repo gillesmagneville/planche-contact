@@ -178,15 +178,13 @@ Run the application.
 
 # Windows Version
 
-Planche-Contact is being ported to Windows 10/11, sharing the exact same
+Planche-Contact is available on Windows 10/11, sharing the exact same
 core engine (`portfolio/`) and GTK4 interface (`planche-contact-gtk.py`) as
 the Linux version — no separate codebase to maintain.
 
-**Status:** build scripts are available and produce both a portable `.zip`
-and an installer `.exe`. Real-machine testing is underway — several issues
-found during testing have already been fixed — but the Windows version has
-not yet been fully validated end-to-end or published as an official
-release. Testing and feedback are very welcome.
+**Status:** validated on real Windows hardware, with no known issues —
+official release. Build scripts produce both a portable `.zip` and an
+installer `.exe`.
 
 ```powershell
 .\build-windows.ps1
@@ -223,7 +221,6 @@ and troubleshooting.
 
 # Roadmap
 
-- Windows version — build scripts available, official binary release pending real-world testing
 - Internationalization (i18n)
 - Custom contact sheet templates
 - Additional export formats

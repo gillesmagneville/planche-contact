@@ -5,11 +5,9 @@ Windows (version portable `.zip` et installeur `.exe`) à partir du même
 code source que la version Linux (`portfolio/` et `planche-contact-gtk.py`
 à la racine du dépôt ne sont **pas** dupliqués — ce sont les mêmes fichiers).
 
-⚠️ **Portage en cours de validation sur machine Windows réelle.** Plusieurs
-problèmes déjà rencontrés lors de tests réels ont été corrigés (voir
-`CHANGELOG.md`), mais l'ensemble n'a pas encore été validé de bout en bout
-ni publié comme release officielle. D'autres ajustements restent possibles
-— voir la section Dépannage plus bas.
+✅ **Portage validé sur machine Windows réelle, sans bug apparent — release
+officielle.** Plusieurs problèmes rencontrés lors des tests réels ont été
+corrigés au fil de l'eau (voir `CHANGELOG.md`).
 
 ## Utilisation
 
@@ -121,7 +119,7 @@ lance aussi depuis la racine) — c'est celui-là qu'on lance en pratique.
 5. Le dossier résultant est zippé tel quel (version portable), et/ou
    embarqué dans un installeur NSIS.
 
-## Dépannage attendu
+## Dépannage
 
 **"Namespace Gtk not Available" au lancement de l'exécutable gelé**
 Signale que les typelibs ou les DLL GTK4 n'ont pas été trouvés au runtime.

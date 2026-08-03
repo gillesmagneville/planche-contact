@@ -276,14 +276,12 @@ en cause sans en connaître la raison) :
 | Couleurs GTK4 différentes du thème Windows choisi | **Limitation inhérente**, pas un bug : GTK4 utilise son propre système de thème (Adwaita), indépendant du thème natif de l'OS. Aucune correction simple possible sans un chantier de theming dédié (interroger l'API/le registre Windows et générer du CSS GTK dynamiquement) |
 | Avertissement SmartScreen ("Windows a protégé votre PC") à l'installation | **Pas de correctif de code possible** : nécessite un certificat de signature de code payant (~100-500 €/an) ou l'accumulation naturelle de réputation avec le temps. La procédure de contournement (« Informations complémentaires » puis « Exécuter quand même ») est documentée pour l'utilisateur final dans `windows/README.md`, le manuel utilisateur et le `README.md` principal |
 | Version Python Windows figée sur celle de la dernière publication gvsbuild | Contrainte externe, pas un bug : si gvsbuild publie une nouvelle version ciblant une autre version de Python, il faudra installer cette nouvelle version (le script la détecte et propose de l'installer automatiquement) |
-| Build Windows non testable directement par Claude sur machine réelle | Aucun accès direct à une machine Windows. Cela dit, `makensis` + Wine (voir §6) permettent désormais de compiler et d'exécuter un vrai installeur NSIS dans le bac à sable Linux pour reproduire/valider un correctif de logique avant transmission — plusieurs bugs (voir historique dans `CHANGELOG.md`) ont ainsi été confirmés puis corrigés avec certitude plutôt que par déduction. Un test réel sur machine Windows par le mainteneur reste néanmoins la validation finale (thème visuel, UAC, SmartScreen...) |
+| Build Windows non testable directement par Claude sur machine réelle | Aucun accès direct à une machine Windows — reste vrai pour tout futur correctif. Cela dit, `makensis` + Wine (voir §6) permettent de compiler et d'exécuter un vrai installeur NSIS dans le bac à sable Linux pour reproduire/valider un correctif de logique avant transmission — plusieurs bugs (voir historique dans `CHANGELOG.md`) ont ainsi été confirmés puis corrigés avec certitude plutôt que par déduction. Le portage a depuis été **validé sur machine Windows réelle par le mainteneur, sans bug apparent**, et publié comme release officielle |
 
 ---
 
 ## 8. Roadmap
 
-- Publier une release binaire Windows officielle une fois les tests
-  utilisateur réels concluants.
 - Internationalisation (i18n) — l'interface et les messages sont
   actuellement uniquement en français.
 - Modèles de planches contact personnalisables.
