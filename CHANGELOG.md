@@ -6,6 +6,10 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 ## [Non publié]
 
+### Ajouté
+
+- Galerie HTML : clic sur une vignette ouvre désormais une visionneuse plein écran avec navigation précédent/suivant (flèches ‹ › ou clavier, fermeture par Échap ou clic en dehors), au lieu d'ouvrir chaque image dans un nouvel onglet.
+
 ### Modifié
 
 - Statut du portage Windows mis à jour : validé sur machine réelle, sans bug apparent, publié comme release officielle (`README.md`, `windows/README.md`, `PROJECT_CONTEXT.md`).
@@ -13,6 +17,7 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 ### Corrigé
 
 - Récursivité sous Windows : les images déjà générées lors d'une exécution précédente (`planches/`, `gallery/`) pouvaient être re-détectées comme photos sources (ex : 185 images comptées pour 60 réelles), l'exclusion basée sur une comparaison textuelle des chemins (`Path.resolve()` + `relative_to()`) échouant lorsqu'un même dossier physique est atteint par deux chemins textuellement différents — cas typique d'un lecteur réseau mappé vs son équivalent en chemin UNC. Comparaison désormais basée sur l'identité réelle du fichier (`os.path.samefile()`), bornée au dossier d'entrée pour éviter un appel système par niveau jusqu'à la racine du système de fichiers sur chaque photo (sensible sur un partage réseau).
+- Galerie HTML : filigrane parfois tronqué en bas des vignettes (mosaïque à taille de police fixe appliquée séparément sur un canevas ~6x plus petit que l'image pleine taille, produisant un motif disproportionné selon la hauteur exacte de chaque photo). La vignette est désormais dérivée par simple redimensionnement de l'image pleine taille déjà filigranée, garantissant un rendu identique (juste réduit).
 
 ## [1.5.3] - 2026-08-03
 

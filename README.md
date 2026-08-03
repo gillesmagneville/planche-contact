@@ -211,6 +211,7 @@ and troubleshooting.
 | File | Description |
 |------|-------------|
 | README.md | Project overview |
+| [docs/planche-contact-manual.html](docs/planche-contact-manual.html) | Full user manual (also opened by the app's "Aide" tab) |
 | [windows/README.md](windows/README.md) | Windows build instructions, requirements, troubleshooting |
 | CHANGELOG.md | Release history |
 | CONTRIBUTING.md | Contribution guidelines |

@@ -58,7 +58,7 @@ interactive, options `-Major/-Minor/-Patch`).
 | `thumbnail.py` | Génération de vignettes en parallèle (`ProcessPoolExecutor`, contexte `spawn` forcé) |
 | `contactsheet.py` | Génère les planches contact (en-tête, grille de vignettes, pied de page, numéro de page) |
 | `pdfexport.py` | Assemble les planches en PDF (`reportlab`) ; marge haute réduite indépendamment des autres marges |
-| `htmlgallery.py` | Galerie HTML paginée ; **une seule passe de décodage** par photo (la vignette est dérivée de l'image pleine taille déjà décodée, pas un second décodage) ; `ImageOps.exif_transpose()` appliqué systématiquement pour respecter l'orientation (voir §5) |
+| `htmlgallery.py` | Galerie HTML paginée ; **une seule passe de décodage** par photo (la vignette est dérivée de l'image pleine taille déjà décodée, pas un second décodage) ; `ImageOps.exif_transpose()` appliqué systématiquement pour respecter l'orientation (voir §5) ; filigrane appliqué **une seule fois** sur l'image pleine taille, la vignette étant dérivée par redimensionnement de cette version déjà filigranée (voir §5, évite un motif disproportionné/tronqué) ; visionneuse plein écran en JS vanilla intégrée à chaque page générée (précédent/suivant, clavier, sans dépendance externe) |
 | `csvindex.py` | Génère l'index CSV |
 | `utils.py` | `get_font()` (police embarquée, mise en cache), `apply_watermark()` (filigrane en mosaïque, **fonction unique** utilisée par les planches, le PDF et la galerie), `setup_logging()` |
 | `portfolio.py` | Point d'entrée CLI (`argparse`), orchestre tout ce qui précède, affiche des lignes `PROGRESS:X/100 message` sur stdout (lues par l'interface graphique) |
@@ -218,6 +218,16 @@ bel et bien dans `portfolio.py` actuel).
   décodage optimisés/fusionnés (voir `CHANGELOG.md`, bug corrigé sur la
   galerie HTML qui avait perdu cet appel lors du passage au décodage
   unique).
+- **Filigrane sur une image ET sa vignette dérivée** : toujours filigraner
+  la version pleine taille en premier, puis dériver la vignette par
+  redimensionnement de cette version déjà filigranée — jamais appliquer
+  `apply_watermark()` séparément sur les deux tailles. La mosaïque utilise
+  une taille de police et un espacement fixes en pixels (voir `utils.py`),
+  pensés pour les grandes tailles (planches, PDF, images "pleine taille"
+  de la galerie) ; appliqués tels quels sur un canevas nettement plus
+  petit (ex : vignette 400px), le motif devient disproportionné et peut
+  se retrouver tronqué en bas selon la hauteur exacte de l'image (voir
+  `CHANGELOG.md`, bug corrigé sur la galerie HTML).
 - **`pip install` dans le venv embarqué (Linux, `build-deb.sh`)** :
   toujours avec `--ignore-installed`. Le venv est créé avec
   `--system-site-packages` ; sans ce flag, `pip` saute silencieusement la

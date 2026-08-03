@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import shutil
 from concurrent.futures import ProcessPoolExecutor
 import logging
@@ -35,11 +36,14 @@ def _process_full_image_worker(args):
     HTML à partir d'un seul et même décodage (au lieu de deux décodages
     séparés comme auparavant) : décodage (en préférant l'aperçu embarqué
     pour les RAW quand il est assez grand, voir rawloader.load_image),
-    plafonnement à GALLERY_FULL_MAX_SIZE, dérivation de la vignette 400px
-    par simple redimensionnement (pas un nouveau décodage), filigrane
-    éventuel sur les deux (mosaïque identique aux planches contact / au
-    PDF, voir utils.apply_watermark), puis enregistrement des deux JPEG -
-    le tout dans le processus worker, sans repasser par le processus
+    plafonnement à GALLERY_FULL_MAX_SIZE, filigrane éventuel (mosaïque
+    identique aux planches contact / au PDF, voir utils.apply_watermark)
+    appliqué UNE SEULE FOIS sur l'image pleine taille, puis dérivation de
+    la vignette 400px par simple redimensionnement de cette version déjà
+    filigranée (pas un nouveau décodage, ni un nouveau filigrane à une
+    échelle différente - évite un motif disproportionné/tronqué sur un
+    canevas nettement plus petit), puis enregistrement des deux JPEG - le
+    tout dans le processus worker, sans repasser par le processus
     principal."""
     (image_path, images_dir_str, thumbs_dir_str, thumb_filename,
      watermark_text, watermark_opacity, watermark_orientation) = args
@@ -57,14 +61,18 @@ def _process_full_image_worker(args):
         img = img.convert("RGB")
         img.thumbnail(target, Image.Resampling.LANCZOS)
 
-        # Vignette dérivée de l'image déjà décodée ci-dessus : simple
-        # redimensionnement, aucun nouveau décodage du fichier source.
-        thumb = img.copy()
-        thumb.thumbnail((400, 400), Image.Resampling.LANCZOS)
-
         if watermark_text:
             img = apply_watermark(img, watermark_text, watermark_opacity, watermark_orientation)
-            thumb = apply_watermark(thumb, watermark_text, watermark_opacity, watermark_orientation)
+
+        # Vignette dérivée de l'image pleine taille CI-DESSUS, déjà
+        # filigranée : simple redimensionnement, garantissant un filigrane
+        # visuellement identique (juste réduit). Appliquer le motif en
+        # mosaïque séparément sur un canevas ~6x plus petit (avec la même
+        # taille de police et le même espacement fixes en pixels) produisait
+        # un rendu disproportionné, parfois tronqué en bas de la vignette
+        # selon la hauteur exacte de chaque photo (voir CHANGELOG.md).
+        thumb = img.copy()
+        thumb.thumbnail((400, 400), Image.Resampling.LANCZOS)
 
         img.save(images_dir / out_name, "JPEG", quality=90)
         thumb.save(thumbs_dir / thumb_filename, "JPEG", quality=85)
@@ -260,6 +268,49 @@ class HTMLGalleryGenerator:
         }}
         .gallery img:hover {{ transform: scale(1.03); }}
         .footer {{ text-align: center; margin-top: 30px; color: #666; }}
+
+        .lightbox {{
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }}
+        .lightbox.open {{ display: flex; }}
+        .lightbox img {{
+            max-width: 92vw;
+            max-height: 92vh;
+            border-radius: 4px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+        }}
+        .lightbox-close, .lightbox-prev, .lightbox-next {{
+            position: fixed;
+            background: rgba(255,255,255,0.12);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 1.8em;
+            line-height: 1;
+            padding: 10px 16px;
+            border-radius: 6px;
+            user-select: none;
+        }}
+        .lightbox-close:hover, .lightbox-prev:hover, .lightbox-next:hover {{
+            background: rgba(255,255,255,0.28);
+        }}
+        .lightbox-close {{ top: 16px; right: 16px; }}
+        .lightbox-prev {{ left: 16px; top: 50%; transform: translateY(-50%); }}
+        .lightbox-next {{ right: 16px; top: 50%; transform: translateY(-50%); }}
+        .lightbox-counter {{
+            position: fixed;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.85);
+            font-size: 0.95em;
+        }}
     </style>
 </head>
 <body>
@@ -269,6 +320,7 @@ class HTMLGalleryGenerator:
 {nav_html}
 <div class="gallery">
 """
+        full_image_urls = []
         for idx, (item, ok) in enumerate(zip(page_images, page_results)):
             if not ok:
                 continue
@@ -280,7 +332,9 @@ class HTMLGalleryGenerator:
             # (voir _process_full_image_worker) : on référence juste son nom
             # ici, sans nouvelle écriture ni nouveau décodage.
 
-            html += f''' <a href="images/{filename}" target="_blank">
+            position = len(full_image_urls)
+            full_image_urls.append(f"images/{filename}")
+            html += f''' <a href="images/{filename}" onclick="return openLightbox(event, {position})">
         <img src="thumbs/{thumb_filename}" alt="">
     </a>\n'''
 
@@ -290,6 +344,50 @@ class HTMLGalleryGenerator:
 <div class="footer">
     <p>Galerie générée par Planche-Contact</p>
 </div>
+
+<div id="lightbox" class="lightbox" onclick="if (event.target === this) closeLightbox()">
+    <button class="lightbox-close" onclick="closeLightbox()" aria-label="Fermer">&times;</button>
+    <button class="lightbox-prev" onclick="showDelta(-1)" aria-label="Précédent">&#8249;</button>
+    <img id="lightbox-img" src="" alt="">
+    <button class="lightbox-next" onclick="showDelta(1)" aria-label="Suivant">&#8250;</button>
+    <div class="lightbox-counter" id="lightbox-counter"></div>
+</div>
+
+<script>
+    const galleryImages = {json.dumps(full_image_urls, ensure_ascii=False)};
+    let currentIndex = -1;
+
+    function openLightbox(event, index) {{
+        event.preventDefault();
+        currentIndex = index;
+        updateLightbox();
+        document.getElementById('lightbox').classList.add('open');
+        return false;
+    }}
+
+    function closeLightbox() {{
+        document.getElementById('lightbox').classList.remove('open');
+    }}
+
+    function showDelta(delta) {{
+        if (galleryImages.length === 0) return;
+        currentIndex = (currentIndex + delta + galleryImages.length) % galleryImages.length;
+        updateLightbox();
+    }}
+
+    function updateLightbox() {{
+        document.getElementById('lightbox-img').src = galleryImages[currentIndex];
+        document.getElementById('lightbox-counter').textContent =
+            (currentIndex + 1) + ' / ' + galleryImages.length;
+    }}
+
+    document.addEventListener('keydown', function(e) {{
+        if (!document.getElementById('lightbox').classList.contains('open')) return;
+        if (e.key === 'Escape') closeLightbox();
+        else if (e.key === 'ArrowLeft') showDelta(-1);
+        else if (e.key === 'ArrowRight') showDelta(1);
+    }});
+</script>
 </body>
 </html>"""
         with open(html_path, "w", encoding="utf-8") as f:
