@@ -6,6 +6,10 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 ## [Non publié]
 
+### Retiré
+
+- Traces de diagnostic devenues inutiles : lignes `[DIAG]` dans `FolderPreviewController` (`planche-contact-gtk.py`) et fenêtre console de l'exécutable Windows (`console=True` dans `windows/planche-contact.spec`, repassé à `False`).
+
 ## [1.5.0] - 2026-08-02
 
 Consolide l'ensemble des évolutions depuis la 1.2.2-rc.1 (portage Windows,

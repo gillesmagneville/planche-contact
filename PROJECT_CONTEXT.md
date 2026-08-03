@@ -277,15 +277,11 @@ en cause sans en connaître la raison) :
 | Avertissement SmartScreen ("Windows a protégé votre PC") à l'installation | **Pas de correctif de code possible** : nécessite un certificat de signature de code payant (~100-500 €/an) ou l'accumulation naturelle de réputation avec le temps |
 | Version Python Windows figée sur celle de la dernière publication gvsbuild | Contrainte externe, pas un bug : si gvsbuild publie une nouvelle version ciblant une autre version de Python, il faudra installer cette nouvelle version (le script la détecte et propose de l'installer automatiquement) |
 | Build Windows non testable directement par Claude sur machine réelle | Aucun accès direct à une machine Windows. Cela dit, `makensis` + Wine (voir §6) permettent désormais de compiler et d'exécuter un vrai installeur NSIS dans le bac à sable Linux pour reproduire/valider un correctif de logique avant transmission — plusieurs bugs (voir historique dans `CHANGELOG.md`) ont ainsi été confirmés puis corrigés avec certitude plutôt que par déduction. Un test réel sur machine Windows par le mainteneur reste néanmoins la validation finale (thème visuel, UAC, SmartScreen...) |
-| `console=True` dans `windows/planche-contact.spec` | Activé temporairement pour le diagnostic (affiche une fenêtre console). À repasser à `False` une fois la stabilité du build Windows confirmée sur la durée |
-| Lignes `[DIAG]` dans `planche-contact-gtk.py` (`FolderPreviewController`) | Ajoutées pour diagnostiquer le blocage sur "Analyse du dossier..." (résolu). À retirer une fois le build Windows pleinement validé |
 
 ---
 
 ## 8. Roadmap
 
-- Retirer `console=True` et les lignes `[DIAG]` une fois le build Windows
-  validé sur la durée (voir §7).
 - Publier une release binaire Windows officielle une fois les tests
   utilisateur réels concluants.
 - Internationalisation (i18n) — l'interface et les messages sont

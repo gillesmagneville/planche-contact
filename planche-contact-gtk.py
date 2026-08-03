@@ -153,7 +153,6 @@ class FolderPreviewController:
             return
 
         self.status_label.set_text("Analyse du dossier...")
-        print(f"[DIAG] refresh() : demarrage du thread de scan pour {folder_path!r} (token={token})", flush=True)
         threading.Thread(
             target=self._scan_files,
             args=(folder_path, token),
@@ -171,23 +170,17 @@ class FolderPreviewController:
         """Exécuté en arrière-plan : liste uniquement les fichiers (rapide,
         pas de décodage d'image ici) pour connaître le nombre total de
         photos et permettre la pagination."""
-        print(f"[DIAG] _scan_files() : le thread a bien demarre (token={token})", flush=True)
         try:
             folder = Path(folder_path)
             image_files = sorted(
                 p for p in folder.iterdir()
                 if p.is_file() and p.suffix.lower() in ImageScanner.SUPPORTED_EXTENSIONS
             )
-            print(f"[DIAG] _scan_files() : scan termine, {len(image_files)} fichier(s) trouve(s)", flush=True)
-        except Exception as e:
-            print(f"[DIAG] _scan_files() : EXCEPTION pendant le scan : {e!r}", flush=True)
+        except Exception:
             image_files = []
-        print(f"[DIAG] _scan_files() : appel de GLib.idle_add (token={token})", flush=True)
         glib_idle_add(self._apply_file_list, token, image_files)
-        print(f"[DIAG] _scan_files() : glib_idle_add() est revenu, fin du thread (token={token})", flush=True)
 
     def _apply_file_list(self, token, image_files):
-        print(f"[DIAG] _apply_file_list() : callback invoque par la boucle principale (token={token}, attendu={self._token})", flush=True)
         if token != self._token:
             return False  # Un scan plus récent a été lancé entre-temps.
 

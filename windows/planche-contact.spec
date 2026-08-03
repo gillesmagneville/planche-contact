@@ -121,7 +121,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,  # DIAGNOSTIC TEMPORAIRE : remettre a False une fois le probleme resolu
+    console=False,
     icon=icon_file if icon_file and os.path.isfile(icon_file) else None,
     # Désactive le sous-dossier "_internal" (comportement par défaut de
     # PyInstaller 6+) : les DLL/typelibs GTK4 se retrouvent directement à
