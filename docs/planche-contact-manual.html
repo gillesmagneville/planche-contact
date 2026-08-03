@@ -77,11 +77,12 @@
 <div class="note">
 Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, installée automatiquement dans le paquet <code>.deb</code> (aucune installation manuelle nécessaire). Pour accélérer le traitement, Planche-Contact utilise en priorité l'aperçu JPEG déjà embarqué dans le fichier RAW par l'appareil photo ; un dématriçage complet (plus lent) n'est déclenché que si cet aperçu est absent ou trop petit pour l'usage demandé (vignette, planche, image "pleine taille" de la galerie).
 </div>
+<p>L'orientation des photos (portrait ou paysage) est toujours respectée telle qu'indiquée par l'appareil photo, sur les trois sorties (planches, PDF, galerie HTML) — aucune manipulation manuelle n'est nécessaire, y compris pour des photos prises l'appareil tenu à la verticale.</p>
 
 <h2>3. Interface graphique (GTK)</h2>
 
 <h3>3.1 Fenêtre principale</h3>
-<p>La fenêtre s'ouvre maximisée par défaut (tout en restant redimensionnable normalement) et propose trois onglets : <strong>Génération</strong>, <strong>Aide</strong> et <strong>À propos</strong>.</p>
+<p>La fenêtre s'ouvre maximisée par défaut (tout en restant redimensionnable normalement) et propose trois onglets : <strong>Génération</strong>, <strong>Aide</strong> et <strong>À propos</strong>. L'onglet Aide ouvre ce manuel dans le navigateur par défaut.</p>
 
 <h3>3.2 Onglet « Génération »</h3>
 
@@ -163,6 +164,9 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
 
 <pre><code># Génération simple
 python3 portfolio.py -i /Photos/2025 -o ./Sortie --pdf --html
+
+# Galerie HTML avec 24 images par page au lieu de 48 par défaut
+python3 portfolio.py -i /Photos/2025 -o ./Sortie --html --html-per-page 24
 
 # Version professionnelle avec filigrane diagonal et opacité personnalisée
 python3 portfolio.py \
