@@ -6,6 +6,17 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 ## [Non publié]
 
+### Ajouté
+
+- Procédure de contournement de l'avertissement SmartScreen Windows à l'installation, documentée pour l'utilisateur final (`windows/README.md`, `README.md`, manuel utilisateur).
+- Mention transparente de l'assistance de Claude.ai (Anthropic) à la conception du logiciel, dans le `README.md`, le manuel utilisateur et l'onglet « À propos » de l'application.
+
+## [1.5.1] - 2026-08-03
+
+### Ajouté
+
+- Manuel utilisateur : note sur le respect automatique de l'orientation EXIF, mention que l'onglet Aide ouvre ce manuel, exemple CLI avec `--html-per-page`.
+
 ### Retiré
 
 - Traces de diagnostic devenues inutiles : lignes `[DIAG]` dans `FolderPreviewController` (`planche-contact-gtk.py`) et fenêtre console de l'exécutable Windows (`console=True` dans `windows/planche-contact.spec`, repassé à `False`).

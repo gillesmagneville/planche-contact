@@ -1357,6 +1357,15 @@ class PlancheContactGTK(Gtk.Application):
         author.set_margin_top(25)
         box.append(author)
 
+        # Mention transparente de l'assistance IA à la conception
+        ai_credit = Gtk.Label()
+        ai_credit.set_markup(
+            "<span size='small'>Conçu avec l'aide de "
+            '<a href="https://claude.ai">Claude.ai</a> (Anthropic)</span>'
+        )
+        ai_credit.set_margin_top(4)
+        box.append(ai_credit)
+
         # Licence
         license_label = Gtk.Label()
         license_label.set_markup("<span size='small'>Distribué sous licence GNU GPL v3</span>")

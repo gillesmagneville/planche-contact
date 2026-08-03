@@ -198,6 +198,14 @@ offers to install anything missing automatically. See
 [`windows/README.md`](windows/README.md) for full details, requirements
 and troubleshooting.
 
+> **Note:** since the installer isn't (yet) code-signed, Windows will very
+> likely show a blue **"Windows protected your PC"** (SmartScreen) warning
+> on first run. This is expected for a small, unsigned open-source project
+> — not a sign of malware. Click **More info**, then **Run anyway** to
+> proceed. The warning fades over time as the installer builds reputation
+> with SmartScreen, or disappears immediately with a paid code-signing
+> certificate (see Roadmap).
+
 ---
 
 # Documentation
@@ -235,7 +243,8 @@ Please read **CONTRIBUTING.md** before opening an Issue or a Pull Request.
 
 # License
 
-Planche-Contact is developed by **Gilles MAGNEVILLE**.
+Planche-Contact is developed by **Gilles MAGNEVILLE**, with the help of
+[Claude.ai](https://claude.ai) (Anthropic).
 
 Distributed under the terms of the **GNU General Public License v3.0**.
 

@@ -50,6 +50,27 @@ racine du dépôt :
 - `planche-contact_X.Y.Z_windows-setup.exe` — installeur classique
   (raccourcis menu Démarrer, désinstalleur), si NSIS est disponible.
 
+## Avertissement SmartScreen à l'installation
+
+⚠️ **À prévenir auprès des utilisateurs finaux** : au premier lancement de
+`planche-contact_X.Y.Z_windows-setup.exe` (ou de l'exécutable portable),
+Windows affiche très probablement un écran bleu **« Windows a protégé
+votre PC »** (SmartScreen). C'est normal et attendu — l'installeur n'est
+pas signé numériquement (voir §7 de `PROJECT_CONTEXT.md`), pas un signe de
+logiciel malveillant.
+
+Pour continuer :
+
+1. Cliquer sur **Informations complémentaires**.
+2. Cliquer sur **Exécuter quand même**.
+
+Cet avertissement s'atténue naturellement avec le temps, à mesure que
+l'installeur accumule de la réputation auprès du service SmartScreen de
+Microsoft (téléchargements, absence de signalement), ou disparaît
+immédiatement avec un certificat de signature de code payant (~100-500
+€/an — voir la Roadmap de `PROJECT_CONTEXT.md`). Aucun correctif de code
+ne peut le supprimer.
+
 ## Prérequis (vérifiés et proposés à l'installation automatiquement)
 
 ⚠️ **Windows 64 bits (x64) exclusivement.** gvsbuild ne publie pas de build
