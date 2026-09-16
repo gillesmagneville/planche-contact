@@ -9,6 +9,7 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 ### Ajouté
 
 - Galerie HTML : clic sur une vignette ouvre désormais une visionneuse plein écran avec navigation précédent/suivant (flèches ‹ › ou clavier, fermeture par Échap ou clic en dehors), au lieu d'ouvrir chaque image dans un nouvel onglet.
+- Visionneuse de la galerie HTML enrichie : indicateur de la page contenant la photo affichée, champ « aller à la page », nom du fichier affiché, bouton de téléchargement, panneau d'informations (résolution réelle d'origine, taille du fichier, date de prise de vue), bascule plein écran (raccourcis clavier `I` et `F` en plus des boutons).
 
 ### Modifié
 
@@ -18,6 +19,7 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 - Récursivité sous Windows : les images déjà générées lors d'une exécution précédente (`planches/`, `gallery/`) pouvaient être re-détectées comme photos sources (ex : 185 images comptées pour 60 réelles), l'exclusion basée sur une comparaison textuelle des chemins (`Path.resolve()` + `relative_to()`) échouant lorsqu'un même dossier physique est atteint par deux chemins textuellement différents — cas typique d'un lecteur réseau mappé vs son équivalent en chemin UNC. Comparaison désormais basée sur l'identité réelle du fichier (`os.path.samefile()`), bornée au dossier d'entrée pour éviter un appel système par niveau jusqu'à la racine du système de fichiers sur chaque photo (sensible sur un partage réseau).
 - Galerie HTML : filigrane parfois tronqué en bas des vignettes (mosaïque à taille de police fixe appliquée séparément sur un canevas ~6x plus petit que l'image pleine taille, produisant un motif disproportionné selon la hauteur exacte de chaque photo). La vignette est désormais dérivée par simple redimensionnement de l'image pleine taille déjà filigranée, garantissant un rendu identique (juste réduit).
+- Tri par date EXIF (photos JPEG/PNG, non RAW) : `DateTimeOriginal`/`DateTimeDigitized` n'étaient en réalité jamais lus (ces tags vivent dans un sous-IFD Exif séparé, inaccessible via `Image.getexif().get()` direct), le tri retombait donc silencieusement sur la date de modification du fichier depuis le début. Découvert en ajoutant l'affichage de la date dans la nouvelle visionneuse, qui l'a rendu visible.
 
 ## [1.5.3] - 2026-08-03
 

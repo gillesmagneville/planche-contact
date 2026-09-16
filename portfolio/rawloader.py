@@ -49,6 +49,44 @@ def is_raw_file(path: Path) -> bool:
     return Path(path).suffix.lower() in RAW_EXTENSIONS
 
 
+def get_original_dimensions(path: Path):
+    """Résolution réelle du fichier source (largeur, hauteur), orientation
+    EXIF/RAW appliquée pour refléter ce que l'utilisateur voit réellement -
+    utilisé pour l'affichage d'informations dans la visionneuse de la
+    galerie HTML (voir htmlgallery.py). Toujours une lecture de métadonnées
+    seules (en-tête JPEG/TIFF, ou `rawpy.sizes` pour un RAW) : jamais un
+    décodage complet, donc rapide même sur plusieurs centaines de photos.
+
+    Retourne None si la lecture échoue (fichier corrompu, format non
+    supporté...) - à charge de l'appelant de gérer l'absence de résultat.
+    """
+    path = Path(path)
+    try:
+        if is_raw_file(path):
+            if not RAWPY_AVAILABLE:
+                return None
+            with rawpy.imread(str(path)) as raw:
+                width, height = raw.sizes.width, raw.sizes.height
+                # raw.sizes.flip est le code de rotation LibRaw (0 = aucune,
+                # 3 = 180°, 5/6 = 90° dans un sens ou l'autre) : width/height
+                # restent dans l'orientation NATIVE du capteur, à échanger
+                # pour les rotations à 90°.
+                if raw.sizes.flip in (5, 6):
+                    width, height = height, width
+                return (width, height)
+
+        with Image.open(path) as img:
+            width, height = img.size
+            exif = img.getexif()
+            orientation = exif.get(0x0112)  # tag EXIF Orientation
+            if orientation in (5, 6, 7, 8):
+                width, height = height, width
+            return (width, height)
+    except Exception as e:
+        logger.debug(f"Dimensions d'origine illisibles pour {path.name} : {e}")
+        return None
+
+
 def _large_enough(img_size, target_size, tolerance=0.9):
     """Vrai si img_size couvre au moins ~tolerance fois le plus grand côté
     demandé. Une petite marge est tolérée : un aperçu embarqué très

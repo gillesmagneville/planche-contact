@@ -53,14 +53,14 @@ interactive, options `-Major/-Minor/-Patch`).
 | Module | Rôle |
 |---|---|
 | `config.py` | Dataclass `Config` : tous les paramètres d'une génération |
-| `scanner.py` | Scan du dossier (récursif ou non), tri par date EXIF ou nom, exclut `planches/` et `gallery/` du dossier de sortie configuré pour éviter de re-scanner ses propres fichiers générés (comparaison par identité réelle de fichier via `os.path.samefile()`, pas par texte — voir §5) |
-| `rawloader.py` | Chargement unifié image/RAW : aperçu JPEG embarqué en priorité (rapide), dématriçage complet (`rawpy`) uniquement si cet aperçu est absent ou trop petit |
+| `scanner.py` | Scan du dossier (récursif ou non), tri par date EXIF ou nom (délègue à `utils.get_exif_date()`), exclut `planches/` et `gallery/` du dossier de sortie configuré pour éviter de re-scanner ses propres fichiers générés (comparaison par identité réelle de fichier via `os.path.samefile()`, pas par texte — voir §5) |
+| `rawloader.py` | Chargement unifié image/RAW : aperçu JPEG embarqué en priorité (rapide), dématriçage complet (`rawpy`) uniquement si cet aperçu est absent ou trop petit ; `get_original_dimensions()` : résolution réelle d'origine (métadonnées seules, orientation EXIF/RAW appliquée), utilisée par la visionneuse de la galerie HTML |
 | `thumbnail.py` | Génération de vignettes en parallèle (`ProcessPoolExecutor`, contexte `spawn` forcé) |
 | `contactsheet.py` | Génère les planches contact (en-tête, grille de vignettes, pied de page, numéro de page) |
 | `pdfexport.py` | Assemble les planches en PDF (`reportlab`) ; marge haute réduite indépendamment des autres marges |
-| `htmlgallery.py` | Galerie HTML paginée ; **une seule passe de décodage** par photo (la vignette est dérivée de l'image pleine taille déjà décodée, pas un second décodage) ; `ImageOps.exif_transpose()` appliqué systématiquement pour respecter l'orientation (voir §5) ; filigrane appliqué **une seule fois** sur l'image pleine taille, la vignette étant dérivée par redimensionnement de cette version déjà filigranée (voir §5, évite un motif disproportionné/tronqué) ; visionneuse plein écran en JS vanilla intégrée à chaque page générée (précédent/suivant, clavier, sans dépendance externe) |
+| `htmlgallery.py` | Galerie HTML paginée ; **une seule passe de décodage** par photo (la vignette est dérivée de l'image pleine taille déjà décodée, pas un second décodage) ; `ImageOps.exif_transpose()` appliqué systématiquement pour respecter l'orientation (voir §5) ; filigrane appliqué **une seule fois** sur l'image pleine taille, la vignette étant dérivée par redimensionnement de cette version déjà filigranée (voir §5, évite un motif disproportionné/tronqué) ; visionneuse plein écran en JS vanilla intégrée à chaque page générée (précédent/suivant, clavier, sans dépendance externe) avec indicateur de page, saut direct à une page, nom du fichier, téléchargement, panneau d'informations (résolution/taille/date, calculées par le worker en même temps que l'image) et bascule plein écran (`Fullscreen API`) |
 | `csvindex.py` | Génère l'index CSV |
-| `utils.py` | `get_font()` (police embarquée, mise en cache), `apply_watermark()` (filigrane en mosaïque, **fonction unique** utilisée par les planches, le PDF et la galerie), `setup_logging()` |
+| `utils.py` | `get_font()` (police embarquée, mise en cache), `apply_watermark()` (filigrane en mosaïque, **fonction unique** utilisée par les planches, le PDF et la galerie), `get_exif_date()` (date de prise de vue, RAW compris — **fonction unique** utilisée par le tri de `scanner.py` et les informations de la visionneuse de `htmlgallery.py`), `format_file_size()`, `setup_logging()` |
 | `portfolio.py` | Point d'entrée CLI (`argparse`), orchestre tout ce qui précède, affiche des lignes `PROGRESS:X/100 message` sur stdout (lues par l'interface graphique) |
 | `fonts/` | Police DejaVu Sans (normale + gras) embarquée avec le projet — licence Bitstream Vera, redistribution autorisée |
 
@@ -249,6 +249,19 @@ bel et bien dans `portfolio.py` actuel).
   de `_is_within()` dans `scanner.py`) plutôt que de remonter jusqu'à la
   racine du système de fichiers à chaque fichier — sensible sur un
   partage réseau.
+- **Date EXIF (formats standards, non RAW)** : toujours passer par
+  `utils.get_exif_date()`, jamais par `Image.getexif().get()` direct pour
+  `DateTimeOriginal`/`DateTimeDigitized` (tags `0x9003`/`0x9004`). Ces
+  deux tags vivent dans un **sous-IFD Exif séparé** (pointé par le tag
+  `0x8769` de l'IFD0), jamais dans l'IFD0 principal : `exif.get(0x9003)`
+  renvoie toujours `None`, il faut passer par
+  `exif.get_ifd(0x8769).get(0x9003)`. Seul `DateTime` (`0x0132`, date de
+  *modification* du fichier, moins pertinente qu'une date de prise de
+  vue) vit dans l'IFD0 et reste accessible directement. Ce bug affectait
+  silencieusement le tri par date depuis le début (repli sur la date de
+  modification du fichier) - découvert en ajoutant l'affichage de la
+  date dans la visionneuse de la galerie HTML, qui l'a rendu visible
+  (voir `CHANGELOG.md`).
 - **Filigrane** : toujours via `utils.apply_watermark()` — fonction
   unique, jamais de logique de filigrane dupliquée localement.
 - **Compatibilité GTK/Windows** : pattern défensif systématique pour les

@@ -1,7 +1,17 @@
 import functools
 import logging
+from datetime import datetime
 from pathlib import Path
+from typing import Optional
 from PIL import Image, ImageDraw, ImageFont
+
+from .rawloader import is_raw_file
+
+try:
+    import exifread
+    EXIFREAD_AVAILABLE = True
+except ImportError:
+    EXIFREAD_AVAILABLE = False
 
 
 def setup_logging(log_path: Path) -> None:
@@ -115,3 +125,66 @@ def apply_watermark(
     except Exception as e:
         logging.getLogger(__name__).warning(f"Filigrane impossible : {e}")
         return image
+
+
+def get_exif_date(path: Path) -> Optional[datetime]:
+    """Extrait la date EXIF la plus pertinente (prise de vue), RAW compris.
+    Centralisé ici : utilisé à la fois pour le tri des photos
+    (scanner.py) et pour les informations affichées dans la visionneuse
+    de la galerie HTML (htmlgallery.py)."""
+    path = Path(path)
+    if is_raw_file(path):
+        if not EXIFREAD_AVAILABLE:
+            return None
+        try:
+            with open(path, "rb") as f:
+                tags = exifread.process_file(f, details=False, stop_tag="EXIF DateTimeOriginal")
+            for key in ("EXIF DateTimeOriginal", "EXIF DateTimeDigitized", "Image DateTime"):
+                date_str = tags.get(key)
+                if date_str:
+                    try:
+                        return datetime.strptime(str(date_str), "%Y:%m:%d %H:%M:%S")
+                    except ValueError:
+                        continue
+        except Exception:
+            pass
+        return None
+
+    try:
+        with Image.open(path) as img:
+            exif = img.getexif()
+            # DateTimeOriginal (0x9003) et DateTimeDigitized (0x9004) vivent
+            # dans le sous-IFD Exif, jamais dans l'IFD0 principal : exif.get()
+            # direct ne les trouve pas, il faut passer par get_ifd(). Seul
+            # DateTime (0x0132, date de MODIFICATION du fichier, moins
+            # pertinente qu'une date de prise de vue) vit dans l'IFD0.
+            exif_ifd = exif.get_ifd(0x8769)  # ExifTags.IFD.Exif
+            for tag in (0x9003, 0x9004):
+                date_str = exif_ifd.get(tag)
+                if date_str:
+                    try:
+                        return datetime.strptime(str(date_str), "%Y:%m:%d %H:%M:%S")
+                    except ValueError:
+                        continue
+            date_str = exif.get(0x0132)
+            if date_str:
+                try:
+                    return datetime.strptime(str(date_str), "%Y:%m:%d %H:%M:%S")
+                except ValueError:
+                    pass
+    except Exception:
+        pass
+    return None
+
+
+def format_file_size(num_bytes: int) -> str:
+    """Taille de fichier lisible (ex: "4,2 Mo"), utilisée pour les
+    informations affichées dans la visionneuse de la galerie HTML."""
+    size = float(num_bytes)
+    for unit in ("o", "Ko", "Mo", "Go"):
+        if size < 1024 or unit == "Go":
+            if unit == "o":
+                return f"{int(size)} {unit}"
+            return f"{size:.1f} {unit}".replace(".", ",")
+        size /= 1024
+    return f"{size:.1f} Go".replace(".", ",")

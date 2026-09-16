@@ -7,8 +7,8 @@ import multiprocessing
 import os
 from PIL import Image, ImageOps
 
-from .rawloader import load_image, is_raw_file
-from .utils import apply_watermark
+from .rawloader import load_image, is_raw_file, get_original_dimensions
+from .utils import apply_watermark, get_exif_date, format_file_size
 
 # Taille max. (plus grand côté) des images "pleine taille" de la galerie
 # HTML. Une photo RAW de 45 Mpx pleinement dématricée puis enregistrée telle
@@ -44,14 +44,17 @@ def _process_full_image_worker(args):
     échelle différente - évite un motif disproportionné/tronqué sur un
     canevas nettement plus petit), puis enregistrement des deux JPEG - le
     tout dans le processus worker, sans repasser par le processus
-    principal."""
+    principal. Calcule également les métadonnées affichées dans la
+    visionneuse (résolution réelle d'origine, taille du fichier, date de
+    prise de vue) pendant que le fichier est déjà ouvert, plutôt qu'une
+    passe séparée qui relirait chaque photo une seconde fois."""
     (image_path, images_dir_str, thumbs_dir_str, thumb_filename,
      watermark_text, watermark_opacity, watermark_orientation) = args
     images_dir = Path(images_dir_str)
     thumbs_dir = Path(thumbs_dir_str)
     path = Path(image_path)
     if not path.exists():
-        return False
+        return (False, None)
 
     out_name = HTMLGalleryGenerator.display_filename(path)
     target = (GALLERY_FULL_MAX_SIZE, GALLERY_FULL_MAX_SIZE)
@@ -76,7 +79,22 @@ def _process_full_image_worker(args):
 
         img.save(images_dir / out_name, "JPEG", quality=90)
         thumb.save(thumbs_dir / thumb_filename, "JPEG", quality=85)
-        return True
+
+        dimensions = get_original_dimensions(path)
+        exif_date = get_exif_date(path)
+        try:
+            size_bytes = path.stat().st_size
+        except OSError:
+            size_bytes = None
+
+        metadata = {
+            "filename": out_name,
+            "width": dimensions[0] if dimensions else None,
+            "height": dimensions[1] if dimensions else None,
+            "size": format_file_size(size_bytes) if size_bytes is not None else None,
+            "date": exif_date.strftime("%d/%m/%Y %H:%M") if exif_date else None,
+        }
+        return (True, metadata)
     except Exception as e:
         logging.getLogger(__name__).warning(f"Erreur sur {path.name}: {e}")
         if not is_raw_file(path):
@@ -85,7 +103,7 @@ def _process_full_image_worker(args):
                 shutil.copy2(path, images_dir / out_name)
             except Exception:
                 pass
-        return False
+        return (False, None)
 
 
 class HTMLGalleryGenerator:
@@ -149,7 +167,7 @@ class HTMLGalleryGenerator:
                     self.watermark_text, self.watermark_opacity, self.watermark_orientation
                 ))
 
-        results = [False] * len(images)
+        results = [(False, None)] * len(images)
         if tasks:
             max_workers = min(os.cpu_count() or 4, 64)
             ctx = multiprocessing.get_context("spawn")
@@ -167,16 +185,21 @@ class HTMLGalleryGenerator:
             ) as executor:
                 results = list(executor.map(_process_full_image_worker, tasks))
 
+        page_ok = [ok for ok, _ in results]
+        page_meta_all = [meta for _, meta in results]
+
         for page_num in range(1, total_pages + 1):
             start = (page_num - 1) * self.images_per_page
             page_images = images[start : start + self.images_per_page]
-            page_results = results[start : start + self.images_per_page]
+            page_results = page_ok[start : start + self.images_per_page]
+            page_meta = page_meta_all[start : start + self.images_per_page]
 
             html_path = output_dir / ("index.html" if page_num == 1 else f"page_{page_num:03d}.html")
 
             self._generate_page(
                 page_images=page_images,
                 page_results=page_results,
+                page_meta=page_meta,
                 html_path=html_path,
                 display_title=display_title,
                 current_page=page_num,
@@ -187,7 +210,7 @@ class HTMLGalleryGenerator:
 
         print(f"Galerie HTML créée : {total_pages} page(s) dans {output_dir}")
 
-    def _generate_page(self, page_images, page_results, html_path, display_title,
+    def _generate_page(self, page_images, page_results, page_meta, html_path, display_title,
                        current_page, total_pages, total_images, thumbs_dir):
         thumbs_dir.mkdir(exist_ok=True)
 
@@ -300,17 +323,96 @@ class HTMLGalleryGenerator:
         .lightbox-close:hover, .lightbox-prev:hover, .lightbox-next:hover {{
             background: rgba(255,255,255,0.28);
         }}
-        .lightbox-close {{ top: 16px; right: 16px; }}
         .lightbox-prev {{ left: 16px; top: 50%; transform: translateY(-50%); }}
         .lightbox-next {{ right: 16px; top: 50%; transform: translateY(-50%); }}
-        .lightbox-counter {{
+
+        .lightbox-topbar {{
             position: fixed;
-            bottom: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: rgba(255,255,255,0.85);
+            top: 0; left: 0; right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 16px;
+            background: rgba(0,0,0,0.55);
+            color: white;
+            box-sizing: border-box;
             font-size: 0.95em;
         }}
+        .lightbox-filename {{
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            opacity: 0.9;
+        }}
+        .lightbox-page-indicator {{
+            opacity: 0.75;
+            white-space: nowrap;
+            margin-left: auto;
+            margin-right: 12px;
+        }}
+        .lightbox-actions {{ display: flex; gap: 6px; flex-shrink: 0; }}
+        .lightbox-btn {{
+            background: rgba(255,255,255,0.12);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2em;
+            line-height: 1;
+            padding: 6px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+        }}
+        .lightbox-btn:hover {{ background: rgba(255,255,255,0.28); }}
+
+        .lightbox-bottombar {{
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            padding: 10px 16px;
+            background: rgba(0,0,0,0.55);
+            color: rgba(255,255,255,0.9);
+            box-sizing: border-box;
+            font-size: 0.9em;
+        }}
+        .lightbox-goto {{ display: flex; align-items: center; gap: 6px; }}
+        .lightbox-goto input {{
+            width: 4.5em;
+            padding: 3px 6px;
+            border-radius: 4px;
+            border: none;
+        }}
+        .lightbox-goto button {{
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 10px;
+            cursor: pointer;
+        }}
+        .lightbox-goto button:hover {{ background: rgba(255,255,255,0.3); }}
+        .lightbox-counter {{ white-space: nowrap; }}
+
+        .lightbox-info {{
+            display: none;
+            position: fixed;
+            top: 56px;
+            right: 16px;
+            background: rgba(20,20,20,0.92);
+            color: rgba(255,255,255,0.92);
+            padding: 14px 18px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            max-width: 320px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        }}
+        .lightbox-info.open {{ display: block; }}
+        .lightbox-info p {{ margin: 4px 0; }}
     </style>
 </head>
 <body>
@@ -321,6 +423,7 @@ class HTMLGalleryGenerator:
 <div class="gallery">
 """
         full_image_urls = []
+        gallery_meta = []
         for idx, (item, ok) in enumerate(zip(page_images, page_results)):
             if not ok:
                 continue
@@ -334,9 +437,27 @@ class HTMLGalleryGenerator:
 
             position = len(full_image_urls)
             full_image_urls.append(f"images/{filename}")
+            meta = page_meta[idx] or {}
+            width, height = meta.get("width"), meta.get("height")
+            gallery_meta.append({
+                "filename": meta.get("filename") or filename,
+                "resolution": f"{width} × {height} px" if width and height else "Inconnue",
+                "size": meta.get("size") or "Inconnue",
+                "date": meta.get("date") or "Inconnue",
+            })
             html += f''' <a href="images/{filename}" onclick="return openLightbox(event, {position})">
         <img src="thumbs/{thumb_filename}" alt="">
     </a>\n'''
+
+        goto_page_html = ""
+        if total_pages > 1:
+            goto_page_html = (
+                '<div class="lightbox-goto">'
+                '<label for="goto-page-input">Aller à la page :</label>'
+                f'<input type="number" id="goto-page-input" min="1" max="{total_pages}" placeholder="1-{total_pages}">'
+                '<button onclick="goToPage()">OK</button>'
+                '</div>'
+            )
 
         html += f"""
 </div>
@@ -346,16 +467,43 @@ class HTMLGalleryGenerator:
 </div>
 
 <div id="lightbox" class="lightbox" onclick="if (event.target === this) closeLightbox()">
-    <button class="lightbox-close" onclick="closeLightbox()" aria-label="Fermer">&times;</button>
+    <div class="lightbox-topbar">
+        <span id="lightbox-filename" class="lightbox-filename"></span>
+        <span class="lightbox-page-indicator">Page {current_page} / {total_pages}</span>
+        <div class="lightbox-actions">
+            <button class="lightbox-btn" onclick="toggleInfo()" aria-label="Informations" title="Informations">&#9432;</button>
+            <a id="lightbox-download" class="lightbox-btn" download aria-label="Télécharger" title="Télécharger">&#8681;</a>
+            <button class="lightbox-btn" onclick="toggleFullscreen()" aria-label="Plein écran" title="Plein écran">&#10530;</button>
+            <button class="lightbox-btn" onclick="closeLightbox()" aria-label="Fermer" title="Fermer">&times;</button>
+        </div>
+    </div>
+
     <button class="lightbox-prev" onclick="showDelta(-1)" aria-label="Précédent">&#8249;</button>
     <img id="lightbox-img" src="" alt="">
     <button class="lightbox-next" onclick="showDelta(1)" aria-label="Suivant">&#8250;</button>
-    <div class="lightbox-counter" id="lightbox-counter"></div>
+
+    <div id="lightbox-info" class="lightbox-info">
+        <p><strong>Fichier :</strong> <span id="info-filename"></span></p>
+        <p><strong>Résolution :</strong> <span id="info-resolution"></span></p>
+        <p><strong>Taille :</strong> <span id="info-size"></span></p>
+        <p><strong>Date :</strong> <span id="info-date"></span></p>
+    </div>
+
+    <div class="lightbox-bottombar">
+        <div class="lightbox-counter" id="lightbox-counter"></div>
+        {goto_page_html}
+    </div>
 </div>
 
 <script>
     const galleryImages = {json.dumps(full_image_urls, ensure_ascii=False)};
+    const galleryMeta = {json.dumps(gallery_meta, ensure_ascii=False)};
+    const totalPages = {total_pages};
     let currentIndex = -1;
+
+    function pageUrl(n) {{
+        return n === 1 ? 'index.html' : 'page_' + String(n).padStart(3, '0') + '.html';
+    }}
 
     function openLightbox(event, index) {{
         event.preventDefault();
@@ -367,6 +515,7 @@ class HTMLGalleryGenerator:
 
     function closeLightbox() {{
         document.getElementById('lightbox').classList.remove('open');
+        document.getElementById('lightbox-info').classList.remove('open');
     }}
 
     function showDelta(delta) {{
@@ -376,16 +525,55 @@ class HTMLGalleryGenerator:
     }}
 
     function updateLightbox() {{
-        document.getElementById('lightbox-img').src = galleryImages[currentIndex];
+        const url = galleryImages[currentIndex];
+        const meta = galleryMeta[currentIndex];
+
+        document.getElementById('lightbox-img').src = url;
+        document.getElementById('lightbox-filename').textContent = meta.filename;
         document.getElementById('lightbox-counter').textContent =
             (currentIndex + 1) + ' / ' + galleryImages.length;
+
+        const dl = document.getElementById('lightbox-download');
+        dl.href = url;
+        dl.download = meta.filename;
+
+        document.getElementById('info-filename').textContent = meta.filename;
+        document.getElementById('info-resolution').textContent = meta.resolution;
+        document.getElementById('info-size').textContent = meta.size;
+        document.getElementById('info-date').textContent = meta.date;
+    }}
+
+    function toggleInfo() {{
+        document.getElementById('lightbox-info').classList.toggle('open');
+    }}
+
+    function toggleFullscreen() {{
+        if (!document.fullscreenElement) {{
+            document.documentElement.requestFullscreen().catch(() => {{}});
+        }} else {{
+            document.exitFullscreen();
+        }}
+    }}
+
+    function goToPage() {{
+        const input = document.getElementById('goto-page-input');
+        let n = parseInt(input.value, 10);
+        if (isNaN(n)) return;
+        n = Math.max(1, Math.min(totalPages, n));
+        window.location.href = pageUrl(n);
     }}
 
     document.addEventListener('keydown', function(e) {{
         if (!document.getElementById('lightbox').classList.contains('open')) return;
+        if (document.activeElement && document.activeElement.id === 'goto-page-input') {{
+            if (e.key === 'Enter') goToPage();
+            return;
+        }}
         if (e.key === 'Escape') closeLightbox();
         else if (e.key === 'ArrowLeft') showDelta(-1);
         else if (e.key === 'ArrowRight') showDelta(1);
+        else if (e.key === 'i' || e.key === 'I') toggleInfo();
+        else if (e.key === 'f' || e.key === 'F') toggleFullscreen();
     }});
 </script>
 </body>
