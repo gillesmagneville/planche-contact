@@ -404,7 +404,22 @@ bel et bien dans `portfolio.py` actuel).
 - **Fichier `VERSION`** : source unique à la racine, lue et écrite par les
   deux scripts de build. N'est mis à jour qu'après un build **réussi**
   (jamais en cas d'échec, pour ne pas désynchroniser le numéro affiché du
-  contenu réellement publié).
+  contenu réellement publié). **Appartient exclusivement aux scripts de
+  build, jamais à Claude** : incrémenté en local par le mainteneur à
+  chaque build, indépendamment des sessions de travail avec Claude - sa
+  valeur sur GitHub peut donc avoir avancé depuis le dernier `git pull`
+  de Claude, y compris plusieurs fois de suite, sans aucun rapport avec
+  le fichier sur lequel Claude travaille. Règle stricte : **ne jamais
+  créer, modifier, ni livrer un fichier `VERSION`** de mémoire ou par
+  supposition - un `git pull`/`git fetch` juste avant toute livraison ne
+  suffit pas à lui seul s'il ne vérifie pas spécifiquement ce fichier,
+  car une modification portant sur d'autres fichiers pourrait laisser
+  croire que VERSION est à jour alors qu'il a changé entre deux pulls.
+  Si un besoin ponctuel exige de connaître la version actuelle (ex : la
+  citer dans une discussion), toujours relire `VERSION` fraîchement
+  depuis `origin/main` à ce moment précis plutôt que de se fier à une
+  valeur vue plus tôt dans la conversation - un oubli ici reviendrait à
+  faire régresser le numéro de version affiché.
 - **Livraison de code** : fichiers complets systématiquement, jamais de
   diff/patch partiel (convention de travail établie avec le mainteneur).
 - **"Afficher les résultats" opérant sur ce qui existe déjà**
