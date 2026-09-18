@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Planche-Contact - Vollständiges Handbuch</title>
+    <style>
+        body {
+            font-family: "DejaVu Sans", Arial, sans-serif;
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 20px;
+            line-height: 1.65;
+            background: #f8f9fa;
+        }
+        h1, h2, h3 { color: #1a1a1a; }
+        h1 { font-size: 2.2em; border-bottom: 3px solid #333; padding-bottom: 10px; }
+        h2 { font-size: 1.6em; margin-top: 45px; border-bottom: 1px solid #ccc; padding-bottom: 6px; }
+        h3 { font-size: 1.25em; margin-top: 30px; }
+        code, pre {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: "DejaVu Sans Mono", monospace;
+        }
+        pre {
+            padding: 14px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th { background: #e9ecef; }
+        .note {
+            background: #fff3cd;
+            border-left: 6px solid #ffc107;
+            padding: 14px 18px;
+            margin: 25px 0;
+        }
+        ul { padding-left: 22px; }
+        a { color: #0066cc; }
+    </style>
+</head>
+<body>
+
+<h1>Planche-Contact — Vollständiges Handbuch</h1>
+
+<h2>1. Überblick</h2>
+<p><strong>Planche-Contact</strong> ist ein leichtes, schnelles Werkzeug zur Erstellung hochwertiger (300 dpi) fotografischer Kontaktbögen aus einem Fotoordner, ohne Datenbank und ohne aufwändige Software.</p>
+<p>Es gibt zwei Varianten:</p>
+<ul>
+    <li><strong>GTK4-Benutzeroberfläche</strong> (<code>planche-contact-gtk.py</code> / <code>planche-contact-gtk</code>)</li>
+    <li><strong>Kommandozeile</strong> (<code>portfolio.py</code>)</li>
+</ul>
+<p>Aus demselben Fotoordner kann das Programm gleichzeitig erzeugen:</p>
+<ul>
+    <li><strong>Kontaktbögen</strong> im JPEG-Format (eine oder mehrere Seiten);</li>
+    <li>ein <strong>PDF</strong>, das alle Kontaktbögen zusammenfasst;</li>
+    <li>eine paginierte, eigenständige <strong>HTML-Galerie</strong> mit anklickbaren Miniaturbildern, die jedes Foto in einer Vollbild-Ansicht öffnen: Dateiname und Seitenzahl werden angezeigt, Navigation zwischen den Fotos der Seite (Tastatur oder Pfeile ‹ ›), direkter Sprung zu einer anderen Seite, Zoom von 50 % bis 200 %, Herunterladen des angezeigten Fotos, technische Informationen (Originalauflösung, Größe, Aufnahmedatum) und Vollbild-Umschaltung;</li>
+    <li>ein <strong>CSV-Verzeichnis</strong>, das jedes Foto mit seiner Nummer aufführt.</li>
+</ul>
+<div class="note">
+<strong>Unter Windows</strong> zeigt Windows beim ersten Start des Installationsprogramms sehr wahrscheinlich einen blauen Bildschirm „Windows hat Ihren PC geschützt" (SmartScreen) an. Das ist bei kleiner, nicht digital signierter Software normal — kein Hinweis auf Schadsoftware. Klicken Sie auf <strong>Weitere Informationen</strong> und dann auf <strong>Trotzdem ausführen</strong>, um fortzufahren.
+</div>
+
+<h2>2. Unterstützte Fotoformate</h2>
+<table>
+<tr><th>Typ</th><th>Erweiterungen</th></tr>
+<tr><td>Standardformate</td><td><code>.jpg</code>, <code>.jpeg</code>, <code>.png</code>, <code>.tif</code>, <code>.tiff</code>, <code>.bmp</code>, <code>.webp</code>, <code>.heic</code>, <code>.heif</code></td></tr>
+<tr><td>RAW-Formate</td><td><code>.cr2</code>, <code>.cr3</code> (Canon), <code>.nef</code> (Nikon), <code>.dng</code>, <code>.arw</code> (Sony)</td></tr>
+</table>
+<div class="note">
+Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automatisch im <code>.deb</code>-Paket installiert wird (keine manuelle Installation nötig). Um die Verarbeitung zu beschleunigen, verwendet Planche-Contact bevorzugt die von der Kamera bereits in der RAW-Datei eingebettete JPEG-Vorschau; ein vollständiges (langsameres) Dematrizieren wird nur ausgelöst, wenn diese Vorschau fehlt oder für den gewünschten Zweck (Miniaturbild, Kontaktbogen, „Vollbild"-Galeriebild) zu klein ist.
+</div>
+<p>Die Ausrichtung der Fotos (Hoch- oder Querformat) wird immer genau so berücksichtigt, wie von der Kamera angegeben, und zwar bei allen drei Ausgaben (Kontaktbögen, PDF, HTML-Galerie) — keine manuelle Anpassung ist nötig, auch nicht bei Fotos, die mit senkrecht gehaltener Kamera aufgenommen wurden.</p>
+
+<h2>3. Grafische Benutzeroberfläche (GTK)</h2>
+
+<h3>3.1 Hauptfenster</h3>
+<p>Das Fenster öffnet sich standardmäßig maximiert (bleibt aber normal in der Größe veränderbar) und bietet drei Reiter: <strong>Erstellung</strong>, <strong>Hilfe</strong> und <strong>Über</strong>. Der Reiter Hilfe öffnet dieses Handbuch im Standardbrowser.</p>
+
+<h3>3.2 Reiter „Erstellung"</h3>
+
+<table>
+<tr><th>Feld / Option</th><th>Beschreibung</th></tr>
+<tr><td><strong>Projekttitel</strong></td><td>Groß angezeigter Text oben auf jedem Kontaktbogen. Auf derselben Zeile wie der Name des Autors.</td></tr>
+<tr><td><strong>Name des Autors</strong></td><td>Unter dem Titel angezeigter Name (fett, kleiner).</td></tr>
+<tr><td><strong>Quellordner</strong></td><td>Ordner mit den zu verarbeitenden Fotografien (erforderlich). Zeigt automatisch eine Vorschau der Fotos im Ordner (siehe §3.3).</td></tr>
+<tr><td><strong>Zielordner</strong></td><td>Ordner, in dem die Ergebnisse erstellt werden. Standard: <code>Portfolio/</code> im Quellordner. Wird automatisch erstellt, falls er noch nicht existiert.</td></tr>
+<tr><td><strong>Rekursive Suche</strong></td><td>Wenn aktiviert, werden auch alle Unterordner durchsucht.</td></tr>
+<tr><td><strong>Bilder pro Kontaktbogen</strong></td><td>Anzahl der Miniaturbilder pro Seite (8 bis 48, in Schritten von 4). Auf derselben Zeile wie die nächsten drei Felder.</td></tr>
+<tr><td><strong>Format des Kontaktbogens</strong></td><td>Papierformat: A5, A4, A3, A2 oder Letter.</td></tr>
+<tr><td><strong>Wasserzeichen (Text)</strong></td><td>Text, der als Muster über alle Bilder wiederholt wird (Kontaktbögen, PDF und HTML-Galerie) — ein „©" wird automatisch hinzugefügt, falls nicht vorhanden.</td></tr>
+<tr><td><strong>Ausrichtung des Wasserzeichens</strong></td><td>
+    <ul>
+        <li><strong>Horizontal</strong>: horizontaler Text</li>
+        <li><strong>Diagonal (im Uhrzeigersinn)</strong>: im Uhrzeigersinn geneigter Text</li>
+        <li><strong>Diagonal (gegen den Uhrzeigersinn)</strong>: entgegengesetzt geneigter Text</li>
+    </ul>
+</td></tr>
+<tr><td><strong>Deckkraft des Wasserzeichens</strong></td><td>Regler von 0 bis 100 % (Standard: 40 %). Gilt identisch für Kontaktbögen, PDF und HTML-Galerie.</td></tr>
+<tr><td><strong>Exportoptionen</strong></td><td>Kontrollkästchen: PDF erstellen, HTML-Galerie erstellen, CSV-Verzeichnis erstellen.</td></tr>
+<tr><td><strong>Bilder pro Seite</strong></td><td>Anzahl der Miniaturbilder pro HTML-Galerieseite (12 bis 64, in Schritten von 4, Standard: 48). Auf derselben Zeile wie das Kontrollkästchen „HTML-Galerie erstellen".</td></tr>
+</table>
+
+<p>Wenn keines der Felder Titel / Autor / Wasserzeichen ausgefüllt ist, zeigt die Kopfzeile der Kontaktbögen standardmäßig den Namen des Quellordners (ohne vollständigen Pfad) an, um einen völlig anonymen Kontaktbogen zu vermeiden.</p>
+
+<h3>3.3 Vorschau des Quellordners</h3>
+<p>Sobald ein gültiger Quellordner angegeben ist (beim Start, wenn bereits ein Ordner gespeichert war, oder nach Eingabe/Auswahl), zeigt ein Vorschaustreifen automatisch Miniaturbilder der enthaltenen Fotos an, in Seiten zu je 10, mit nummerierter Seitennavigation (<code>← Zurück 1 … 4 5 6 … 19 Weiter →</code>). Das Scannen und Erstellen der Miniaturbilder erfolgt im Hintergrund: Die Benutzeroberfläche friert nicht ein, selbst bei einem Ordner mit Hunderten von Fotos.</p>
+
+<h3>3.4 Eigener Ordnerauswahldialog</h3>
+<p>Die Schaltfläche „Auswählen..." (Quell- oder Zielordner) öffnet einen vollständig von der Anwendung erstellten Ordner-Browser, anstelle des systemeigenen Dialogs:</p>
+<ul>
+    <li>Es werden <strong>ausschließlich Ordner</strong> angezeigt (keine Dateien), für eine übersichtliche Navigation.</li>
+    <li>Ein <strong>Vorschaubereich</strong> unten zeigt bis zu 20 Miniaturbilder (2 Zeilen zu je 10) der Fotos im angezeigten Ordner, mit eigener Seitennavigation.</li>
+    <li>Ein anklickbarer <strong>Pfadnavigationspfad</strong> oben ermöglicht schnelles Aufsteigen in der Ordnerstruktur.</li>
+    <li>Eine <strong>Seitenleiste</strong> bietet eine Verknüpfung zum persönlichen Ordner sowie die bereits im System gespeicherten Lesezeichen (dieselben wie im Dateimanager), falls vorhanden.</li>
+    <li>Ein Doppelklick auf einen Ordner öffnet ihn; die Schaltfläche <strong>„Diesen Ordner auswählen"</strong> bestätigt den aktuell angezeigten Ordner.</li>
+</ul>
+
+<h3>3.5 Schaltfläche „Ergebnisse anzeigen"</h3>
+<p>Nach einer erfolgreichen Erstellung ermöglicht diese Auswahlschaltfläche, die Ergebnisse direkt mit den Standardanwendungen des Systems zu öffnen, ohne das Hauptfenster zu vergrößern:</p>
+<table>
+<tr><th>Option</th><th>Aktion</th></tr>
+<tr><td><strong>Kontaktbögen</strong></td><td>Öffnet den Ordner <code>planches/</code> im Standard-Dateimanager.</td></tr>
+<tr><td><strong>Portfolio-PDF</strong></td><td>Öffnet das PDF mit dem Standardbetrachter.</td></tr>
+<tr><td><strong>HTML-Galerie</strong></td><td>Öffnet die Galerie im Standardbrowser.</td></tr>
+<tr><td><strong>CSV-Verzeichnis</strong></td><td>Öffnet die CSV-Datei mit der Standardanwendung (meist eine Tabellenkalkulation).</td></tr>
+</table>
+<p>Jede Option ist nur aktiviert, wenn das entsprechende Element tatsächlich erstellt wurde (je nach bei der Erstellung ausgewählten Kontrollkästchen). Ist auf dem System keine Standardanwendung für einen bestimmten Dateityp konfiguriert, erscheint ein Warnfenster mit einem Vorschlag für eine zu installierende Anwendung.</p>
+
+<h3>3.6 Reiter „Über"</h3>
+<p>Zeigt die Versionsnummer, das Build-Datum, eine kurze Beschreibung, den Autor, die Lizenz (<strong>GNU GPL v3</strong>) und einen anklickbaren Link zum GitHub-Repository des Projekts an. Enthält außerdem die Sprachauswahl — siehe Hinweis unten.</p>
+<div class="note">
+Eine Sprachänderung wird erst nach einem Neustart der Anwendung wirksam. Die gewählte Sprache wird auch für die Kommandozeile und für jede danach erstellte HTML-Galerie verwendet — siehe §4 und §5.
+</div>
+
+<h2>4. Kommandozeilen-Schnittstelle (CLI)</h2>
+
+<h3>4.1 Hauptoptionen</h3>
+
+<table>
+<tr><th>Option</th><th>Beschreibung</th><th>Beispiel</th></tr>
+<tr><td><code>-i, --input</code></td><td>Quellordner (erforderlich)</td><td><code>-i /Fotos/Reise</code></td></tr>
+<tr><td><code>-o, --output</code></td><td>Zielordner</td><td><code>-o ./Ergebnisse</code></td></tr>
+<tr><td><code>-n, --num</code></td><td>Anzahl der Bilder pro Kontaktbogen</td><td><code>-n 16</code></td></tr>
+<tr><td><code>--format</code></td><td>Seitenformat (A5, A4, A3, A2, Letter)</td><td><code>--format A3</code></td></tr>
+<tr><td><code>--title</code></td><td>Projekttitel</td><td><code>--title "Reise 2025"</code></td></tr>
+<tr><td><code>--author</code></td><td>Name des Autors</td><td><code>--author "Abel GEZ"</code></td></tr>
+<tr><td><code>--watermark</code></td><td>Text des Wasserzeichens</td><td><code>--watermark "Abel GEZ"</code></td></tr>
+<tr><td><code>--watermark-orientation</code></td><td>Ausrichtung des Wasserzeichens</td><td><code>--watermark-orientation "Diagonale horaire"</code></td></tr>
+<tr><td><code>--watermark-opacity</code></td><td>Deckkraft des Wasserzeichens, von 0 bis 100 (Standard: 40)</td><td><code>--watermark-opacity 60</code></td></tr>
+<tr><td><code>--pdf</code></td><td>PDF erstellen</td><td></td></tr>
+<tr><td><code>--html</code></td><td>HTML-Galerie erstellen</td><td></td></tr>
+<tr><td><code>--csv</code></td><td>CSV-Verzeichnis erstellen</td><td></td></tr>
+<tr><td><code>-r, --recursive</code></td><td>Rekursive Analyse der Unterordner</td><td></td></tr>
+<tr><td><code>--sort</code></td><td>Sortierung der Fotos: <code>date</code> (EXIF) oder <code>name</code></td><td><code>--sort name</code></td></tr>
+<tr><td><code>--html-per-page</code></td><td>Anzahl der Bilder pro HTML-Galerieseite (Standard: 48)</td><td><code>--html-per-page 60</code></td></tr>
+<tr><td><code>--language</code></td><td>Sprache der Meldungen und der erstellten HTML-Galerie: <code>system</code> (Standard), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language de</code></td></tr>
+</table>
+<div class="note">
+Die Werte für <code>--watermark-orientation</code> bleiben intern immer auf Französisch, unabhängig von der gewählten <code>--language</code> (<code>"Horizontal"</code>, <code>"Diagonale horaire"</code>, <code>"Diagonale anti-horaire"</code>) — dies ist die interne Vorgabe des Programmkerns und hat nichts mit der Anzeigesprache zu tun.
+</div>
+
+<h3>4.2 Vollständige Beispiele</h3>
+
+<pre><code># Einfache Erstellung
+python3 portfolio.py -i /Fotos/2025 -o ./Ausgabe --pdf --html
+
+# HTML-Galerie mit 24 Bildern pro Seite statt der Standardeinstellung 48
+python3 portfolio.py -i /Fotos/2025 -o ./Ausgabe --html --html-per-page 24
+
+# Professionelle Version mit diagonalem Wasserzeichen, individueller Deckkraft, auf Deutsch
+python3 portfolio.py \
+  -i /Fotos/Island \
+  -n 16 \
+  --format A3 \
+  --title "Island 2025" \
+  --author "Abel GEZ" \
+  --watermark "Abel GEZ" \
+  --watermark-orientation "Diagonale horaire" \
+  --watermark-opacity 55 \
+  --language de \
+  --pdf --html --csv
+</code></pre>
+
+<h2>5. Wasserzeichen</h2>
+<p>Das Wasserzeichen verwendet eine <strong>einzige, identische Darstellung</strong>, unabhängig vom Ausgabeträger: Kontaktbögen, PDF (das direkt die Kontaktbogenbilder wiederverwendet) und HTML-Galerie (Rastermin­iaturbilder und „Vollbild"-Bilder). Der Text wird als Muster über das ganze Bild wiederholt, mit der gewählten Ausrichtung und Deckkraft — kein Unterschied in der Darstellung zwischen den drei Ausgaben.</p>
+
+<h2>6. Erstellte Dateien</h2>
+<table>
+<tr><th>Ordner / Datei</th><th>Inhalt</th></tr>
+<tr><td><code>planches/</code></td><td>Einzelne Kontaktbögen (JPEG, 300 dpi)</td></tr>
+<tr><td><code>portfolio.pdf</code></td><td>Vollständiges PDF, das alle Kontaktbögen zusammenfasst</td></tr>
+<tr><td><code>gallery/</code></td><td>Paginierte, eigenständige HTML-Galerie (mit eigenen Miniaturbildern und „Vollbild"-Bildern)</td></tr>
+<tr><td><code>index.csv</code></td><td>Liste der Bilder mit ihrer Nummer</td></tr>
+<tr><td><code>generation.log</code></td><td>Detailliertes Protokoll der Erstellung</td></tr>
+</table>
+
+<h2>7. Empfehlungen</h2>
+<ul>
+    <li>Für ein einheitliches Erscheinungsbild sollten Sie im gesamten Projekt dieselbe Anzahl an Bildern pro Kontaktbogen beibehalten.</li>
+    <li>Ein diagonales Wasserzeichen ist in der Regel eleganter und visuell weniger störend.</li>
+    <li>Die HTML-Galerie ist eigenständig: Sie können den gesamten Ordner <code>gallery/</code> an einen anderen Ort kopieren (USB-Stick, Webserver...), ohne etwas zu beschädigen.</li>
+    <li>Damit die Download-Schaltfläche der Ansicht tatsächlich den üblichen Speicherdialog des Browsers öffnet (statt das Bild zu öffnen), rufen Sie die Galerie über einen Webserver auf, statt direkt auf <code>index.html</code> zu doppelklicken (siehe Hinweis unten).</li>
+    <li>Bei umfangreichen Ordnern (mehrere hundert Fotos) nutzt die Verarbeitung automatisch alle verfügbaren Kerne des Rechners: je mehr Kerne, desto schneller die Erstellung.</li>
+</ul>
+<div class="note">
+Wenn die Galerie direkt durch Doppelklick auf <code>index.html</code> geöffnet wird (ohne Webserver), blockieren alle Browser (Firefox, Chrome...) aus Sicherheitsgründen die Mechanismen zum Erzwingen eines Downloads — in der Ansicht erscheint dann eine erklärende Meldung, und das Bild öffnet sich stattdessen in einem neuen Tab: ein Rechtsklick darauf und <strong>„Bild speichern unter"</strong> funktioniert in diesem Fall weiterhin normal. Um den Download mit einem Klick zurückzubekommen, rufen Sie die Galerie einfach über einen Webserver statt lokal auf — ein einfacher Befehl wie <code>python3 -m http.server</code>, im Galerieordner ausgeführt, reicht aus, ohne dass etwas weiter installiert werden muss.
+</div>
+
+<h2>8. Über</h2>
+<p>Planche-Contact wird von <strong>Gilles MAGNEVILLE</strong> entwickelt.</p>
+<p>Diese Software wurde mit Unterstützung von <a href="https://claude.ai">Claude.ai</a> (Anthropic) entwickelt.</p>
+<p>Veröffentlicht unter der Lizenz <strong>GNU GPL v3</strong>.</p>
+<p>GitHub-Repository: <a href="https://github.com/gillesmagneville/planche-contact">github.com/gillesmagneville/planche-contact</a></p>
+
+</body>
+</html>

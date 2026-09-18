@@ -3,6 +3,7 @@ from pathlib import Path
 
 from reportlab.pdfgen import canvas
 from PIL import Image as PILImage
+from .i18n import _
 
 
 class PDFExporter:
@@ -45,4 +46,4 @@ class PDFExporter:
                 logger.error(f"Erreur lors de l'ajout de {planche.name} au PDF : {e}")
 
         c.save()
-        logger.info(f"PDF créé avec succès : {output_path}")
+        logger.info(_("engine.log_pdf_created", path=output_path))

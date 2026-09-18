@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Planche-Contact - Full Manual</title>
+    <style>
+        body {
+            font-family: "DejaVu Sans", Arial, sans-serif;
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 20px;
+            line-height: 1.65;
+            background: #f8f9fa;
+        }
+        h1, h2, h3 { color: #1a1a1a; }
+        h1 { font-size: 2.2em; border-bottom: 3px solid #333; padding-bottom: 10px; }
+        h2 { font-size: 1.6em; margin-top: 45px; border-bottom: 1px solid #ccc; padding-bottom: 6px; }
+        h3 { font-size: 1.25em; margin-top: 30px; }
+        code, pre {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: "DejaVu Sans Mono", monospace;
+        }
+        pre {
+            padding: 14px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th { background: #e9ecef; }
+        .note {
+            background: #fff3cd;
+            border-left: 6px solid #ffc107;
+            padding: 14px 18px;
+            margin: 25px 0;
+        }
+        ul { padding-left: 22px; }
+        a { color: #0066cc; }
+    </style>
+</head>
+<body>
+
+<h1>Planche-Contact — Full Manual</h1>
+
+<h2>1. Overview</h2>
+<p><strong>Planche-Contact</strong> is a lightweight, fast tool for generating high-quality (300 dpi) photographic contact sheets from a folder of photos, with no database and no heavy software.</p>
+<p>It comes in two forms:</p>
+<ul>
+    <li><strong>GTK4 graphical interface</strong> (<code>planche-contact-gtk.py</code> / <code>planche-contact-gtk</code>)</li>
+    <li><strong>Command line</strong> (<code>portfolio.py</code>)</li>
+</ul>
+<p>From the same folder of photos, the tool can produce simultaneously:</p>
+<ul>
+    <li><strong>contact sheets</strong> in JPEG format (one or several pages);</li>
+    <li>a <strong>PDF</strong> assembling all the sheets;</li>
+    <li>a paginated, self-contained <strong>HTML gallery</strong> with clickable thumbnails opening each photo in a full-screen viewer: filename and page number shown, navigation between the photos on the page (keyboard or ‹ › arrows), direct jump to another page, 50% to 200% zoom, download of the displayed photo, technical information (original resolution, size, capture date) and fullscreen toggle;</li>
+    <li>a <strong>CSV index</strong> listing every photo with its number.</li>
+</ul>
+<div class="note">
+<strong>On Windows</strong>, the first time you run the installer, Windows will very likely show a blue "Windows protected your PC" screen (SmartScreen). This is expected for a small, unsigned piece of software — not a sign of malware. Click <strong>More info</strong>, then <strong>Run anyway</strong> to proceed.
+</div>
+
+<h2>2. Supported photo formats</h2>
+<table>
+<tr><th>Type</th><th>Extensions</th></tr>
+<tr><td>Standard formats</td><td><code>.jpg</code>, <code>.jpeg</code>, <code>.png</code>, <code>.tif</code>, <code>.tiff</code>, <code>.bmp</code>, <code>.webp</code>, <code>.heic</code>, <code>.heif</code></td></tr>
+<tr><td>RAW formats</td><td><code>.cr2</code>, <code>.cr3</code> (Canon), <code>.nef</code> (Nikon), <code>.dng</code>, <code>.arw</code> (Sony)</td></tr>
+</table>
+<div class="note">
+RAW support relies on the <code>rawpy</code> library, installed automatically in the <code>.deb</code> package (no manual installation needed). To speed up processing, Planche-Contact preferentially uses the JPEG preview already embedded in the RAW file by the camera; a full (slower) demosaic is only triggered if that preview is missing or too small for the intended use (thumbnail, sheet, "full-size" gallery image).
+</div>
+<p>Photo orientation (portrait or landscape) is always respected exactly as indicated by the camera, across all three outputs (sheets, PDF, HTML gallery) — no manual adjustment is needed, including for photos taken with the camera held vertically.</p>
+
+<h2>3. Graphical interface (GTK)</h2>
+
+<h3>3.1 Main window</h3>
+<p>The window opens maximized by default (while remaining normally resizable) and offers three tabs: <strong>Generation</strong>, <strong>Help</strong> and <strong>About</strong>. The Help tab opens this manual in the default browser.</p>
+
+<h3>3.2 "Generation" tab</h3>
+
+<table>
+<tr><th>Field / Option</th><th>Description</th></tr>
+<tr><td><strong>Project title</strong></td><td>Text shown in large type at the top of each sheet. On the same line as the author's name.</td></tr>
+<tr><td><strong>Author name</strong></td><td>Name shown under the title (bold, smaller).</td></tr>
+<tr><td><strong>Input folder</strong></td><td>Folder containing the photographs to process (required). Automatically shows a preview of the photos in the folder (see §3.3).</td></tr>
+<tr><td><strong>Output folder</strong></td><td>Folder where the results will be created. Default: <code>Portfolio/</code> inside the source folder. Created automatically if it doesn't exist yet.</td></tr>
+<tr><td><strong>Recursive search</strong></td><td>If checked, also scans all subfolders.</td></tr>
+<tr><td><strong>Images per sheet</strong></td><td>Number of thumbnails per page (8 to 48, in steps of 4). On the same line as the next three fields.</td></tr>
+<tr><td><strong>Sheet format</strong></td><td>Paper format: A5, A4, A3, A2 or Letter.</td></tr>
+<tr><td><strong>Watermark (text)</strong></td><td>Text repeated in a mosaic pattern over all images (sheets, PDF and HTML gallery) — a "©" is added automatically if missing.</td></tr>
+<tr><td><strong>Watermark orientation</strong></td><td>
+    <ul>
+        <li><strong>Horizontal</strong>: horizontal text</li>
+        <li><strong>Diagonal (clockwise)</strong>: text tilted clockwise</li>
+        <li><strong>Diagonal (counter-clockwise)</strong>: text tilted the other way</li>
+    </ul>
+</td></tr>
+<tr><td><strong>Watermark opacity</strong></td><td>Slider from 0 to 100% (default: 40%). Applies identically to sheets, PDF and HTML gallery.</td></tr>
+<tr><td><strong>Export options</strong></td><td>Checkboxes: Generate PDF, Generate HTML Gallery, Generate CSV Index.</td></tr>
+<tr><td><strong>Images per page</strong></td><td>Number of thumbnails per HTML gallery page (12 to 64, in steps of 4, default: 48). On the same line as the "Generate HTML Gallery" checkbox.</td></tr>
+</table>
+
+<p>If none of the Title / Author / Watermark fields is filled in, the sheet header defaults to showing the input folder's name (without its full path), to avoid a completely anonymous sheet.</p>
+
+<h3>3.3 Input folder preview</h3>
+<p>As soon as a valid input folder is set (at startup if a folder was already remembered, or after typing/choosing one), a preview strip automatically shows thumbnails of the photos it contains, in pages of 10, with numbered pagination (<code>← Previous 1 … 4 5 6 … 19 Next →</code>). Scanning and generating thumbnails happens in the background: the interface never freezes, even for a folder containing hundreds of photos.</p>
+
+<h3>3.4 Custom folder picker</h3>
+<p>The "Choose..." button (input or output folder) opens a folder browser entirely built by the application, rather than the system's native dialog:</p>
+<ul>
+    <li><strong>Only folders</strong> are shown (no files), for a clean navigation experience.</li>
+    <li>A <strong>preview panel</strong> at the bottom shows up to 20 thumbnails (2 rows of 10) of the photos in the hovered folder, with its own pagination.</li>
+    <li>A clickable <strong>breadcrumb trail</strong> at the top lets you quickly move up the folder tree.</li>
+    <li>A <strong>sidebar</strong> offers a shortcut to your home folder, as well as any bookmarks already saved on the system (the same ones as in your file manager), if any.</li>
+    <li>Double-clicking a folder enters it; the <strong>"Select this folder"</strong> button confirms the currently displayed folder.</li>
+</ul>
+
+<h3>3.5 "View results" button</h3>
+<p>After a successful generation, this dropdown button lets you open the results directly with the system's default applications, without enlarging the main window:</p>
+<table>
+<tr><th>Option</th><th>Action</th></tr>
+<tr><td><strong>Contact sheets</strong></td><td>Opens the <code>planches/</code> folder in the default file manager.</td></tr>
+<tr><td><strong>Portfolio PDF</strong></td><td>Opens the PDF with the default viewer.</td></tr>
+<tr><td><strong>HTML Gallery</strong></td><td>Opens the gallery in the default browser.</td></tr>
+<tr><td><strong>CSV Index</strong></td><td>Opens the CSV file with the default application (usually a spreadsheet).</td></tr>
+</table>
+<p>Each option is only enabled if the corresponding item was actually generated (based on the checkboxes selected during generation). If no default application is configured on the system for a given file type, a warning window appears, suggesting an application to install.</p>
+
+<h3>3.6 "About" tab</h3>
+<p>Shows the version number, build date, a short description, the author, the license (<strong>GNU GPL v3</strong>) and a clickable link to the project's GitHub repository. Also includes the language selector — see the note below.</p>
+<div class="note">
+Changing the language takes effect after restarting the application. The chosen language is also used for the command line and for any HTML gallery generated afterwards — see §4 and §5.
+</div>
+
+<h2>4. Command-line interface (CLI)</h2>
+
+<h3>4.1 Main options</h3>
+
+<table>
+<tr><th>Option</th><th>Description</th><th>Example</th></tr>
+<tr><td><code>-i, --input</code></td><td>Source folder (required)</td><td><code>-i /Photos/Trip</code></td></tr>
+<tr><td><code>-o, --output</code></td><td>Output folder</td><td><code>-o ./Results</code></td></tr>
+<tr><td><code>-n, --num</code></td><td>Number of images per sheet</td><td><code>-n 16</code></td></tr>
+<tr><td><code>--format</code></td><td>Page format (A5, A4, A3, A2, Letter)</td><td><code>--format A3</code></td></tr>
+<tr><td><code>--title</code></td><td>Project title</td><td><code>--title "Trip 2025"</code></td></tr>
+<tr><td><code>--author</code></td><td>Author name</td><td><code>--author "Abel GEZ"</code></td></tr>
+<tr><td><code>--watermark</code></td><td>Watermark text</td><td><code>--watermark "Abel GEZ"</code></td></tr>
+<tr><td><code>--watermark-orientation</code></td><td>Watermark orientation</td><td><code>--watermark-orientation "Diagonale horaire"</code></td></tr>
+<tr><td><code>--watermark-opacity</code></td><td>Watermark opacity, from 0 to 100 (default: 40)</td><td><code>--watermark-opacity 60</code></td></tr>
+<tr><td><code>--pdf</code></td><td>Generate a PDF</td><td></td></tr>
+<tr><td><code>--html</code></td><td>Generate an HTML gallery</td><td></td></tr>
+<tr><td><code>--csv</code></td><td>Generate a CSV index</td><td></td></tr>
+<tr><td><code>-r, --recursive</code></td><td>Recursively scan subfolders</td><td></td></tr>
+<tr><td><code>--sort</code></td><td>Sort photos by: <code>date</code> (EXIF) or <code>name</code></td><td><code>--sort name</code></td></tr>
+<tr><td><code>--html-per-page</code></td><td>Number of images per HTML gallery page (default: 48)</td><td><code>--html-per-page 60</code></td></tr>
+<tr><td><code>--language</code></td><td>Language of the messages and of the generated HTML gallery: <code>system</code> (default), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language en</code></td></tr>
+</table>
+<div class="note">
+The values for <code>--watermark-orientation</code> stay in French internally regardless of the chosen <code>--language</code> (<code>"Horizontal"</code>, <code>"Diagonale horaire"</code>, <code>"Diagonale anti-horaire"</code>) — this is the engine's internal contract and is unrelated to the display language.
+</div>
+
+<h3>4.2 Full examples</h3>
+
+<pre><code># Simple generation
+python3 portfolio.py -i /Photos/2025 -o ./Output --pdf --html
+
+# HTML gallery with 24 images per page instead of the default 48
+python3 portfolio.py -i /Photos/2025 -o ./Output --html --html-per-page 24
+
+# Professional version with diagonal watermark, custom opacity, in English
+python3 portfolio.py \
+  -i /Photos/Iceland \
+  -n 16 \
+  --format A3 \
+  --title "Iceland 2025" \
+  --author "Abel GEZ" \
+  --watermark "Abel GEZ" \
+  --watermark-orientation "Diagonale horaire" \
+  --watermark-opacity 55 \
+  --language en \
+  --pdf --html --csv
+</code></pre>
+
+<h2>5. Watermark</h2>
+<p>The watermark uses a <strong>single, identical rendering</strong> regardless of the output: contact sheets, PDF (which directly reuses the sheet images) and HTML gallery (grid thumbnails and "full-size" images). The text is repeated in a mosaic pattern across the whole image, with the chosen orientation and opacity — no difference in rendering between the three outputs.</p>
+
+<h2>6. Generated files</h2>
+<table>
+<tr><th>Folder / File</th><th>Content</th></tr>
+<tr><td><code>planches/</code></td><td>Individual contact sheets (JPEG, 300 dpi)</td></tr>
+<tr><td><code>portfolio.pdf</code></td><td>Full PDF assembling all the sheets</td></tr>
+<tr><td><code>gallery/</code></td><td>Paginated, self-contained HTML gallery (with its own thumbnails and "full-size" images)</td></tr>
+<tr><td><code>index.csv</code></td><td>List of images with their number</td></tr>
+<tr><td><code>generation.log</code></td><td>Detailed generation log</td></tr>
+</table>
+
+<h2>7. Recommendations</h2>
+<ul>
+    <li>For a consistent look, keep the same number of images per sheet throughout a project.</li>
+    <li>A diagonal watermark is usually more elegant and visually less intrusive.</li>
+    <li>The HTML gallery is self-contained: you can copy the whole <code>gallery/</code> folder elsewhere (USB drive, web server...) without breaking anything.</li>
+    <li>For the viewer's download button to trigger the browser's usual save dialog (rather than opening the image), view the gallery through a web server rather than double-clicking <code>index.html</code> directly (see the note below).</li>
+    <li>For large folders (several hundred photos), processing automatically uses all available cores on the machine: the more cores, the faster the generation.</li>
+</ul>
+<div class="note">
+When the gallery is opened directly by double-clicking <code>index.html</code> (without a web server), all browsers (Firefox, Chrome...) block, for security reasons, the mechanisms needed to force a download — a message then appears in the viewer explaining this, and the image opens in a new tab instead: right-clicking it and choosing <strong>"Save image as"</strong> still works normally in that case. To get one-click downloads back, simply view the gallery through a web server instead of locally — a simple command such as <code>python3 -m http.server</code> run inside the gallery folder is enough, with nothing else to install.
+</div>
+
+<h2>8. About</h2>
+<p>Planche-Contact is developed by <strong>Gilles MAGNEVILLE</strong>.</p>
+<p>This software was designed with the help of <a href="https://claude.ai">Claude.ai</a> (Anthropic).</p>
+<p>Distributed under the <strong>GNU GPL v3</strong> license.</p>
+<p>GitHub repository: <a href="https://github.com/gillesmagneville/planche-contact">github.com/gillesmagneville/planche-contact</a></p>
+
+</body>
+</html>

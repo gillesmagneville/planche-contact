@@ -6,6 +6,7 @@ from typing import Any
 
 from .config import Config
 from .utils import get_exif_date
+from .i18n import _
 
 
 class ImageScanner:
@@ -74,7 +75,7 @@ class ImageScanner:
         images = []
         pattern = "**/*" if self.config.recursive else "*"
 
-        self.logger.info(f"Scan du dossier : {self.config.input_dir} (récursif={self.config.recursive})")
+        self.logger.info(_("engine.log_scan_folder", dir=self.config.input_dir, recursive=self.config.recursive))
 
         # Sous-dossiers générés par une exécution précédente (planches/,
         # gallery/) à exclure du scan : sinon, une nouvelle génération en
@@ -136,5 +137,5 @@ class ImageScanner:
                 f"{skipped_output} fichier(s) ignoré(s) car situé(s) dans le dossier "
                 f"de sortie (planches/gallery d'une génération précédente)."
             )
-        self.logger.info(f"{len(images)} images trouvées et triées.")
+        self.logger.info(_("engine.log_images_found_sorted", count=len(images)))
         return images

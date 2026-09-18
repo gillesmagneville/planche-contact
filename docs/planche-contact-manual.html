@@ -64,7 +64,7 @@
 <ul>
     <li>des <strong>planches contact</strong> au format JPEG (une ou plusieurs pages) ;</li>
     <li>un <strong>PDF</strong> assemblant toutes les planches ;</li>
-    <li>une <strong>galerie HTML</strong> paginée, autonome, avec vignettes cliquables ouvrant chaque photo dans une visionneuse plein écran : nom du fichier et numéro de page affichés, navigation entre les photos de la page (clavier ou flèches ‹ ›), saut direct à une autre page, téléchargement de la photo affichée, informations techniques (résolution d'origine, taille, date de prise de vue) et bascule en plein écran ;</li>
+    <li>une <strong>galerie HTML</strong> paginée, autonome, avec vignettes cliquables ouvrant chaque photo dans une visionneuse plein écran : nom du fichier et numéro de page affichés, navigation entre les photos de la page (clavier ou flèches ‹ ›), saut direct à une autre page, zoom de 50 % à 200 %, téléchargement de la photo affichée, informations techniques (résolution d'origine, taille, date de prise de vue) et bascule en plein écran ;</li>
     <li>un <strong>index CSV</strong> listant chaque photo avec son numéro.</li>
 </ul>
 <div class="note">
@@ -138,7 +138,10 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
 <p>Chaque option n'est activée que si l'élément correspondant a bien été généré (selon les cases cochées lors de la génération). Si aucune application par défaut n'est configurée sur le système pour un type de fichier donné, une fenêtre d'avertissement s'affiche, avec une suggestion d'application à installer.</p>
 
 <h3>3.6 Onglet « À propos »</h3>
-<p>Affiche le numéro de version, la date de build, une courte description, l'auteur, la licence (<strong>GNU GPL v3</strong>) et un lien cliquable vers le dépôt GitHub du projet.</p>
+<p>Affiche le numéro de version, la date de build, une courte description, l'auteur, la licence (<strong>GNU GPL v3</strong>) et un lien cliquable vers le dépôt GitHub du projet. Comprend aussi le sélecteur de langue — voir la note ci-dessous.</p>
+<div class="note">
+Un changement de langue ne prend effet qu'au redémarrage de l'application. La langue choisie est aussi utilisée pour la ligne de commande et pour toute galerie HTML générée par la suite — voir §4 et §5.
+</div>
 
 <h2>4. Interface en ligne de commande (CLI)</h2>
 
@@ -161,7 +164,11 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
 <tr><td><code>-r, --recursive</code></td><td>Analyse récursive des sous-dossiers</td><td></td></tr>
 <tr><td><code>--sort</code></td><td>Tri des photos : <code>date</code> (EXIF) ou <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Nombre d'images par page dans la galerie HTML (défaut : 48)</td><td><code>--html-per-page 60</code></td></tr>
+<tr><td><code>--language</code></td><td>Langue des messages et de la galerie HTML générée : <code>system</code> (défaut), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language fr</code></td></tr>
 </table>
+<div class="note">
+Les valeurs de <code>--watermark-orientation</code> restent en français en interne quelle que soit la <code>--language</code> choisie (<code>"Horizontal"</code>, <code>"Diagonale horaire"</code>, <code>"Diagonale anti-horaire"</code>) — c'est le contrat interne du moteur, indépendant de la langue d'affichage.
+</div>
 
 <h3>4.2 Exemples complets</h3>
 
@@ -171,7 +178,7 @@ python3 portfolio.py -i /Photos/2025 -o ./Sortie --pdf --html
 # Galerie HTML avec 24 images par page au lieu de 48 par défaut
 python3 portfolio.py -i /Photos/2025 -o ./Sortie --html --html-per-page 24
 
-# Version professionnelle avec filigrane diagonal et opacité personnalisée
+# Version professionnelle avec filigrane diagonal et opacité personnalisée, en français
 python3 portfolio.py \
   -i /Photos/Islande \
   -n 16 \
@@ -181,6 +188,7 @@ python3 portfolio.py \
   --watermark "Abel GEZ" \
   --watermark-orientation "Diagonale horaire" \
   --watermark-opacity 55 \
+  --language fr \
   --pdf --html --csv
 </code></pre>
 
@@ -202,8 +210,12 @@ python3 portfolio.py \
     <li>Pour un rendu homogène, conservez le même nombre d'images par planche sur tout le projet.</li>
     <li>Le filigrane en diagonale est généralement plus élégant et moins gênant visuellement.</li>
     <li>La galerie HTML est autonome : vous pouvez copier tout le dossier <code>gallery/</code> ailleurs (clé USB, serveur web...) sans rien casser.</li>
+    <li>Pour que le bouton de téléchargement de la visionneuse ouvre bien la boîte de dialogue d'enregistrement du navigateur (plutôt que d'ouvrir l'image), consultez la galerie via un serveur web plutôt qu'en double-cliquant directement sur <code>index.html</code> (voir la note ci-dessous).</li>
     <li>Sur les dossiers volumineux (plusieurs centaines de photos), le traitement exploite automatiquement tous les cœurs disponibles de la machine : plus la machine dispose de cœurs, plus la génération est rapide.</li>
 </ul>
+<div class="note">
+Quand la galerie est ouverte directement en double-cliquant sur <code>index.html</code> (sans serveur web), tous les navigateurs (Firefox, Chrome...) bloquent par sécurité les mécanismes permettant de forcer un téléchargement — un message s'affiche alors dans la visionneuse pour l'expliquer, et l'image s'ouvre dans un nouvel onglet à la place : un clic droit sur celle-ci puis <strong>« Enregistrer l'image sous »</strong> fonctionne toujours normalement dans ce cas. Pour retrouver le téléchargement en un clic, il suffit de consulter la galerie via un serveur web plutôt qu'en local — une simple commande comme <code>python3 -m http.server</code> lancée dans le dossier de la galerie suffit, sans rien installer de plus.
+</div>
 
 <h2>8. À propos</h2>
 <p>Planche-Contact est développé par <strong>Gilles MAGNEVILLE</strong>.</p>

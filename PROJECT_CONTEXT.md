@@ -58,10 +58,11 @@ interactive, options `-Major/-Minor/-Patch`).
 | `thumbnail.py` | Génération de vignettes en parallèle (`ProcessPoolExecutor`, contexte `spawn` forcé) |
 | `contactsheet.py` | Génère les planches contact (en-tête, grille de vignettes, pied de page, numéro de page) |
 | `pdfexport.py` | Assemble les planches en PDF (`reportlab`) ; marge haute réduite indépendamment des autres marges |
-| `htmlgallery.py` | Galerie HTML paginée ; **une seule passe de décodage** par photo (la vignette est dérivée de l'image pleine taille déjà décodée, pas un second décodage) ; `ImageOps.exif_transpose()` appliqué systématiquement pour respecter l'orientation (voir §5) ; filigrane appliqué **une seule fois** sur l'image pleine taille, la vignette étant dérivée par redimensionnement de cette version déjà filigranée (voir §5, évite un motif disproportionné/tronqué) ; visionneuse plein écran en JS vanilla intégrée à chaque page générée (précédent/suivant, clavier, sans dépendance externe) avec indicateur de page, saut direct à une page, nom du fichier, téléchargement, panneau d'informations (résolution/taille/date, calculées par le worker en même temps que l'image) et bascule plein écran (`Fullscreen API`) |
+| `htmlgallery.py` | Galerie HTML paginée ; **une seule passe de décodage** par photo (la vignette est dérivée de l'image pleine taille déjà décodée, pas un second décodage) ; `ImageOps.exif_transpose()` appliqué systématiquement pour respecter l'orientation (voir §5) ; filigrane appliqué **une seule fois** sur l'image pleine taille, la vignette étant dérivée par redimensionnement de cette version déjà filigranée (voir §5, évite un motif disproportionné/tronqué) ; visionneuse plein écran en JS vanilla intégrée à chaque page générée (précédent/suivant **franchissant les pages** avec bouclage sur l'ensemble de la galerie (avertissement affiché aux deux extrémités, voir §5), clavier, molette de la souris, sans dépendance externe) avec indicateur de page, saut direct à une page, nom du fichier, téléchargement (via blob, voir §5 — dégradé en `file://`), panneau d'informations (résolution/taille/date, calculées par le worker en même temps que l'image), zoom 50-200 % en largeur/hauteur réelles (boutons, clavier, Ctrl/Alt+molette — voir §5, jamais `transform: scale()`, réinitialisé à chaque changement de photo) et bascule plein écran (`Fullscreen API`) ; pied de page avec mention développeur/licence ; **entièrement traduite** dans la langue active au moment de la génération (`<html lang="...">` compris), via `i18n.py` |
 | `csvindex.py` | Génère l'index CSV |
 | `utils.py` | `get_font()` (police embarquée, mise en cache), `apply_watermark()` (filigrane en mosaïque, **fonction unique** utilisée par les planches, le PDF et la galerie), `get_exif_date()` (date de prise de vue, RAW compris — **fonction unique** utilisée par le tri de `scanner.py` et les informations de la visionneuse de `htmlgallery.py`), `format_file_size()`, `setup_logging()` |
-| `portfolio.py` | Point d'entrée CLI (`argparse`), orchestre tout ce qui précède, affiche des lignes `PROGRESS:X/100 message` sur stdout (lues par l'interface graphique) |
+| `i18n.py` | Internationalisation de **l'interface graphique, du CLI et de la galerie HTML générée** (voir §5) : `_()`, `set_language()`, `get_language()`, `detect_system_language()`. Dictionnaires Python (`locales/{fr,en,de,es}.py`), pas gettext/.po/.mo — aucune étape de compilation ni dépendance supplémentaire à empaqueter |
+| `portfolio.py` | Point d'entrée CLI (`argparse`), orchestre tout ce qui précède, affiche des lignes `PROGRESS:X/100 message` sur stdout (lues par l'interface graphique — préfixe volontairement jamais traduit, voir §5) ; `--language` résolu *avant* la construction du parser pour que `--help` s'affiche déjà dans la bonne langue |
 | `fonts/` | Police DejaVu Sans (normale + gras) embarquée avec le projet — licence Bitstream Vera, redistribution autorisée |
 
 ### 2.3 L'interface graphique (`planche-contact-gtk.py`)
@@ -99,6 +100,22 @@ Composants principaux :
 - **`glib_idle_add()`** : enveloppe autour de `GLib.idle_add()` tolérante à
   deux conventions d'appel différentes selon la plateforme/le binding (voir
   §6, bug PyGObject/Windows).
+- **Sélecteur de langue** : dans un dialogue **Préférences** (`_open_preferences()`), accessible via le bouton menu (icône hamburger,
+  `open-menu-symbolic`) de la barre de titre — **pas** dans l'onglet À
+  propos, qui reste volontairement purement informatif (version, licence,
+  crédits) ; un réglage n'a logiquement rien à y faire (retour du
+  mainteneur). Options : Langue système (par défaut,
+  repli sur l'anglais avec avertissement si non supportée), English,
+  Français, Deutsch, Español. Un changement ne prend effet qu'au
+  redémarrage — reconstruire tout l'arbre de widgets à la volée serait un
+  chantier bien plus lourd pour une préférence qu'on change rarement (voir
+  §5, `portfolio/i18n.py`). **Portée** : le CLI (`portfolio.py`, via
+  `--language`, transmis automatiquement par l'interface graphique lors
+  du lancement du sous-processus de génération) et la galerie HTML
+  générée sont traduits dans la même langue. Le manuel utilisateur
+  (`docs/planche-contact-manual.{en,de,es}.html`) l'est également —
+  l'onglet Aide ouvre la version correspondant à la langue active, avec
+  repli sur le français si le fichier de cette langue est absent.
 
 ---
 
@@ -122,6 +139,8 @@ planche-contact/
 │   ├── htmlgallery.py
 │   ├── csvindex.py
 │   ├── utils.py
+│   ├── i18n.py                     # Traduction de l'interface graphique uniquement
+│   ├── locales/                    # fr.py (source), en.py, de.py, es.py
 │   ├── portfolio.py
 │   └── fonts/
 │       ├── DejaVuSans.ttf
@@ -143,7 +162,10 @@ planche-contact/
 │   └── planche-contact.metainfo.xml # Métadonnées AppStream (App Center, PackageKit)
 │
 ├── docs/
-│   └── planche-contact-manual.html # Manuel utilisateur complet
+│   ├── planche-contact-manual.html    # Manuel utilisateur complet (français, référence)
+│   ├── planche-contact-manual.en.html
+│   ├── planche-contact-manual.de.html
+│   └── planche-contact-manual.es.html
 ├── screenshots/
 │   └── application-icon.png        # Source de l'icône (convertie par chaque script de build)
 │
@@ -262,6 +284,113 @@ bel et bien dans `portfolio.py` actuel).
   modification du fichier) - découvert en ajoutant l'affichage de la
   date dans la visionneuse de la galerie HTML, qui l'a rendu visible
   (voir `CHANGELOG.md`).
+- **Zoom de la visionneuse (galerie HTML) : jamais `transform: scale()`,
+  toujours de vraies largeur/hauteur en pixels** (`applyZoom()` dans
+  `htmlgallery.py`). Trois pièges rencontrés en le découvrant, dans
+  l'ordre où ils se révèlent :
+  1. **`transform` crée un nouveau contexte d'empilement.** Un élément
+     transformé (même juste `scale()`) est traité comme "positionné" pour
+     l'empilement visuel — il se met alors à passer devant les barres
+     `position: fixed` de la visionneuse (z-index auto, départagé par
+     l'ordre du DOM) au lieu de rester dessous. Confirmé avec
+     `document.elementFromPoint()` sur un vrai Chromium (Playwright).
+     Solution : `z-index` explicite sur chaque barre/bouton de la
+     visionneuse (10, ou 20 pour les panneaux qui doivent passer devant
+     même la barre du haut) plutôt que de compter sur l'ordre du DOM.
+  2. **`transform` ne change QUE le rendu visuel, jamais la taille de
+     mise en page.** Une image visuellement zoomée à 200 % via
+     `transform: scale(2)` ne fait grossir ni son `offsetWidth`, ni le
+     `scrollHeight` de son conteneur : rien ne "dépasse" au sens de
+     `overflow`, donc rien n'est réellement défilable même si l'écran
+     laisse penser le contraire. Solution : fixer `width`/`height` en
+     pixels calculés, jamais `transform`, pour que le débordement soit
+     réel et défilable.
+  3. **`max-width`/`max-height` plafonnent silencieusement toute
+     largeur/hauteur fixée par ailleurs**, y compris en style inline
+     JavaScript — la taille réellement rendue reste bornée à ces valeurs
+     quelle que soit la valeur de `width`/`height` demandée. Piège
+     découvert en corrigeant le point 2 : mettre `width: 1472px` en JS ne
+     servait à rien tant que `max-width: 92vw` (utilisé pour l'ajustement
+     à 100 %) restait actif. Solution : neutraliser explicitement
+     `max-width`/`max-height` (`style.maxWidth = 'none'`) dès que le zoom
+     dépasse 100 %, et les restaurer (`= ''`, pour laisser le CSS
+     reprendre la main) au retour à 100 %.
+  4. **Un centrage flex classique masque le débordement en haut/à
+     gauche, hors d'atteinte du défilement**, même une fois 1-3 résolus —
+     seul le débordement bas/droite serait "révélé" au défilement.
+     Solution, complémentaire aux trois précédentes : basculer
+     dynamiquement vers `align-items: flex-start; justify-content:
+     flex-start` (classe `.zoomed`) dès que le zoom dépasse 100 %, pour
+     que la totalité du contenu agrandi reste atteignable au défilement.
+- **Chaînage de défilement (molette qui "fuit" vers la page derrière une
+  visionneuse plein écran)** : un conteneur `position: fixed` qui n'a
+  lui-même rien à défiler (`overflow: auto` mais sans dépassement actuel)
+  ne bloque pas la molette par défaut — le navigateur fait remonter le
+  geste non consommé vers l'ancêtre défilable suivant, ici la page
+  derrière l'overlay, malgré son `position: fixed` qui donne l'illusion
+  visuelle d'être complètement séparée. Confirmé empiriquement (la page
+  défilait alors que le `scrollTop` de la visionneuse restait à 0).
+  Solution : `overscroll-behavior: contain` sur le conteneur `position:
+  fixed` (`.lightbox` dans `htmlgallery.py`), à poser par défaut sur tout
+  overlay plein écran de ce type, même quand rien ne semble à première
+  vue nécessiter de défilement.
+- **Molette de la souris dans la visionneuse** : un seul écouteur
+  `wheel` sur `.lightbox`, `{{ passive: false }}` obligatoire pour que
+  `preventDefault()` soit honoré. Ctrl/Alt/Cmd + molette = zoom (empêche
+  aussi le zoom natif de la page de se déclencher en plus) ; molette
+  seule = navigation précédent/suivant, sauf si déjà zoomé au-delà de
+  100 % (`currentZoom > 100`), où la molette doit alors déplacer l'image
+  agrandie plutôt que changer de photo — dans ce cas précis, ne pas
+  appeler `preventDefault()` et laisser le défilement natif du conteneur
+  faire le travail. Anti-rebond (`WHEEL_THROTTLE_MS`) nécessaire : un
+  simple geste sur trackpad peut émettre des dizaines de micro-événements
+  `wheel`, qui feraient sinon défiler plusieurs photos ou paliers de zoom
+  d'un coup.
+- **Navigation précédent/suivant qui franchit les pages (visionneuse
+  galerie HTML)** : chaque page générée étant un fichier statique séparé
+  avec son propre tableau `galleryImages` borné à ses seules photos,
+  `showDelta()` doit détecter le dépassement des bornes de ce tableau
+  (`newIndex < 0` ou `>= galleryImages.length`) et **naviguer vers le
+  fichier de la page suivante/précédente** (`window.location.href =
+  pageUrl(...)`) plutôt que boucler sur les photos de la page en cours -
+  sauf pour une galerie d'une seule page (`totalPages <= 1`), qui n'a
+  nulle part où aller et garde un simple bouclage local (évite de
+  recharger la page pour rien). Bouclage sur l'**ensemble** de la
+  galerie aux deux extrémités (dernière photo de la dernière page →
+  première photo de la première page, et inversement). La page de
+  destination ne sait pas d'elle-même quelle photo ouvrir : elle arrive
+  avec `?open=0` (venant d'une page précédente) ou `?open=last` (venant
+  d'une suivante) dans l'URL, lu par un bloc exécuté à la fin du script
+  de la page cible, qui ouvre la visionneuse à la bonne photo puis
+  nettoie l'URL (`history.replaceState`) pour qu'un rafraîchissement
+  manuel ne la rouvre pas involontairement. Un second paramètre,
+  `&wrap=fwd`/`&wrap=back`, distingue un franchissement normal (aucun
+  avertissement) d'un bouclage sur l'ensemble de la galerie (dernière
+  photo → première page ou l'inverse), pour afficher le bon message via
+  `showToast()` uniquement dans ce second cas - la page cible ne peut
+  pas déduire seule si son arrivée à l'index 0 ou dernier est un
+  bouclage ou un simple hasard de pagination, il faut que la page
+  source le précise explicitement. La grille de fond (derrière la
+  visionneuse) reflète déjà correctement la page cible après ce
+  changement, `window.location.href` étant une vraie navigation complète
+  — vérifié empiriquement (pagination du haut, vignettes affichées)
+  plutôt que supposé.
+- **Téléchargement d'image dans la visionneuse (galerie HTML)** : le
+  bouton passe par `fetch()` → `Blob` → `URL.createObjectURL()` plutôt
+  que le simple attribut HTML `download` sur le lien direct, peu fiable
+  une fois servi via HTTP(S) selon les navigateurs. **Limite fondamentale
+  et non contournable, testée empiriquement (Playwright/Chromium) avec
+  `CHANGELOG.md`** : quand la galerie est ouverte directement en `file://`
+  (double-clic sur `index.html`, sans serveur web), `fetch()`,
+  `XMLHttpRequest` ET la lecture d'un `<canvas>` ayant chargé l'image sont
+  tous les trois bloqués de façon identique par Firefox ET Chrome (chaque
+  fichier `file://` a une origine "opaque" depuis le correctif de
+  sécurité **CVE-2019-11730**) - aucune API JavaScript ne permet de
+  contourner ça. Le code détecte `location.protocol === 'file:'` en amont
+  et affiche un message explicatif (bouton toast) plutôt que d'échouer
+  silencieusement ; ne PAS retenter une solution "plus maligne" pour ce
+  cas précis sans avoir revérifié que cette restriction navigateur a
+  changé.
 - **Filigrane** : toujours via `utils.apply_watermark()` — fonction
   unique, jamais de logique de filigrane dupliquée localement.
 - **Compatibilité GTK/Windows** : pattern défensif systématique pour les
@@ -278,6 +407,57 @@ bel et bien dans `portfolio.py` actuel).
   contenu réellement publié).
 - **Livraison de code** : fichiers complets systématiquement, jamais de
   diff/patch partiel (convention de travail établie avec le mainteneur).
+- **Internationalisation de l'interface graphique** (`portfolio/i18n.py` +
+  `portfolio/locales/`) : dictionnaires Python par langue (`fr.py` est la
+  source ; `en.py`/`de.py`/`es.py` doivent toujours avoir exactement le
+  même jeu de clés — vérifié explicitement en test), pas gettext/.po/.mo
+  — choix délibéré pour éviter une étape de compilation et une dépendance
+  supplémentaire à empaqueter dans le `.deb`/l'installeur Windows.
+  Nouvelle chaîne visible par l'utilisateur = nouvelle clé dans les 4
+  fichiers de `locales/`, jamais de texte en dur dans
+  `planche-contact-gtk.py`. Un changement de langue ne prend effet qu'au
+  redémarrage (pas de reconstruction de l'arbre de widgets à la volée).
+  **Piège rencontré à surveiller** : certains menus déroulants affichent
+  un texte traduit à l'utilisateur mais doivent transmettre une valeur
+  interne fixe (française) au moteur — cas de l'orientation du filigrane,
+  comparée en dur en français dans `portfolio/config.py`. Toujours lire
+  l'**index** sélectionné (`combo.get_selected()`) et le faire pointer
+  vers une liste de valeurs internes séparée
+  (`self._orient_values[index]`), jamais le texte affiché
+  (`get_selected_item().get_string()`) pour ce genre de champ.
+  **Second piège rencontré, plus insidieux** : `PlancheContactGTK` garde
+  deux variables distinctes pour la langue — `self.language_preference`
+  (le choix brut sauvegardé, peut valoir `"system"`) et `self._language`
+  (le résultat déjà résolu par `set_language()`, jamais `"system"` -
+  c'est celle-ci qui part dans `--language` vers le sous-processus CLI).
+  Changer la langue dans le menu déroulant sans mettre à jour les
+  **deux** laisse `self._language` bloquée sur la langue de démarrage :
+  une génération lancée juste après un changement de langue (sans
+  redémarrer) repartirait alors avec l'ancienne langue - détecté en
+  testant explicitement ce scénario précis avec Xvfb, pas visible en
+  relisant le code.
+  **Troisième piège rencontré, le plus grave** (régression complète,
+  détectée par le mainteneur en test manuel, pas par Claude) : Python
+  traite `_` comme une variable **locale à toute la fonction** dès qu'on
+  lui assigne quoi que ce soit quelque part dans cette fonction - même
+  après l'appel qui utilise `_()`. `_choose_folder()` contenait
+  `uri, _, label = line.partition(" ")` (convention Python classique
+  pour une valeur jetable) dans le code de lecture des signets GTK, plus
+  bas dans la même méthode qui appelle `_("folder_picker.title_input")`
+  en tout début : ça levait `UnboundLocalError` **à chaque clic** sur
+  "Choisir...", empêchant purement et simplement le dialogue de
+  s'ouvrir - PyGObject avale l'exception au lieu de faire remonter un
+  traceback visible, donnant l'impression que "le bouton ne fait rien".
+  Ne plus jamais utiliser `_` comme nom de variable jetable dans un
+  fichier qui importe `_` de `i18n.py` - préférer `_sep`, `_unused`, ou
+  toute alternative explicite. Un contrôle statique simple (chercher, par
+  AST, une fonction qui à la fois assigne `_` et appelle `_(...)`)
+  permet de détecter ce genre de conflit sans avoir à cliquer sur
+  chaque bouton un par un.
+  **Portée** : le CLI (`portfolio.py`), la galerie HTML générée et le
+  manuel utilisateur sont également traduits dans la même langue que
+  l'interface (voir §2.2/§2.3). Internationalisation désormais complète
+  sur l'ensemble du projet.
 
 ---
 
@@ -304,6 +484,8 @@ en cause sans en connaître la raison) :
 | `fpm` (`build-deb.sh`) : scripts de maintenance via `--after-install`/`--after-remove`, jamais un dossier `DEBIAN/` dans les sources `-C` | Contrairement à `dpkg-deb --build` natif, `fpm` ne traite jamais spécialement un dossier nommé `DEBIAN/` parmi ses sources : un tel dossier finit comme contenu de données inerte (installé tel quel sur la machine cible), jamais reconnu comme scripts de maintenance ni exécuté par dpkg |
 | `IntFmt` NSIS : toujours le style printf (`"0x%X"`), jamais la syntaxe mnémonique (`"0xX"`) | `"0xX"` est documentée sur le wiki NSIS (valable en NSIS 2.x) mais ne convertit plus rien en NSIS 3.x — elle retourne la chaîne littérale inchangée, faisant silencieusement échouer tout `WriteRegDWORD` qui en dépend (ex : `EstimatedSize`, repli à 0) |
 | `makensis` + Wine installables via `apt` dans le bac à sable Linux de Claude | Permet de **compiler ET exécuter** un vrai installeur NSIS pour reproduire/valider un bug Windows sans accès à une machine Windows réelle. Nécessite `nsis` (paquet universe), et pour un installeur NSIS 32 bits par défaut : `dpkg --add-architecture i386` + `wine32:i386` (le simple `wine64` ne suffit pas). Les écritures registre sont vérifiables avec `wine reg query`. Ne remplace pas un vrai test utilisateur (thème visuel, UAC réel, etc.) mais permet de confirmer/infirmer un correctif de logique avant de le transmettre |
+| GTK4 + Xvfb installables via `apt` dans le bac à sable Linux de Claude | Permet d'**exécuter réellement** `planche-contact-gtk.py` (pas juste vérifier sa syntaxe) : `apt-get install gir1.2-gtk-4.0 python3-gi`, puis `Xvfb :99 & DISPLAY=:99 python3 script.py`. Piloter l'appli par introspection directe des widgets (`app.win`, `app.run_button.get_label()`, `dropdown.set_selected(i)`...) via `GLib.timeout_add()` après `app.connect("activate", ...)`, plutôt qu'un outil d'automatisation UI dédié. **Xvfb ne survit jamais entre deux appels d'outil séparés** (comme les serveurs HTTP de test) : démarrer Xvfb et lancer le script Python dans la **même** commande shell, jamais deux commandes séparées |
+
 
 ---
 
@@ -320,8 +502,9 @@ en cause sans en connaître la raison) :
 
 ## 8. Roadmap
 
-- Internationalisation (i18n) — l'interface et les messages sont
-  actuellement uniquement en français.
+- Internationalisation (i18n) : **fait**, sur l'ensemble du projet —
+  interface graphique, CLI, galerie HTML générée et manuel utilisateur
+  (anglais, français, allemand, espagnol — voir §2.2/§2.3/§5).
 - Modèles de planches contact personnalisables.
 - Formats d'export supplémentaires.
 - Personnalisation PDF plus poussée.

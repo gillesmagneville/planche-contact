@@ -30,6 +30,8 @@ from pathlib import Path
 
 from PIL import Image
 
+from .i18n import _
+
 logger = logging.getLogger(__name__)
 
 RAW_EXTENSIONS = {".cr2", ".cr3", ".nef", ".dng", ".arw"}
@@ -98,10 +100,7 @@ def _large_enough(img_size, target_size, tolerance=0.9):
 def _load_raw(path: Path, use_embedded_thumb: bool = True, target_size=None) -> Image.Image:
     """Charge un fichier RAW et retourne une image PIL en mode RGB."""
     if not RAWPY_AVAILABLE:
-        raise RuntimeError(
-            f"Impossible de lire '{path.name}' : le module 'rawpy' n'est pas installé. "
-            f"Installez-le avec : pip install rawpy"
-        )
+        raise RuntimeError(_("engine.raw_module_missing", name=path.name))
 
     with rawpy.imread(str(path)) as raw:
         if use_embedded_thumb:

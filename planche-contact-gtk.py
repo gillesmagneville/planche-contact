@@ -67,6 +67,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from portfolio.config import Config
 from portfolio.scanner import ImageScanner
 from portfolio.rawloader import load_image
+from portfolio.i18n import _, set_language, get_language, AVAILABLE_LANGUAGES, detect_system_language
 
 
 def glib_idle_add(function, *args):
@@ -152,7 +153,7 @@ class FolderPreviewController:
             self.status_label.set_text("")
             return
 
-        self.status_label.set_text("Analyse du dossier...")
+        self.status_label.set_text(_("preview.analyzing"))
         threading.Thread(
             target=self._scan_files,
             args=(folder_path, token),
@@ -189,7 +190,7 @@ class FolderPreviewController:
         self._page_cache = {}
 
         if not image_files:
-            self.status_label.set_text("Aucune photo trouvée dans ce dossier.")
+            self.status_label.set_text(_("preview.no_photos"))
             self._clear_flow()
             self._update_nav()
             return False
@@ -261,7 +262,7 @@ class FolderPreviewController:
             return
 
         self._clear_flow()
-        self.status_label.set_text(f"Chargement des photos {start + 1}-{end} sur {total}...")
+        self.status_label.set_text(_("preview.loading", start=start + 1, end=end, total=total))
 
         files_slice = self._files[start:end]
         threading.Thread(
@@ -301,11 +302,10 @@ class FolderPreviewController:
         shown = len(thumb_bytes_list)
         if shown < (end - start):
             self.status_label.set_text(
-                f"Photos {start + 1}-{end} sur {total} ({shown} affichée(s), "
-                f"certaines illisibles)"
+                _("preview.showing_partial", start=start + 1, end=end, total=total, shown=shown)
             )
         else:
-            self.status_label.set_text(f"Photos {start + 1}-{end} sur {total}")
+            self.status_label.set_text(_("preview.showing", start=start + 1, end=end, total=total))
 
         for data in thumb_bytes_list:
             try:
@@ -327,10 +327,18 @@ class PlancheContactGTK(Gtk.Application):
         self.settings_path = Path.home() / ".config" / "planche-contact" / "settings.json"
         self.last_input_dir = ""
         self.last_output_dir = ""
+        self.language_preference = "system"
         self._preview_debounce_id = None
         self._last_result = None
         self._pending_result = None
         self.load_settings()
+        # Résolu AVANT toute construction d'interface : tous les widgets
+        # créés dans do_activate() appellent _() en supposant la langue
+        # déjà active. self._language_fallback_detected reste None sauf si
+        # la langue système demandée n'a aucune traduction disponible -
+        # dans ce cas, un avertissement est affiché une fois la fenêtre
+        # affichée (voir do_activate).
+        self._language, self._language_fallback_detected = set_language(self.language_preference)
 
     def load_settings(self):
         try:
@@ -339,6 +347,7 @@ class PlancheContactGTK(Gtk.Application):
                     data = json.load(f)
                     self.last_input_dir = data.get("last_input_dir", "")
                     self.last_output_dir = data.get("last_output_dir", "")
+                    self.language_preference = data.get("language", "system")
         except Exception:
             pass
 
@@ -346,7 +355,8 @@ class PlancheContactGTK(Gtk.Application):
         self.settings_path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "last_input_dir": self.last_input_dir,
-            "last_output_dir": self.last_output_dir
+            "last_output_dir": self.last_output_dir,
+            "language": self.language_preference
         }
         with open(self.settings_path, "w") as f:
             json.dump(data, f, indent=2)
@@ -361,12 +371,44 @@ class PlancheContactGTK(Gtk.Application):
         # redimensionnable (agrandissable) par l'utilisateur ensuite.
         self.win.set_icon_name("image-x-generic")
 
+        # Barre de titre avec un menu (bouton hamburger) donnant accès aux
+        # Préférences - volontairement PAS dans l'onglet À propos, qui
+        # reste purement informatif (version, licence, crédits) : un
+        # réglage comme la langue n'a logiquement rien à y faire.
+        headerbar = Gtk.HeaderBar()
+        menu_button = Gtk.MenuButton()
+        menu_button.set_icon_name("open-menu-symbolic")
+
+        menu_popover = Gtk.Popover()
+        menu_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        menu_box.set_margin_top(6)
+        menu_box.set_margin_bottom(6)
+        menu_box.set_margin_start(6)
+        menu_box.set_margin_end(6)
+
+        prefs_item = Gtk.Button(label=_("prefs.title"))
+        prefs_item.add_css_class("flat")
+        child = prefs_item.get_child()
+        if child is not None:
+            child.set_xalign(0)
+
+        def on_prefs_clicked(b):
+            menu_popover.popdown()
+            self._open_preferences()
+
+        prefs_item.connect("clicked", on_prefs_clicked)
+        menu_box.append(prefs_item)
+        menu_popover.set_child(menu_box)
+        menu_button.set_popover(menu_popover)
+        headerbar.pack_end(menu_button)
+        self.win.set_titlebar(headerbar)
+
         notebook = Gtk.Notebook()
         self.win.set_child(notebook)
 
-        notebook.append_page(self._build_generation_tab(), Gtk.Label(label="Génération"))
-        notebook.append_page(self._build_help_tab(), Gtk.Label(label="Aide"))
-        notebook.append_page(self._build_about_tab(), Gtk.Label(label="À propos"))
+        notebook.append_page(self._build_generation_tab(), Gtk.Label(label=_("tab.generation")))
+        notebook.append_page(self._build_help_tab(), Gtk.Label(label=_("tab.help")))
+        notebook.append_page(self._build_about_tab(), Gtk.Label(label=_("tab.about")))
 
         self.win.present()
 
@@ -375,6 +417,51 @@ class PlancheContactGTK(Gtk.Application):
         # explicitement pour un dossier déjà mémorisé au démarrage.
         if self.last_input_dir:
             self.input_preview.refresh(self.last_input_dir)
+
+        # Langue système sélectionnée mais sans traduction disponible :
+        # affiché une seule fois au démarrage, après la fenêtre principale
+        # pour ne pas retarder son affichage.
+        if self._language_fallback_detected is not None:
+            dialog = Gtk.AlertDialog()
+            dialog.set_modal(True)
+            dialog.set_message(_("lang.fallback_warning_title"))
+            dialog.set_detail(_("lang.fallback_warning_detail", detected=self._language_fallback_detected))
+            dialog.set_buttons(["OK"])
+            dialog.show(self.win)
+
+    def _open_preferences(self):
+        dialog = Gtk.Window(transient_for=self.win, modal=True)
+        dialog.set_title(_("prefs.title"))
+        dialog.set_default_size(360, -1)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        box.set_margin_top(20)
+        box.set_margin_bottom(20)
+        box.set_margin_start(20)
+        box.set_margin_end(20)
+        dialog.set_child(box)
+
+        lang_box = Gtk.Box(spacing=10)
+        lang_box.append(Gtk.Label(label=_("about.language_label")))
+        lang_model = Gtk.StringList()
+        for code in AVAILABLE_LANGUAGES:
+            lang_model.append(_(f"lang.{code}"))
+        self.language_combo = Gtk.DropDown(model=lang_model)
+        self.language_combo.set_selected(AVAILABLE_LANGUAGES.index(self.language_preference))
+        self.language_combo.set_hexpand(True)
+        lang_box.append(self.language_combo)
+        box.append(lang_box)
+
+        self.language_restart_label = Gtk.Label(label=_("about.language_restart_notice"))
+        self.language_restart_label.add_css_class("dim-label")
+        self.language_restart_label.set_wrap(True)
+        self.language_restart_label.set_xalign(0)
+        self.language_restart_label.set_visible(False)
+        box.append(self.language_restart_label)
+
+        self.language_combo.connect("notify::selected", self._on_language_changed)
+
+        dialog.present()
 
     # ====================== ONGLET GÉNÉRATION ======================
 
@@ -386,14 +473,14 @@ class PlancheContactGTK(Gtk.Application):
 
         # Titre du projet + Nom de l'auteur (même ligne)
         hbox = Gtk.Box(spacing=10)
-        hbox.append(Gtk.Label(label="Titre du projet :"))
+        hbox.append(Gtk.Label(label=_("gen.project_title")))
         self.project_title_entry = Gtk.Entry()
         self.project_title_entry.set_hexpand(False)
         self.project_title_entry.set_halign(Gtk.Align.START)
         self.project_title_entry.set_width_chars(45)
         hbox.append(self.project_title_entry)
 
-        author_label = Gtk.Label(label="Nom de l'auteur :")
+        author_label = Gtk.Label(label=_("gen.author"))
         author_label.set_margin_start(15)
         hbox.append(author_label)
         self.author_entry = Gtk.Entry()
@@ -409,7 +496,7 @@ class PlancheContactGTK(Gtk.Application):
 
         # Dossier d'entrée
         hbox = Gtk.Box(spacing=10)
-        hbox.append(Gtk.Label(label="Dossier d'entrée :"))
+        hbox.append(Gtk.Label(label=_("gen.input_dir")))
         self.input_entry = Gtk.Entry()
         if self.last_input_dir:
             self.input_entry.set_text(self.last_input_dir)
@@ -417,7 +504,7 @@ class PlancheContactGTK(Gtk.Application):
         self.input_entry.set_halign(Gtk.Align.START)
         self.input_entry.set_width_chars(68)
         self.input_entry.connect("changed", self._on_input_entry_changed)
-        btn = Gtk.Button(label="Choisir...")
+        btn = Gtk.Button(label=_("gen.choose"))
         btn.connect("clicked", self._choose_folder, self.input_entry, "input")
         hbox.append(self.input_entry)
         hbox.append(btn)
@@ -456,7 +543,7 @@ class PlancheContactGTK(Gtk.Application):
         preview_nav = Gtk.Box(spacing=6)
         preview_nav.set_halign(Gtk.Align.CENTER)
         preview_nav.set_margin_top(2)
-        self.preview_prev_btn = Gtk.Button(label="← Précédent")
+        self.preview_prev_btn = Gtk.Button(label=_("preview.prev"))
         self.preview_prev_btn.set_sensitive(False)
         self.preview_pages_box = Gtk.Box(spacing=4)
         # Hauteur réservée dès le départ (avant même qu'un dossier ne soit
@@ -465,7 +552,7 @@ class PlancheContactGTK(Gtk.Application):
         # qui agrandit la fenêtre après coup - et perturbe le centrage
         # vertical fait par le gestionnaire de fenêtres à l'ouverture.
         self.preview_pages_box.set_size_request(-1, 34)
-        self.preview_next_btn = Gtk.Button(label="Suivant →")
+        self.preview_next_btn = Gtk.Button(label=_("preview.next"))
         self.preview_next_btn.set_sensitive(False)
         preview_nav.append(self.preview_prev_btn)
         preview_nav.append(self.preview_pages_box)
@@ -479,14 +566,14 @@ class PlancheContactGTK(Gtk.Application):
 
         # Dossier de sortie
         hbox = Gtk.Box(spacing=10)
-        hbox.append(Gtk.Label(label="Dossier de sortie :"))
+        hbox.append(Gtk.Label(label=_("gen.output_dir")))
         self.output_entry = Gtk.Entry()
         if self.last_output_dir:
             self.output_entry.set_text(self.last_output_dir)
         self.output_entry.set_hexpand(False)
         self.output_entry.set_halign(Gtk.Align.START)
         self.output_entry.set_width_chars(68)
-        btn = Gtk.Button(label="Choisir...")
+        btn = Gtk.Button(label=_("gen.choose"))
         btn.connect("clicked", self._choose_folder, self.output_entry, "output")
         hbox.append(self.output_entry)
         hbox.append(btn)
@@ -497,10 +584,10 @@ class PlancheContactGTK(Gtk.Application):
 
         # Options
         grid = Gtk.Grid(column_spacing=10, row_spacing=6)
-        self.recursive_check = Gtk.CheckButton(label="Recherche récursive")
+        self.recursive_check = Gtk.CheckButton(label=_("gen.recursive"))
         grid.attach(self.recursive_check, 0, 0, 8, 1)
 
-        grid.attach(Gtk.Label(label="Images par planche :"), 0, 1, 1, 1)
+        grid.attach(Gtk.Label(label=_("gen.images_per_sheet")), 0, 1, 1, 1)
         num_model = Gtk.StringList()
         for n in range(8, 49, 4):
             num_model.append(str(n))
@@ -508,7 +595,7 @@ class PlancheContactGTK(Gtk.Application):
         self.num_combo.set_selected(1)
         grid.attach(self.num_combo, 1, 1, 1, 1)
 
-        format_label = Gtk.Label(label="Format de la planche :")
+        format_label = Gtk.Label(label=_("gen.sheet_format"))
         format_label.set_margin_start(20)
         grid.attach(format_label, 2, 1, 1, 1)
         format_model = Gtk.StringList()
@@ -519,7 +606,7 @@ class PlancheContactGTK(Gtk.Application):
         grid.attach(self.format_combo, 3, 1, 1, 1)
 
         # Filigrane : sur la même ligne, pour limiter la hauteur du formulaire
-        watermark_label = Gtk.Label(label="Filigrane (texte) :")
+        watermark_label = Gtk.Label(label=_("gen.watermark_text"))
         watermark_label.set_margin_start(20)
         grid.attach(watermark_label, 4, 1, 1, 1)
         self.watermark_entry = Gtk.Entry()
@@ -528,19 +615,25 @@ class PlancheContactGTK(Gtk.Application):
         self.watermark_entry.set_width_chars(18)
         grid.attach(self.watermark_entry, 5, 1, 1, 1)
 
-        orient_label = Gtk.Label(label="Orientation du filigrane :")
+        orient_label = Gtk.Label(label=_("gen.watermark_orientation"))
         orient_label.set_margin_start(20)
         grid.attach(orient_label, 6, 1, 1, 1)
+        # Les valeurs de ce menu sont transmises telles quelles au CLI
+        # (portfolio.py --watermark-orientation), qui les compare en
+        # français (voir portfolio/config.py) : on affiche la traduction
+        # mais on garde la valeur française en interne pour ne rien casser
+        # côté moteur.
+        self._orient_values = ["Horizontal", "Diagonale horaire", "Diagonale anti-horaire"]
         orient_model = Gtk.StringList()
-        for orient in ["Horizontal", "Diagonale horaire", "Diagonale anti-horaire"]:
-            orient_model.append(orient)
+        for key in ["watermark.horizontal", "watermark.diagonal_cw", "watermark.diagonal_ccw"]:
+            orient_model.append(_(key))
         self.watermark_orient_combo = Gtk.DropDown(model=orient_model)
         self.watermark_orient_combo.set_selected(0)
         grid.attach(self.watermark_orient_combo, 7, 1, 1, 1)
 
         # Opacité du filigrane (0-100%), valeur par défaut alignée sur celle
         # utilisée par le générateur (voir portfolio/config.py).
-        opacity_label = Gtk.Label(label="Opacité du filigrane :")
+        opacity_label = Gtk.Label(label=_("gen.watermark_opacity"))
         grid.attach(opacity_label, 0, 2, 1, 1)
         self.watermark_opacity_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
         self.watermark_opacity_scale.set_value(40)
@@ -550,9 +643,9 @@ class PlancheContactGTK(Gtk.Application):
         self.watermark_opacity_scale.set_size_request(220, -1)
         grid.attach(self.watermark_opacity_scale, 1, 2, 3, 1)
 
-        self.pdf_check = Gtk.CheckButton(label="Générer PDF")
-        self.html_check = Gtk.CheckButton(label="Générer Galerie HTML")
-        self.csv_check = Gtk.CheckButton(label="Générer Index CSV")
+        self.pdf_check = Gtk.CheckButton(label=_("gen.generate_pdf"))
+        self.html_check = Gtk.CheckButton(label=_("gen.generate_html"))
+        self.csv_check = Gtk.CheckButton(label=_("gen.generate_csv"))
         self.pdf_check.set_active(True)
         self.html_check.set_active(True)
         self.csv_check.set_active(True)
@@ -564,7 +657,7 @@ class PlancheContactGTK(Gtk.Application):
         # Nombre d'images par page de la galerie HTML : sur la même ligne
         # que la case à cocher correspondante (voir portfolio/htmlgallery.py,
         # HTMLGalleryGenerator.images_per_page, défaut 48).
-        html_per_page_label = Gtk.Label(label="Images par page :")
+        html_per_page_label = Gtk.Label(label=_("gen.images_per_page"))
         html_per_page_label.set_margin_start(20)
         grid.attach(html_per_page_label, 2, 4, 1, 1)
         self.html_per_page_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 12, 64, 4)
@@ -584,11 +677,11 @@ class PlancheContactGTK(Gtk.Application):
 
         # Boutons
         hbox = Gtk.Box(spacing=10)
-        self.run_button = Gtk.Button(label="Lancer la génération")
+        self.run_button = Gtk.Button(label=_("gen.run"))
         self.run_button.add_css_class("suggested-action")
         self.run_button.connect("clicked", self._on_generate)
 
-        reset_btn = Gtk.Button(label="Réinitialiser")
+        reset_btn = Gtk.Button(label=_("gen.reset"))
         reset_btn.connect("clicked", self._reset_form)
 
         # Bouton à liste déroulante pour ouvrir les résultats (planches,
@@ -597,7 +690,7 @@ class PlancheContactGTK(Gtk.Application):
         # Désactivé tant qu'aucune génération n'a réussi ; chaque option
         # individuelle n'est activée que si l'élément correspondant a
         # effectivement été produit lors de la dernière génération.
-        self.view_results_btn = Gtk.MenuButton(label="Afficher les résultats")
+        self.view_results_btn = Gtk.MenuButton(label=_("gen.view_results"))
         self.view_results_btn.set_sensitive(False)
 
         view_popover = Gtk.Popover()
@@ -622,15 +715,15 @@ class PlancheContactGTK(Gtk.Application):
             view_box.append(btn)
             return btn
 
-        self.view_planches_btn = make_view_item("Planches contact", self._open_planches)
-        self.view_pdf_btn = make_view_item("Portfolio PDF", self._open_pdf)
-        self.view_gallery_btn = make_view_item("Galerie HTML", self._open_gallery)
-        self.view_csv_btn = make_view_item("Index CSV", self._open_csv)
+        self.view_planches_btn = make_view_item(_("gen.view_planches"), self._open_planches)
+        self.view_pdf_btn = make_view_item(_("gen.view_pdf"), self._open_pdf)
+        self.view_gallery_btn = make_view_item(_("gen.view_gallery"), self._open_gallery)
+        self.view_csv_btn = make_view_item(_("gen.view_csv"), self._open_csv)
 
         view_popover.set_child(view_box)
         self.view_results_btn.set_popover(view_popover)
 
-        quit_btn = Gtk.Button(label="Quitter")
+        quit_btn = Gtk.Button(label=_("gen.quit"))
         quit_btn.connect("clicked", lambda b: self.quit())
 
         left_box = Gtk.Box(spacing=10)
@@ -707,8 +800,8 @@ class PlancheContactGTK(Gtk.Application):
         """
         dialog = Gtk.Window(transient_for=self.win, modal=True)
         dialog.set_title(
-            "Choisir un dossier d'entrée" if folder_type == "input"
-            else "Choisir un dossier de sortie"
+            _("folder_picker.title_input") if folder_type == "input"
+            else _("folder_picker.title_output")
         )
         dialog.set_default_size(1150, 750)
 
@@ -736,10 +829,8 @@ class PlancheContactGTK(Gtk.Application):
         path_entry_box.set_margin_bottom(6)
         path_entry = Gtk.Entry()
         path_entry.set_hexpand(True)
-        path_entry.set_placeholder_text(
-            "Saisir un chemin (ex: \\\\serveur\\partage) et appuyer sur Entrée..."
-        )
-        path_go_btn = Gtk.Button(label="Aller")
+        path_entry.set_placeholder_text(_("folder_picker.path_placeholder"))
+        path_go_btn = Gtk.Button(label=_("folder_picker.go"))
         path_entry_box.append(path_entry)
         path_entry_box.append(path_go_btn)
         root_box.append(path_entry_box)
@@ -832,7 +923,7 @@ class PlancheContactGTK(Gtk.Application):
         preview_box.set_margin_end(12)
         preview_box.set_margin_bottom(4)
 
-        status_label = Gtk.Label(label="Naviguez pour voir un aperçu des photos.")
+        status_label = Gtk.Label(label=_("preview.hint"))
         status_label.set_xalign(0)
         status_label.add_css_class("dim-label")
         preview_box.append(status_label)
@@ -852,10 +943,10 @@ class PlancheContactGTK(Gtk.Application):
 
         nav_box = Gtk.Box(spacing=6)
         nav_box.set_halign(Gtk.Align.CENTER)
-        prev_btn = Gtk.Button(label="← Précédent")
+        prev_btn = Gtk.Button(label=_("preview.prev"))
         prev_btn.set_sensitive(False)
         pages_box = Gtk.Box(spacing=4)
-        next_btn = Gtk.Button(label="Suivant →")
+        next_btn = Gtk.Button(label=_("preview.next"))
         next_btn.set_sensitive(False)
         nav_box.append(prev_btn)
         nav_box.append(pages_box)
@@ -875,8 +966,8 @@ class PlancheContactGTK(Gtk.Application):
         btn_box.set_margin_top(8)
         btn_box.set_margin_bottom(10)
         btn_box.set_margin_end(12)
-        cancel_btn = Gtk.Button(label="Annuler")
-        select_btn = Gtk.Button(label="Sélectionner ce dossier")
+        cancel_btn = Gtk.Button(label=_("folder_picker.cancel"))
+        select_btn = Gtk.Button(label=_("folder_picker.select"))
         select_btn.add_css_class("suggested-action")
         btn_box.append(cancel_btn)
         btn_box.append(select_btn)
@@ -949,7 +1040,7 @@ class PlancheContactGTK(Gtk.Application):
             sidebar.append(btn)
 
         home_path = str(Path.home())
-        add_sidebar_button("Dossier personnel", home_path, "user-home-symbolic")
+        add_sidebar_button(_("folder_picker.home"), home_path, "user-home-symbolic")
 
         # "Ce PC" : lettres de lecteur disponibles sous Windows (disques
         # locaux ET lecteurs réseau mappés - os.listdrives() ne fait pas la
@@ -961,7 +1052,7 @@ class PlancheContactGTK(Gtk.Application):
             except OSError:
                 drives = []
             if drives:
-                sep_label = Gtk.Label(label="Ce PC")
+                sep_label = Gtk.Label(label=_("folder_picker.this_pc"))
                 sep_label.add_css_class("dim-label")
                 sep_label.set_xalign(0)
                 sep_label.set_margin_top(10)
@@ -979,7 +1070,7 @@ class PlancheContactGTK(Gtk.Application):
                     line = line.strip()
                     if not line:
                         continue
-                    uri, _, label = line.partition(" ")
+                    uri, _sep, label = line.partition(" ")
                     bpath = Gio.File.new_for_uri(uri).get_path()
                     if bpath and Path(bpath).is_dir():
                         add_sidebar_button(label or Path(bpath).name, bpath)
@@ -1028,7 +1119,7 @@ class PlancheContactGTK(Gtk.Application):
     def _on_generate(self, button):
         input_dir = self.input_entry.get_text().strip()
         if not input_dir:
-            self._log("Veuillez sélectionner un dossier d'entrée.")
+            self._log(_("gen.select_input_first"))
             return
 
         output_dir = self.output_entry.get_text().strip() or str(Path(input_dir) / "Portfolio")
@@ -1041,7 +1132,10 @@ class PlancheContactGTK(Gtk.Application):
         title = self.project_title_entry.get_text().strip() or None
         author = self.author_entry.get_text().strip() or None
         watermark = self.watermark_entry.get_text().strip() or None
-        orientation = self.watermark_orient_combo.get_selected_item().get_string()
+        # Valeur française interne (voir portfolio/config.py), pas le texte
+        # traduit affiché dans le menu déroulant - self._orient_values est
+        # rempli dans le même ordre que les options du menu.
+        orientation = self._orient_values[self.watermark_orient_combo.get_selected()]
         opacity = int(self.watermark_opacity_scale.get_value())
         html_per_page = int(self.html_per_page_scale.get_value())
 
@@ -1065,7 +1159,12 @@ class PlancheContactGTK(Gtk.Application):
             "-o", output_dir,
             "-n", str(num_per_sheet),
             "--format", page_format,
-            "--html-per-page", str(html_per_page)
+            "--html-per-page", str(html_per_page),
+            # Langue déjà résolue (voir __init__ : plus jamais "system" à ce
+            # stade) - garantit que la galerie HTML générée correspond
+            # toujours à la langue affichée dans l'interface, plutôt que de
+            # laisser le CLI redétecter indépendamment la langue système.
+            "--language", self._language
         ]
 
         if title:
@@ -1085,11 +1184,11 @@ class PlancheContactGTK(Gtk.Application):
         if self.csv_check.get_active():
             cmd.append("--csv")
 
-        self._log("Démarrage de la génération...")
+        self._log(_("gen.starting"))
         self.run_button.set_sensitive(False)
         self.view_results_btn.set_sensitive(False)
         self.progress.set_fraction(0.0)
-        self.status_label.set_text("Génération en cours...")
+        self.status_label.set_text(_("gen.running"))
 
         # Mémorise ce qui est demandé dans CETTE génération (indépendamment
         # de l'état futur des cases à cocher, qui pourrait changer avant la
@@ -1119,32 +1218,30 @@ class PlancheContactGTK(Gtk.Application):
                     glib_idle_add(self._log, line)
                     glib_idle_add(self.status_label.set_text, line)
 
+                    # Le calcul de progression repose uniquement sur le
+                    # marqueur "PROGRESS:X/100", volontairement jamais
+                    # traduit (voir portfolio/portfolio.py) : ne dépend
+                    # d'aucun texte humain, donc valable dans toutes les
+                    # langues de l'interface.
                     progress_match = re.search(r"PROGRESS:(\d+)/100", line)
                     if progress_match:
                         fraction = int(progress_match.group(1)) / 100.0
                         glib_idle_add(self.progress.set_fraction, fraction)
                         continue
 
-                    match = re.search(r"Planche (\d+)/(\d+)", line)
-                    if match:
-                        current = int(match.group(1))
-                        total = int(match.group(2))
-                        fraction = min(0.70, 0.15 + (current / total) * 0.55)
-                        glib_idle_add(self.progress.set_fraction, fraction)
-
             process.wait()
 
             if process.returncode == 0:
-                glib_idle_add(self._log, "✅ Génération terminée avec succès !")
-                glib_idle_add(self.status_label.set_text, "Terminé avec succès")
+                glib_idle_add(self._log, _("gen.success_log"))
+                glib_idle_add(self.status_label.set_text, _("gen.success_status"))
                 glib_idle_add(self.progress.set_fraction, 1.0)
                 glib_idle_add(self._on_generation_success)
             else:
-                glib_idle_add(self._log, f"❌ Erreur (code {process.returncode})")
-                glib_idle_add(self.status_label.set_text, "Erreur pendant la génération")
+                glib_idle_add(self._log, _("gen.error_log_code", code=process.returncode))
+                glib_idle_add(self.status_label.set_text, _("gen.error_status"))
         except Exception as e:
-            glib_idle_add(self._log, f"❌ Erreur : {e}")
-            glib_idle_add(self.status_label.set_text, "Erreur")
+            glib_idle_add(self._log, _("gen.error_log_exception", error=e))
+            glib_idle_add(self.status_label.set_text, _("gen.error_status_generic"))
         finally:
             glib_idle_add(self.run_button.set_sensitive, True)
 
@@ -1229,9 +1326,8 @@ class PlancheContactGTK(Gtk.Application):
         # un dossier plutôt qu'à un fichier.
         if not self._open_path_with_default_app(planches_dir):
             self._show_no_viewer_dialog(
-                "Aucun gestionnaire de fichiers disponible",
-                "Aucune application par défaut n'est configurée pour ouvrir des "
-                "dossiers sur ce système."
+                _("dialog.no_file_manager_title"),
+                _("dialog.no_file_manager_detail")
             )
 
     def _open_pdf(self):
@@ -1242,10 +1338,8 @@ class PlancheContactGTK(Gtk.Application):
             return
         if not self._open_path_with_default_app(pdf_path):
             self._show_no_viewer_dialog(
-                "Aucun lecteur PDF disponible",
-                "Aucune application par défaut n'est configurée pour ouvrir les fichiers "
-                "PDF sur ce système.\n\nInstallez un lecteur PDF (par exemple : "
-                "Evince / Visionneur de documents, ou Okular) puis réessayez."
+                _("dialog.no_pdf_viewer_title"),
+                _("dialog.no_pdf_viewer_detail")
             )
 
     def _open_gallery(self):
@@ -1261,10 +1355,8 @@ class PlancheContactGTK(Gtk.Application):
         # être trouvé).
         if not self._open_path_with_default_app(gallery_index):
             self._show_no_viewer_dialog(
-                "Aucun navigateur web disponible",
-                "Aucune application par défaut n'est configurée pour ouvrir les pages "
-                "web sur ce système.\n\nInstallez un navigateur web (par exemple : "
-                "Firefox ou Chromium) puis réessayez."
+                _("dialog.no_browser_title"),
+                _("dialog.no_browser_detail")
             )
 
     def _open_csv(self):
@@ -1275,16 +1367,23 @@ class PlancheContactGTK(Gtk.Application):
             return
         if not self._open_path_with_default_app(csv_path):
             self._show_no_viewer_dialog(
-                "Aucune application disponible pour les fichiers CSV",
-                "Aucune application par défaut n'est configurée pour ouvrir les fichiers "
-                "CSV sur ce système.\n\nInstallez un tableur (par exemple : LibreOffice "
-                "Calc) ou un éditeur de texte, puis réessayez."
+                _("dialog.no_csv_app_title"),
+                _("dialog.no_csv_app_detail")
             )
 
     # ====================== AIDE ======================
 
     def _open_full_manual(self, button):
-        manual_path = Path(__file__).parent / "docs" / "planche-contact-manual.html"
+        docs_dir = Path(__file__).parent / "docs"
+        # Une version distincte par langue (pas de bascule JS interne au
+        # fichier, comme pour la galerie HTML générée) : plus simple à
+        # maintenir pour un document de référence statique. Repli sur le
+        # français si le fichier de la langue active n'existe pas (ne
+        # devrait arriver que pour "system" avec une langue non couverte,
+        # déjà gérée par ailleurs - voir portfolio/i18n.py).
+        lang = get_language()
+        candidate = docs_dir / f"planche-contact-manual.{lang}.html" if lang != "fr" else docs_dir / "planche-contact-manual.html"
+        manual_path = candidate if candidate.exists() else docs_dir / "planche-contact-manual.html"
 
         if manual_path.exists():
             webbrowser.open(f'file://{manual_path.resolve()}')
@@ -1307,15 +1406,15 @@ class PlancheContactGTK(Gtk.Application):
         box.set_margin_end(30)
 
         title = Gtk.Label()
-        title.set_markup("<big><b>Aide - Planche-Contact</b></big>")
+        title.set_markup(f"<big><b>{_('help.title')}</b></big>")
         box.append(title)
 
         info = Gtk.Label()
-        info.set_text("Clique sur le bouton ci-dessous pour ouvrir le manuel complet dans ton navigateur.")
+        info.set_text(_("help.description"))
         info.set_wrap(True)
         box.append(info)
 
-        button = Gtk.Button(label="Ouvrir le manuel complet dans le navigateur")
+        button = Gtk.Button(label=_("help.open_manual"))
         button.connect("clicked", self._open_full_manual)
         box.append(button)
 
@@ -1343,32 +1442,28 @@ class PlancheContactGTK(Gtk.Application):
 
         # Description
         desc = Gtk.Label()
-        desc.set_markup(
-            "<span size='small'>Générateur de planches contact photographiques\n"
-            "haute qualité (300 dpi)</span>"
-        )
+        desc.set_markup(f"<span size='small'>{_('about.tagline')}</span>")
         desc.set_justify(Gtk.Justification.CENTER)
         desc.set_margin_top(20)
         box.append(desc)
 
         # Auteur
         author = Gtk.Label()
-        author.set_markup("<span size='small'>Développé par Gilles MAGNEVILLE</span>")
+        author.set_markup(f"<span size='small'>{_('about.developed_by', name='Gilles MAGNEVILLE')}</span>")
         author.set_margin_top(25)
         box.append(author)
 
         # Mention transparente de l'assistance IA à la conception
         ai_credit = Gtk.Label()
         ai_credit.set_markup(
-            "<span size='small'>Conçu avec l'aide de "
-            '<a href="https://claude.ai">Claude.ai</a> (Anthropic)</span>'
+            f"<span size='small'>{_('about.ai_credit', link='<a href=\"https://claude.ai\">Claude.ai</a>')}</span>"
         )
         ai_credit.set_margin_top(4)
         box.append(ai_credit)
 
         # Licence
         license_label = Gtk.Label()
-        license_label.set_markup("<span size='small'>Distribué sous licence GNU GPL v3</span>")
+        license_label.set_markup(f"<span size='small'>{_('about.license')}</span>")
         license_label.set_margin_top(10)
         box.append(license_label)
 
@@ -1384,6 +1479,21 @@ class PlancheContactGTK(Gtk.Application):
         box.append(github_label)
 
         return box
+
+    def _on_language_changed(self, dropdown, _param):
+        new_preference = AVAILABLE_LANGUAGES[dropdown.get_selected()]
+        if new_preference == self.language_preference:
+            return
+        self.language_preference = new_preference
+        self.save_settings()
+        self.language_restart_label.set_visible(True)
+        # Les widgets déjà construits ne changent pas de texte sans
+        # redémarrer (voir le message ci-dessus), mais self._language doit
+        # être mis à jour immédiatement : c'est elle qui est transmise au
+        # CLI via --language dans _on_generate(), et une génération lancée
+        # avant un redémarrage doit refléter le choix qui vient d'être
+        # fait, pas la langue active au démarrage de l'application.
+        self._language, _unsupported = set_language(new_preference)
 
     def _get_version_info(self):
         """Récupère le numéro de version et la date de build"""
@@ -1411,9 +1521,9 @@ class PlancheContactGTK(Gtk.Application):
                 pass
 
         if build_date:
-            return f"Version {version}  —  Build du {build_date}"
+            return _("about.version_build", version=version, date=build_date)
         else:
-            return f"Version {version}"
+            return _("about.version_only", version=version)
 
 
 if __name__ == "__main__":

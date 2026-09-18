@@ -9,6 +9,7 @@ from PIL import Image, ImageOps
 
 from .rawloader import load_image, is_raw_file, get_original_dimensions
 from .utils import apply_watermark, get_exif_date, format_file_size
+from .i18n import _, get_language
 
 # Taille max. (plus grand côté) des images "pleine taille" de la galerie
 # HTML. Une photo RAW de 45 Mpx pleinement dématricée puis enregistrée telle
@@ -208,7 +209,7 @@ class HTMLGalleryGenerator:
                 thumbs_dir=thumbs_dir
             )
 
-        print(f"Galerie HTML créée : {total_pages} page(s) dans {output_dir}")
+        print(_("gallery.created_log", pages=total_pages, dir=output_dir))
 
     def _generate_page(self, page_images, page_results, page_meta, html_path, display_title,
                        current_page, total_pages, total_images, thumbs_dir):
@@ -216,8 +217,8 @@ class HTMLGalleryGenerator:
 
         header_html = f"<h1>{display_title}</h1>"
         if self.author:
-            header_html += f"<p>Par {self.author}</p>"
-        header_html += f"<p>{total_images} images • Page {current_page} / {total_pages}</p>"
+            header_html += f"<p>{_('gallery.by_author', author=self.author)}</p>"
+        header_html += f"<p>{_('gallery.header_count', count=total_images, current=current_page, total=total_pages)}</p>"
 
         nav_html = ""
         if total_pages > 1:
@@ -225,7 +226,7 @@ class HTMLGalleryGenerator:
 
             if current_page > 1:
                 prev = "index.html" if current_page == 2 else f"page_{current_page-1:03d}.html"
-                nav_html += f'<a href="{prev}">← Précédent</a>&nbsp;&nbsp;'
+                nav_html += f'<a href="{prev}">{_("gallery.nav_prev")}</a>&nbsp;&nbsp;'
 
             if total_pages <= 15:
                 pages = list(range(1, total_pages + 1))
@@ -252,12 +253,12 @@ class HTMLGalleryGenerator:
 
             if current_page < total_pages:
                 nextp = f"page_{current_page+1:03d}.html"
-                nav_html += f'&nbsp;&nbsp;<a href="{nextp}">Suivant →</a>'
+                nav_html += f'&nbsp;&nbsp;<a href="{nextp}">{_("gallery.nav_next")}</a>'
 
             nav_html += '</div>'
 
         html = f"""<!DOCTYPE html>
-<html lang="fr">
+<html lang="{get_language()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -300,15 +301,36 @@ class HTMLGalleryGenerator:
             z-index: 1000;
             align-items: center;
             justify-content: center;
+            overflow: auto;
+            /* Empêche la molette/le geste de défilement de "fuir" vers la
+               page en arrière-plan une fois que la visionneuse elle-même
+               n'a plus rien à défiler (par défaut, le navigateur chaîne le
+               défilement non consommé vers l'ancêtre défilable suivant -
+               ici la galerie sous l'overlay, malgré son position: fixed). */
+            overscroll-behavior: contain;
         }}
         .lightbox.open {{ display: flex; }}
+        /* Au-delà de 100% de zoom, l'image peut dépasser l'écran : on
+           bascule l'alignement en haut-à-gauche pour que la totalité de
+           l'image reste atteignable au défilement (un centrage flex
+           classique masquerait la partie qui dépasse en haut/à gauche,
+           hors d'atteinte du défilement). */
+        .lightbox.zoomed {{ align-items: flex-start; justify-content: flex-start; }}
         .lightbox img {{
             max-width: 92vw;
             max-height: 92vh;
             border-radius: 4px;
             box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+            transition: width 0.15s ease-out, height 0.15s ease-out;
+            /* z-index explicite : sans lui, une fois zoomée (largeur/hauteur
+               agrandies), l'image passait devant la barre du haut et les
+               flèches précédent/suivant malgré leur position: fixed - un
+               élément "positionné" via z-index auto se classe par ordre du
+               DOM, pas par sa taille. */
+            position: relative;
+            z-index: 1;
         }}
-        .lightbox-close, .lightbox-prev, .lightbox-next {{
+        .lightbox-prev, .lightbox-next {{
             position: fixed;
             background: rgba(255,255,255,0.12);
             color: white;
@@ -319,8 +341,9 @@ class HTMLGalleryGenerator:
             padding: 10px 16px;
             border-radius: 6px;
             user-select: none;
+            z-index: 10;
         }}
-        .lightbox-close:hover, .lightbox-prev:hover, .lightbox-next:hover {{
+        .lightbox-prev:hover, .lightbox-next:hover {{
             background: rgba(255,255,255,0.28);
         }}
         .lightbox-prev {{ left: 16px; top: 50%; transform: translateY(-50%); }}
@@ -328,6 +351,7 @@ class HTMLGalleryGenerator:
 
         .lightbox-topbar {{
             position: fixed;
+            z-index: 10;
             top: 0; left: 0; right: 0;
             display: flex;
             align-items: center;
@@ -366,9 +390,16 @@ class HTMLGalleryGenerator:
             align-items: center;
         }}
         .lightbox-btn:hover {{ background: rgba(255,255,255,0.28); }}
+        .lightbox-zoom-level {{
+            min-width: 3.4em;
+            justify-content: center;
+            font-size: 0.85em;
+            cursor: pointer;
+        }}
 
         .lightbox-bottombar {{
             position: fixed;
+            z-index: 10;
             bottom: 0; left: 0; right: 0;
             display: flex;
             align-items: center;
@@ -401,6 +432,7 @@ class HTMLGalleryGenerator:
         .lightbox-info {{
             display: none;
             position: fixed;
+            z-index: 20;
             top: 56px;
             right: 16px;
             background: rgba(20,20,20,0.92);
@@ -413,6 +445,31 @@ class HTMLGalleryGenerator:
         }}
         .lightbox-info.open {{ display: block; }}
         .lightbox-info p {{ margin: 4px 0; }}
+
+        .lightbox-toast {{
+            position: fixed;
+            z-index: 20;
+            bottom: 56px;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            max-width: 90vw;
+            width: max-content;
+            background: rgba(20,20,20,0.95);
+            color: rgba(255,255,255,0.95);
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 0.88em;
+            text-align: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, transform 0.2s;
+        }}
+        .lightbox-toast.show {{
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }}
     </style>
 </head>
 <body>
@@ -441,9 +498,9 @@ class HTMLGalleryGenerator:
             width, height = meta.get("width"), meta.get("height")
             gallery_meta.append({
                 "filename": meta.get("filename") or filename,
-                "resolution": f"{width} × {height} px" if width and height else "Inconnue",
-                "size": meta.get("size") or "Inconnue",
-                "date": meta.get("date") or "Inconnue",
+                "resolution": f"{width} × {height} px" if width and height else _("gallery.unknown"),
+                "size": meta.get("size") or _("gallery.unknown"),
+                "date": meta.get("date") or _("gallery.unknown"),
             })
             html += f''' <a href="images/{filename}" onclick="return openLightbox(event, {position})">
         <img src="thumbs/{thumb_filename}" alt="">
@@ -453,41 +510,55 @@ class HTMLGalleryGenerator:
         if total_pages > 1:
             goto_page_html = (
                 '<div class="lightbox-goto">'
-                '<label for="goto-page-input">Aller à la page :</label>'
+                f'<label for="goto-page-input">{_("gallery.goto_page_label")}</label>'
                 f'<input type="number" id="goto-page-input" min="1" max="{total_pages}" placeholder="1-{total_pages}">'
-                '<button onclick="goToPage()">OK</button>'
+                f'<button onclick="goToPage()">{_("gallery.goto_page_ok")}</button>'
                 '</div>'
             )
+
+        # Pré-échappé pour JS (json.dumps échappe correctement guillemets/
+        # apostrophes quelle que soit la langue, plus sûr qu'un échappement
+        # manuel - les traductions contiennent chacune leur propre
+        # ponctuation).
+        download_toast_js = json.dumps(_("gallery.download_toast"), ensure_ascii=False)
+        wrap_forward_js = json.dumps(_("gallery.wrap_forward"), ensure_ascii=False)
+        wrap_backward_js = json.dumps(_("gallery.wrap_backward"), ensure_ascii=False)
 
         html += f"""
 </div>
 {nav_html}
 <div class="footer">
-    <p>Galerie générée par Planche-Contact</p>
+    <p>{_('gallery.footer')}</p>
+    <p>{_('gallery.footer_credit', name='Gilles MAGNEVILLE')}</p>
 </div>
 
 <div id="lightbox" class="lightbox" onclick="if (event.target === this) closeLightbox()">
     <div class="lightbox-topbar">
         <span id="lightbox-filename" class="lightbox-filename"></span>
-        <span class="lightbox-page-indicator">Page {current_page} / {total_pages}</span>
+        <span class="lightbox-page-indicator">{_('gallery.lightbox_page', current=current_page, total=total_pages)}</span>
         <div class="lightbox-actions">
-            <button class="lightbox-btn" onclick="toggleInfo()" aria-label="Informations" title="Informations">&#9432;</button>
-            <a id="lightbox-download" class="lightbox-btn" download aria-label="Télécharger" title="Télécharger">&#8681;</a>
-            <button class="lightbox-btn" onclick="toggleFullscreen()" aria-label="Plein écran" title="Plein écran">&#10530;</button>
-            <button class="lightbox-btn" onclick="closeLightbox()" aria-label="Fermer" title="Fermer">&times;</button>
+            <button class="lightbox-btn" onclick="zoomOut()" aria-label="{_('gallery.zoom_out')}" title="{_('gallery.zoom_out_title')}">&minus;</button>
+            <button class="lightbox-btn lightbox-zoom-level" id="lightbox-zoom-level" onclick="zoomReset()" aria-label="{_('gallery.zoom_reset_label')}" title="{_('gallery.zoom_reset_title')}">100 %</button>
+            <button class="lightbox-btn" onclick="zoomIn()" aria-label="{_('gallery.zoom_in')}" title="{_('gallery.zoom_in_title')}">&plus;</button>
+            <button class="lightbox-btn" onclick="toggleInfo()" aria-label="{_('gallery.info')}" title="{_('gallery.info')}">&#9432;</button>
+            <a id="lightbox-download" class="lightbox-btn" href="#" onclick="downloadCurrentImage(); return false;" aria-label="{_('gallery.download')}" title="{_('gallery.download')}">&#8681;</a>
+            <button class="lightbox-btn" onclick="toggleFullscreen()" aria-label="{_('gallery.fullscreen')}" title="{_('gallery.fullscreen')}">&#10530;</button>
+            <button class="lightbox-btn" onclick="closeLightbox()" aria-label="{_('gallery.close')}" title="{_('gallery.close')}">&times;</button>
         </div>
     </div>
 
-    <button class="lightbox-prev" onclick="showDelta(-1)" aria-label="Précédent">&#8249;</button>
+    <button class="lightbox-prev" onclick="showDelta(-1)" aria-label="{_('gallery.prev')}">&#8249;</button>
     <img id="lightbox-img" src="" alt="">
-    <button class="lightbox-next" onclick="showDelta(1)" aria-label="Suivant">&#8250;</button>
+    <button class="lightbox-next" onclick="showDelta(1)" aria-label="{_('gallery.next')}">&#8250;</button>
 
     <div id="lightbox-info" class="lightbox-info">
-        <p><strong>Fichier :</strong> <span id="info-filename"></span></p>
-        <p><strong>Résolution :</strong> <span id="info-resolution"></span></p>
-        <p><strong>Taille :</strong> <span id="info-size"></span></p>
-        <p><strong>Date :</strong> <span id="info-date"></span></p>
+        <p><strong>{_('gallery.info_filename')}</strong> <span id="info-filename"></span></p>
+        <p><strong>{_('gallery.info_resolution')}</strong> <span id="info-resolution"></span></p>
+        <p><strong>{_('gallery.info_size')}</strong> <span id="info-size"></span></p>
+        <p><strong>{_('gallery.info_date')}</strong> <span id="info-date"></span></p>
     </div>
+
+    <div id="lightbox-toast" class="lightbox-toast"></div>
 
     <div class="lightbox-bottombar">
         <div class="lightbox-counter" id="lightbox-counter"></div>
@@ -499,7 +570,13 @@ class HTMLGalleryGenerator:
     const galleryImages = {json.dumps(full_image_urls, ensure_ascii=False)};
     const galleryMeta = {json.dumps(gallery_meta, ensure_ascii=False)};
     const totalPages = {total_pages};
+    const currentPage = {current_page};
     let currentIndex = -1;
+    let currentZoom = 100;
+    let baseWidth = 0, baseHeight = 0;
+    const ZOOM_MIN = 50, ZOOM_MAX = 200, ZOOM_STEP = 10;
+    let lastWheelAction = 0;
+    const WHEEL_THROTTLE_MS = 150;
 
     function pageUrl(n) {{
         return n === 1 ? 'index.html' : 'page_' + String(n).padStart(3, '0') + '.html';
@@ -520,15 +597,114 @@ class HTMLGalleryGenerator:
 
     function showDelta(delta) {{
         if (galleryImages.length === 0) return;
-        currentIndex = (currentIndex + delta + galleryImages.length) % galleryImages.length;
+        const newIndex = currentIndex + delta;
+
+        // Au-delà des bornes de la page en cours : passe réellement à la
+        // page suivante/précédente (avec bouclage sur l'ensemble de la
+        // galerie aux deux extrémités) plutôt que de boucler sur les
+        // photos de cette seule page. Une galerie d'une seule page n'a
+        // nulle part où aller : elle garde l'ancien comportement (simple
+        // bouclage local, sans recharger la page pour rien).
+        if (totalPages > 1 && (newIndex < 0 || newIndex >= galleryImages.length)) {{
+            if (newIndex < 0) {{
+                const wrapping = currentPage === 1;
+                const targetPage = wrapping ? totalPages : currentPage - 1;
+                window.location.href = pageUrl(targetPage) + '?open=last' + (wrapping ? '&wrap=back' : '');
+            }} else {{
+                const wrapping = currentPage === totalPages;
+                const targetPage = wrapping ? 1 : currentPage + 1;
+                window.location.href = pageUrl(targetPage) + '?open=0' + (wrapping ? '&wrap=fwd' : '');
+            }}
+            return;
+        }}
+
+        currentIndex = (newIndex + galleryImages.length) % galleryImages.length;
         updateLightbox();
+    }}
+
+    function triggerBlobDownload(blob, filename) {{
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    }}
+
+    function showToast(message) {{
+        const toast = document.getElementById('lightbox-toast');
+        toast.textContent = message;
+        toast.classList.add('show');
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = setTimeout(() => toast.classList.remove('show'), 6000);
+    }}
+
+    function downloadCurrentImage() {{
+        const url = galleryImages[currentIndex];
+        const filename = galleryMeta[currentIndex].filename;
+
+        // Depuis un correctif de sécurité largement adopté (CVE-2019-11730),
+        // Firefox et Chrome traitent une page ouverte en file:// (double-clic
+        // direct sur index.html, sans serveur web) comme ayant une origine
+        // "opaque" : fetch(), XMLHttpRequest ET la lecture d'un <canvas>
+        // ayant chargé l'image sont bloqués de façon identique dans les deux
+        // navigateurs pour accéder à un fichier voisin - aucune de ces trois
+        // voies ne permet de contourner ça en JavaScript. On le détecte donc
+        // en amont plutôt que d'échouer silencieusement après coup.
+        if (window.location.protocol === 'file:') {{
+            window.open(url, '_blank');
+            showToast({download_toast_js});
+            return;
+        }}
+
+        // L'attribut HTML "download" natif est également peu fiable une
+        // fois servi via HTTP(S) selon les navigateurs (priorité donnée à
+        // l'en-tête Content-Disposition, etc.) : on convertit donc en blob
+        // avant de déclencher le téléchargement, ce qui contourne cette
+        // variabilité (voir CHANGELOG.md).
+        fetch(url)
+            .then(response => {{
+                if (!response.ok) throw new Error('fetch a echoue');
+                return response.blob();
+            }})
+            .then(blob => triggerBlobDownload(blob, filename))
+            .catch(() => {{
+                // Repli improbable si fetch() échoue malgré tout en HTTP(S) :
+                // l'image est déjà chargée à l'écran (<img>), on la redessine
+                // sur un canevas caché pour en extraire un blob, sans
+                // nouvelle requête réseau.
+                try {{
+                    const img = document.getElementById('lightbox-img');
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    canvas.getContext('2d').drawImage(img, 0, 0);
+                    canvas.toBlob(blob => {{
+                        if (blob) triggerBlobDownload(blob, filename);
+                        else window.open(url, '_blank');
+                    }}, 'image/jpeg', 0.92);
+                }} catch (e) {{
+                    // Dernier repli : au moins ouvrir l'image.
+                    window.open(url, '_blank');
+                }}
+            }});
     }}
 
     function updateLightbox() {{
         const url = galleryImages[currentIndex];
         const meta = galleryMeta[currentIndex];
 
-        document.getElementById('lightbox-img').src = url;
+        currentZoom = 100;
+        baseWidth = 0;
+        baseHeight = 0;
+
+        const img = document.getElementById('lightbox-img');
+        img.style.width = '';
+        img.style.height = '';
+        img.src = url;
+
         document.getElementById('lightbox-filename').textContent = meta.filename;
         document.getElementById('lightbox-counter').textContent =
             (currentIndex + 1) + ' / ' + galleryImages.length;
@@ -541,7 +717,55 @@ class HTMLGalleryGenerator:
         document.getElementById('info-resolution').textContent = meta.resolution;
         document.getElementById('info-size').textContent = meta.size;
         document.getElementById('info-date').textContent = meta.date;
+
+        document.getElementById('lightbox-zoom-level').textContent = '100 %';
+        document.getElementById('lightbox').classList.remove('zoomed');
     }}
+
+    // Mesure la taille "ajustée à l'écran" (100 %) une fois l'image
+    // effectivement chargée, pour zoomer en dimensions réelles
+    // (largeur/hauteur) plutôt qu'un simple transform: scale() -
+    // nécessaire pour que le débordement au-delà de 100 % soit réellement
+    // défilable : transform ne change que le rendu visuel, jamais la
+    // taille de mise en page prise en compte par overflow (voir
+    // CHANGELOG.md).
+    document.getElementById('lightbox-img').addEventListener('load', function() {{
+        this.style.width = '';
+        this.style.height = '';
+        baseWidth = this.clientWidth;
+        baseHeight = this.clientHeight;
+        applyZoom();
+    }});
+
+    function applyZoom() {{
+        const img = document.getElementById('lightbox-img');
+        if (currentZoom === 100 || !baseWidth) {{
+            img.style.width = '';
+            img.style.height = '';
+            img.style.maxWidth = '';
+            img.style.maxHeight = '';
+        }} else {{
+            // max-width/max-height (CSS, pour l'ajustement à 100%) plafonnent
+            // sinon silencieusement la taille réellement rendue, quelle que
+            // soit la largeur/hauteur fixée ci-dessous - rien ne dépasserait
+            // alors vraiment, et il n'y aurait rien à défiler.
+            img.style.maxWidth = 'none';
+            img.style.maxHeight = 'none';
+            img.style.width = Math.round(baseWidth * currentZoom / 100) + 'px';
+            img.style.height = Math.round(baseHeight * currentZoom / 100) + 'px';
+        }}
+    }}
+
+    function setZoom(value) {{
+        currentZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, value));
+        applyZoom();
+        document.getElementById('lightbox-zoom-level').textContent = currentZoom + ' %';
+        document.getElementById('lightbox').classList.toggle('zoomed', currentZoom > 100);
+    }}
+
+    function zoomIn() {{ setZoom(currentZoom + ZOOM_STEP); }}
+    function zoomOut() {{ setZoom(currentZoom - ZOOM_STEP); }}
+    function zoomReset() {{ setZoom(100); }}
 
     function toggleInfo() {{
         document.getElementById('lightbox-info').classList.toggle('open');
@@ -574,7 +798,57 @@ class HTMLGalleryGenerator:
         else if (e.key === 'ArrowRight') showDelta(1);
         else if (e.key === 'i' || e.key === 'I') toggleInfo();
         else if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+        else if (e.key === '+' || e.key === '=') zoomIn();
+        else if (e.key === '-' || e.key === '_') zoomOut();
+        else if (e.key === '0') zoomReset();
     }});
+
+    // Molette de la souris, uniquement au-dessus de la visionneuse (jamais
+    // sur la page/le navigateur en arrière-plan, grâce à preventDefault +
+    // overscroll-behavior: contain sur .lightbox ci-dessus) :
+    // - Ctrl/Alt/Cmd + molette : zoome, comme le geste natif du navigateur
+    //   mais limité à la seule photo affichée (empêche aussi le zoom natif
+    //   de la page de se déclencher en plus).
+    // - Molette seule : passe à la photo suivante/précédente - sauf si
+    //   déjà zoomée au-delà de 100 %, où la molette doit plutôt déplacer
+    //   l'image agrandie (défilement natif du conteneur, non intercepté).
+    document.getElementById('lightbox').addEventListener('wheel', function(e) {{
+        const now = Date.now();
+        if (e.ctrlKey || e.metaKey || e.altKey) {{
+            e.preventDefault();
+            if (now - lastWheelAction < WHEEL_THROTTLE_MS) return;
+            lastWheelAction = now;
+            if (e.deltaY < 0) zoomIn(); else zoomOut();
+            return;
+        }}
+        if (currentZoom > 100) return;
+        e.preventDefault();
+        if (now - lastWheelAction < WHEEL_THROTTLE_MS) return;
+        lastWheelAction = now;
+        if (e.deltaY > 0) showDelta(1); else showDelta(-1);
+    }}, {{ passive: false }});
+
+    // Arrivée en provenance de la page précédente/suivante (voir
+    // showDelta ci-dessus) : rouvre directement la visionneuse à la
+    // bonne photo plutôt que sur la grille, pour un enchaînement fluide
+    // entre deux pages. Nettoie l'URL ensuite pour qu'un rafraîchissement
+    // manuel n'ouvre pas la visionneuse de façon inattendue.
+    (function() {{
+        const params = new URLSearchParams(window.location.search);
+        if (!params.has('open')) return;
+        const raw = params.get('open');
+        const index = raw === 'last' ? galleryImages.length - 1 : parseInt(raw, 10);
+        if (!isNaN(index) && index >= 0 && index < galleryImages.length) {{
+            openLightbox({{ preventDefault() {{}} }}, index);
+            // Bouclage sur l'ensemble de la galerie (dernière photo ->
+            // première page, ou l'inverse) : prévenir l'utilisateur, sans
+            // quoi le changement de page pourrait sembler inattendu.
+            const wrap = params.get('wrap');
+            if (wrap === 'fwd') showToast({wrap_forward_js});
+            else if (wrap === 'back') showToast({wrap_backward_js});
+        }}
+        history.replaceState(null, '', window.location.pathname);
+    }})();
 </script>
 </body>
 </html>"""
