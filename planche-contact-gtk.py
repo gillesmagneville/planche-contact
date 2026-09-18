@@ -329,6 +329,7 @@ class PlancheContactGTK(Gtk.Application):
         self.last_output_dir = ""
         self.language_preference = "system"
         self._preview_debounce_id = None
+        self._output_debounce_id = None
         self._last_result = None
         self._pending_result = None
         self.load_settings()
@@ -417,6 +418,12 @@ class PlancheContactGTK(Gtk.Application):
         # explicitement pour un dossier déjà mémorisé au démarrage.
         if self.last_input_dir:
             self.input_preview.refresh(self.last_input_dir)
+
+        # Même chose pour le dossier de sortie : si des résultats existent
+        # déjà (générés lors d'une session précédente), "Afficher les
+        # résultats" doit être opérant sans attendre une nouvelle génération.
+        if self.last_output_dir:
+            self._check_existing_results(self.last_output_dir)
 
         # Langue système sélectionnée mais sans traduction disponible :
         # affiché une seule fois au démarrage, après la fenêtre principale
@@ -573,6 +580,7 @@ class PlancheContactGTK(Gtk.Application):
         self.output_entry.set_hexpand(False)
         self.output_entry.set_halign(Gtk.Align.START)
         self.output_entry.set_width_chars(68)
+        self.output_entry.connect("changed", self._on_output_entry_changed)
         btn = Gtk.Button(label=_("gen.choose"))
         btn.connect("clicked", self._choose_folder, self.output_entry, "output")
         hbox.append(self.output_entry)
@@ -1116,6 +1124,56 @@ class PlancheContactGTK(Gtk.Application):
         self.input_preview.refresh(path)
         return False
 
+    def _on_output_entry_changed(self, entry):
+        # Anti-rebond, même logique que pour le dossier d'entrée : évite de
+        # scanner le disque à chaque frappe.
+        if self._output_debounce_id is not None:
+            GLib.source_remove(self._output_debounce_id)
+        self._output_debounce_id = GLib.timeout_add(
+            400, self._debounced_output_check, entry.get_text().strip()
+        )
+
+    def _debounced_output_check(self, path):
+        self._output_debounce_id = None
+        self._check_existing_results(path)
+        return False
+
+    def _check_existing_results(self, output_dir_str):
+        """Active "Afficher les résultats" pour ce qui existe déjà dans le
+        dossier de sortie choisi (planches, PDF, galerie HTML, CSV d'une
+        génération précédente), sans obliger à relancer une génération
+        juste pour rouvrir des résultats déjà là. Appelé au changement du
+        champ dossier de sortie (saisie ou sélecteur), au démarrage si un
+        dossier était mémorisé, et après une génération réussie."""
+        output_dir = Path(output_dir_str) if output_dir_str else None
+        if not output_dir or not output_dir.is_dir():
+            self._last_result = None
+            self.view_planches_btn.set_sensitive(False)
+            self.view_pdf_btn.set_sensitive(False)
+            self.view_gallery_btn.set_sensitive(False)
+            self.view_csv_btn.set_sensitive(False)
+            self.view_results_btn.set_sensitive(False)
+            return
+
+        planches_dir = output_dir / "planches"
+        has_planches = planches_dir.is_dir() and any(planches_dir.iterdir())
+
+        pdf_path = output_dir / "portfolio.pdf"
+        has_pdf = pdf_path.is_file()
+
+        gallery_index = output_dir / "gallery" / "index.html"
+        has_gallery = gallery_index.is_file()
+
+        csv_path = output_dir / "index.csv"
+        has_csv = csv_path.is_file()
+
+        self._last_result = {"output_dir": output_dir}
+        self.view_planches_btn.set_sensitive(has_planches)
+        self.view_pdf_btn.set_sensitive(has_pdf)
+        self.view_gallery_btn.set_sensitive(has_gallery)
+        self.view_csv_btn.set_sensitive(has_csv)
+        self.view_results_btn.set_sensitive(has_planches or has_pdf or has_gallery or has_csv)
+
     def _on_generate(self, button):
         input_dir = self.input_entry.get_text().strip()
         if not input_dir:
@@ -1190,15 +1248,12 @@ class PlancheContactGTK(Gtk.Application):
         self.progress.set_fraction(0.0)
         self.status_label.set_text(_("gen.running"))
 
-        # Mémorise ce qui est demandé dans CETTE génération (indépendamment
-        # de l'état futur des cases à cocher, qui pourrait changer avant la
-        # fin du traitement) : sert à activer les bons éléments du menu
-        # "Afficher les résultats" une fois terminé.
+        # Mémorise le dossier de sortie de CETTE génération (indépendamment
+        # du champ, qui pourrait être modifié par l'utilisateur avant la
+        # fin du traitement) : sert à vérifier ce qui existe réellement une
+        # fois terminé (voir _on_generation_success/_check_existing_results).
         self._pending_result = {
             "output_dir": Path(output_dir),
-            "pdf": self.pdf_check.get_active(),
-            "html": self.html_check.get_active(),
-            "csv": self.csv_check.get_active(),
         }
 
         threading.Thread(target=self._run_cli, args=(cmd,), daemon=True).start()
@@ -1265,22 +1320,9 @@ class PlancheContactGTK(Gtk.Application):
     # fenêtre principale ne s'agrandit donc jamais pour ça.
 
     def _on_generation_success(self):
-        self._last_result = self._pending_result
-        output_dir = self._last_result["output_dir"]
-
-        planches_dir = output_dir / "planches"
-        self.view_planches_btn.set_sensitive(planches_dir.is_dir())
-
-        pdf_path = output_dir / "portfolio.pdf"
-        self.view_pdf_btn.set_sensitive(self._last_result["pdf"] and pdf_path.is_file())
-
-        gallery_index = output_dir / "gallery" / "index.html"
-        self.view_gallery_btn.set_sensitive(self._last_result["html"] and gallery_index.is_file())
-
-        csv_path = output_dir / "index.csv"
-        self.view_csv_btn.set_sensitive(self._last_result["csv"] and csv_path.is_file())
-
-        self.view_results_btn.set_sensitive(True)
+        output_dir = self._pending_result["output_dir"]
+        self._pending_result = None
+        self._check_existing_results(str(output_dir))
         return False
 
     def _show_no_viewer_dialog(self, message, detail):

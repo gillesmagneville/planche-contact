@@ -407,6 +407,26 @@ bel et bien dans `portfolio.py` actuel).
   contenu réellement publié).
 - **Livraison de code** : fichiers complets systématiquement, jamais de
   diff/patch partiel (convention de travail établie avec le mainteneur).
+- **"Afficher les résultats" opérant sur ce qui existe déjà**
+  (`_check_existing_results()`) : n'est plus conditionné à une génération
+  réussie dans la session en cours. Se déclenche au changement du champ
+  dossier de sortie (saisie ou sélecteur, avec anti-rebond 400 ms comme
+  pour l'aperçu du dossier d'entrée) et une fois au démarrage si un
+  dossier de sortie était mémorisé. Vérifie l'existence réelle de chaque
+  artefact (`planches/` non vide, `portfolio.pdf`, `gallery/index.html`,
+  `index.csv`) et active chaque sous-élément indépendamment - **pas** de
+  condition sur ce qui a été demandé dans une éventuelle génération
+  passée (simplifié depuis une version antérieure qui recoupait
+  existence de fichier ET case cochée cette fois-ci ; l'existence seule
+  suffit désormais, cohérent avec la possibilité d'ouvrir des résultats
+  d'une session précédente sans relancer de génération). `_last_result`
+  n'est donc plus réservé à "la dernière génération de cette session" :
+  il reflète le dossier de sortie actuellement configuré, qu'il ait ou
+  non déclenché une génération. **Piège rencontré en testant** : la
+  branche "dossier absent" doit désactiver explicitement CHAQUE
+  sous-bouton, pas seulement le bouton principal - sinon un sous-bouton
+  précédemment activé (ex: PDF trouvé pour un dossier tapé juste avant)
+  reste actif après avoir tapé un dossier sans aucun résultat.
 - **Internationalisation de l'interface graphique** (`portfolio/i18n.py` +
   `portfolio/locales/`) : dictionnaires Python par langue (`fr.py` est la
   source ; `en.py`/`de.py`/`es.py` doivent toujours avoir exactement le
