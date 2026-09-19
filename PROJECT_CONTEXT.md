@@ -58,7 +58,7 @@ interactive, options `-Major/-Minor/-Patch`).
 | `thumbnail.py` | Génération de vignettes en parallèle (`ProcessPoolExecutor`, contexte `spawn` forcé) |
 | `contactsheet.py` | Génère les planches contact (en-tête, grille de vignettes, pied de page, numéro de page) |
 | `pdfexport.py` | Assemble les planches en PDF (`reportlab`) ; marge haute réduite indépendamment des autres marges |
-| `htmlgallery.py` | Galerie HTML paginée ; **une seule passe de décodage** par photo (la vignette est dérivée de l'image pleine taille déjà décodée, pas un second décodage) ; `ImageOps.exif_transpose()` appliqué systématiquement pour respecter l'orientation (voir §5) ; filigrane appliqué **une seule fois** sur l'image pleine taille, la vignette étant dérivée par redimensionnement de cette version déjà filigranée (voir §5, évite un motif disproportionné/tronqué) ; visionneuse plein écran en JS vanilla intégrée à chaque page générée (précédent/suivant **franchissant les pages** avec bouclage sur l'ensemble de la galerie (avertissement affiché aux deux extrémités, voir §5), clavier, molette de la souris, sans dépendance externe) avec indicateur de page, saut direct à une page, nom du fichier, téléchargement (via blob, voir §5 — dégradé en `file://`), panneau d'informations (résolution/taille/date, calculées par le worker en même temps que l'image), zoom 50-200 % en largeur/hauteur réelles (boutons, clavier, Ctrl/Alt+molette — voir §5, jamais `transform: scale()`, réinitialisé à chaque changement de photo) et bascule plein écran (`Fullscreen API`) ; pied de page avec mention développeur/licence ; **entièrement traduite** dans la langue active au moment de la génération (`<html lang="...">` compris), via `i18n.py` |
+| `htmlgallery.py` | Galerie HTML paginée ; **une seule passe de décodage** par photo (la vignette est dérivée de l'image pleine taille déjà décodée, pas un second décodage) ; `ImageOps.exif_transpose()` appliqué systématiquement pour respecter l'orientation (voir §5) ; filigrane appliqué **une seule fois** sur l'image pleine taille, la vignette étant dérivée par redimensionnement de cette version déjà filigranée (voir §5, évite un motif disproportionné/tronqué) ; visionneuse plein écran en JS vanilla intégrée à chaque page générée (précédent/suivant **franchissant les pages** avec bouclage sur l'ensemble de la galerie (avertissement affiché aux deux extrémités, voir §5), clavier, molette de la souris, sans dépendance externe) avec indicateur de page, saut direct à une page, nom du fichier, téléchargement (via blob, voir §5 — dégradé en `file://`), panneau d'informations (résolution/taille/date, calculées par le worker en même temps que l'image), zoom 50-200 % en largeur/hauteur réelles, toujours centrée, déplaçable au glisser-déposer une fois zoomée (souris/tactile via Pointer Events, bornée pour ne jamais sortir complètement du cadre — voir §5, boutons, clavier, Ctrl/Alt+molette pour zoomer et molette seule pour déplacer, jamais `transform: scale()` pour le zoom, réinitialisé à chaque changement de photo) et bascule plein écran (`Fullscreen API`) ; pied de page avec mention développeur/licence ; **entièrement traduite** dans la langue active au moment de la génération (`<html lang="...">` compris), via `i18n.py` |
 | `csvindex.py` | Génère l'index CSV |
 | `utils.py` | `get_font()` (police embarquée, mise en cache), `apply_watermark()` (filigrane en mosaïque, **fonction unique** utilisée par les planches, le PDF et la galerie), `get_exif_date()` (date de prise de vue, RAW compris — **fonction unique** utilisée par le tri de `scanner.py` et les informations de la visionneuse de `htmlgallery.py`), `format_file_size()`, `setup_logging()` |
 | `i18n.py` | Internationalisation de **l'interface graphique, du CLI et de la galerie HTML générée** (voir §5) : `_()`, `set_language()`, `get_language()`, `detect_system_language()`. Dictionnaires Python (`locales/{fr,en,de,es}.py`), pas gettext/.po/.mo — aucune étape de compilation ni dépendance supplémentaire à empaqueter |
@@ -315,37 +315,47 @@ bel et bien dans `portfolio.py` actuel).
      `max-width`/`max-height` (`style.maxWidth = 'none'`) dès que le zoom
      dépasse 100 %, et les restaurer (`= ''`, pour laisser le CSS
      reprendre la main) au retour à 100 %.
-  4. **Un centrage flex classique masque le débordement en haut/à
-     gauche, hors d'atteinte du défilement**, même une fois 1-3 résolus —
-     seul le débordement bas/droite serait "révélé" au défilement.
-     Solution, complémentaire aux trois précédentes : basculer
-     dynamiquement vers `align-items: flex-start; justify-content:
-     flex-start` (classe `.zoomed`) dès que le zoom dépasse 100 %, pour
-     que la totalité du contenu agrandi reste atteignable au défilement.
-- **Chaînage de défilement (molette qui "fuit" vers la page derrière une
-  visionneuse plein écran)** : un conteneur `position: fixed` qui n'a
-  lui-même rien à défiler (`overflow: auto` mais sans dépassement actuel)
-  ne bloque pas la molette par défaut — le navigateur fait remonter le
-  geste non consommé vers l'ancêtre défilable suivant, ici la page
-  derrière l'overlay, malgré son `position: fixed` qui donne l'illusion
-  visuelle d'être complètement séparée. Confirmé empiriquement (la page
-  défilait alors que le `scrollTop` de la visionneuse restait à 0).
-  Solution : `overscroll-behavior: contain` sur le conteneur `position:
-  fixed` (`.lightbox` dans `htmlgallery.py`), à poser par défaut sur tout
-  overlay plein écran de ce type, même quand rien ne semble à première
-  vue nécessiter de défilement.
+- **Déplacement dans l'image zoomée (galerie HTML) : glisser-déposer via
+  `transform: translate()`, jamais de défilement natif du conteneur**
+  (`applyPan()`/`clampPan()` dans `htmlgallery.py`). Une première version
+  s'appuyait sur `overflow: auto` + un centrage flex basculé
+  dynamiquement en `flex-start` dès que le zoom dépassait 100 % : ça
+  laissait l'image plaquée en haut-à-gauche au lieu de rester centrée
+  (signalé par le mainteneur), et ne permettait de toute façon aucun
+  déplacement tactile ni glisser-déposer à la souris — seule la molette
+  fonctionnait, en s'appuyant sur le défilement natif du navigateur.
+  Approche actuelle, plus robuste : `.lightbox` reste `overflow: hidden`
+  (jamais de défilement natif, donc plus aucun piège de centrage ni de
+  chaînage de défilement vers la page en arrière-plan à gérer - les deux
+  problèmes disparaissent avec leur cause), l'image reste **toujours**
+  centrée par le flexbox parent quelle que soit sa taille, et
+  `panX`/`panY` (deux variables JS, appliquées via `transform:
+  translate(panX, panY)` sur l'image, **sans transition** pour un suivi
+  en temps réel) déplacent son rendu visuel indépendamment de sa
+  position de mise en page. Bornage dans `clampPan()` :
+  `maxPan = max(0, (tailleImage - tailleConteneur) / 2)` dans chaque
+  dimension, appliqué après tout changement de zoom ET après tout
+  déplacement, pour qu'il soit impossible de faire sortir l'image
+  entièrement du cadre. Déclenché par trois entrées, toutes réunies vers
+  les mêmes `panX`/`panY`/`clampPan()`/`applyPan()` : glisser-déposer
+  (Pointer Events - `pointerdown`/`pointermove`/`pointerup`, unifie
+  souris/tactile/stylet en une seule API, `setPointerCapture` pour ne
+  pas perdre le geste si le curseur sort de l'image en cours de
+  glissement), et la molette quand déjà zoomée (voir plus bas). Remis à
+  zéro (`panX = panY = 0`) à chaque retour à 100 % de zoom et à chaque
+  changement de photo.
 - **Molette de la souris dans la visionneuse** : un seul écouteur
-  `wheel` sur `.lightbox`, `{{ passive: false }}` obligatoire pour que
+  `wheel` sur `.lightbox`, `{ passive: false }` obligatoire pour que
   `preventDefault()` soit honoré. Ctrl/Alt/Cmd + molette = zoom (empêche
   aussi le zoom natif de la page de se déclencher en plus) ; molette
   seule = navigation précédent/suivant, sauf si déjà zoomé au-delà de
-  100 % (`currentZoom > 100`), où la molette doit alors déplacer l'image
-  agrandie plutôt que changer de photo — dans ce cas précis, ne pas
-  appeler `preventDefault()` et laisser le défilement natif du conteneur
-  faire le travail. Anti-rebond (`WHEEL_THROTTLE_MS`) nécessaire : un
-  simple geste sur trackpad peut émettre des dizaines de micro-événements
-  `wheel`, qui feraient sinon défiler plusieurs photos ou paliers de zoom
-  d'un coup.
+  100 % (`currentZoom > 100`), où la molette déplace directement l'image
+  agrandie (`panX -= deltaX; panY -= deltaY;` puis `clampPan()` +
+  `applyPan()`, voir ci-dessus) plutôt que de changer de photo. Anti-
+  rebond (`WHEEL_THROTTLE_MS`) nécessaire sur le changement de photo
+  (pas sur le déplacement, qui doit rester fluide) : un simple geste sur
+  trackpad peut émettre des dizaines de micro-événements `wheel`, qui
+  feraient sinon défiler plusieurs photos ou paliers de zoom d'un coup.
 - **Navigation précédent/suivant qui franchit les pages (visionneuse
   galerie HTML)** : chaque page générée étant un fichier statique séparé
   avec son propre tableau `galleryImages` borné à ses seules photos,

@@ -301,27 +301,25 @@ class HTMLGalleryGenerator:
             z-index: 1000;
             align-items: center;
             justify-content: center;
-            overflow: auto;
-            /* Empêche la molette/le geste de défilement de "fuir" vers la
-               page en arrière-plan une fois que la visionneuse elle-même
-               n'a plus rien à défiler (par défaut, le navigateur chaîne le
-               défilement non consommé vers l'ancêtre défilable suivant -
-               ici la galerie sous l'overlay, malgré son position: fixed). */
-            overscroll-behavior: contain;
+            /* L'image reste TOUJOURS centrée, même zoomée au-delà de
+               l'écran (voir plus bas) : le débordement est simplement
+               rogné ici, jamais défilé nativement - le déplacement dans
+               l'image zoomée se fait par glisser-déposer (transform:
+               translate() piloté en JS), pas par défilement du navigateur.
+               Un centrage flex classique + overflow: auto ne révèle pas la
+               partie qui dépasse en haut/à gauche au défilement ; cette
+               approche par transform contourne le problème à la racine. */
+            overflow: hidden;
         }}
         .lightbox.open {{ display: flex; }}
-        /* Au-delà de 100% de zoom, l'image peut dépasser l'écran : on
-           bascule l'alignement en haut-à-gauche pour que la totalité de
-           l'image reste atteignable au défilement (un centrage flex
-           classique masquerait la partie qui dépasse en haut/à gauche,
-           hors d'atteinte du défilement). */
-        .lightbox.zoomed {{ align-items: flex-start; justify-content: flex-start; }}
         .lightbox img {{
             max-width: 92vw;
             max-height: 92vh;
             border-radius: 4px;
             box-shadow: 0 4px 24px rgba(0,0,0,0.5);
             transition: width 0.15s ease-out, height 0.15s ease-out;
+            /* Pas de transition sur transform : le glisser-déposer doit
+               suivre la souris/le doigt en temps réel, sans latence. */
             /* z-index explicite : sans lui, une fois zoomée (largeur/hauteur
                agrandies), l'image passait devant la barre du haut et les
                flèches précédent/suivant malgré leur position: fixed - un
@@ -329,7 +327,10 @@ class HTMLGalleryGenerator:
                DOM, pas par sa taille. */
             position: relative;
             z-index: 1;
+            touch-action: none;
         }}
+        .lightbox img.zoomed {{ cursor: grab; }}
+        .lightbox img.zoomed.dragging {{ cursor: grabbing; }}
         .lightbox-prev, .lightbox-next {{
             position: fixed;
             background: rgba(255,255,255,0.12);
@@ -574,6 +575,9 @@ class HTMLGalleryGenerator:
     let currentIndex = -1;
     let currentZoom = 100;
     let baseWidth = 0, baseHeight = 0;
+    let panX = 0, panY = 0;
+    let isDragging = false;
+    let dragStartX = 0, dragStartY = 0, panStartX = 0, panStartY = 0;
     const ZOOM_MIN = 50, ZOOM_MAX = 200, ZOOM_STEP = 10;
     let lastWheelAction = 0;
     const WHEEL_THROTTLE_MS = 150;
@@ -744,28 +748,85 @@ class HTMLGalleryGenerator:
             img.style.height = '';
             img.style.maxWidth = '';
             img.style.maxHeight = '';
+            panX = 0;
+            panY = 0;
         }} else {{
             // max-width/max-height (CSS, pour l'ajustement à 100%) plafonnent
             // sinon silencieusement la taille réellement rendue, quelle que
             // soit la largeur/hauteur fixée ci-dessous - rien ne dépasserait
-            // alors vraiment, et il n'y aurait rien à défiler.
+            // alors vraiment, et il n'y aurait rien à déplacer.
             img.style.maxWidth = 'none';
             img.style.maxHeight = 'none';
             img.style.width = Math.round(baseWidth * currentZoom / 100) + 'px';
             img.style.height = Math.round(baseHeight * currentZoom / 100) + 'px';
+            clampPan();
         }}
+        applyPan();
+        img.classList.toggle('zoomed', currentZoom > 100);
+    }}
+
+    // Borne le déplacement pour que l'image zoomée ne puisse jamais sortir
+    // complètement de la fenêtre (dans chaque dimension où elle dépasse
+    // effectivement le cadre - sinon, aucun déplacement autorisé sur cette
+    // dimension, l'image y tenant déjà entièrement).
+    function clampPan() {{
+        const img = document.getElementById('lightbox-img');
+        const lightbox = document.getElementById('lightbox');
+        const maxPanX = Math.max(0, (img.offsetWidth - lightbox.clientWidth) / 2);
+        const maxPanY = Math.max(0, (img.offsetHeight - lightbox.clientHeight) / 2);
+        panX = Math.max(-maxPanX, Math.min(maxPanX, panX));
+        panY = Math.max(-maxPanY, Math.min(maxPanY, panY));
+    }}
+
+    function applyPan() {{
+        const img = document.getElementById('lightbox-img');
+        img.style.transform = (panX !== 0 || panY !== 0) ? `translate(${{panX}}px, ${{panY}}px)` : '';
     }}
 
     function setZoom(value) {{
         currentZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, value));
         applyZoom();
         document.getElementById('lightbox-zoom-level').textContent = currentZoom + ' %';
-        document.getElementById('lightbox').classList.toggle('zoomed', currentZoom > 100);
     }}
 
     function zoomIn() {{ setZoom(currentZoom + ZOOM_STEP); }}
     function zoomOut() {{ setZoom(currentZoom - ZOOM_STEP); }}
     function zoomReset() {{ setZoom(100); }}
+
+    // Glisser-déposer pour déplacer l'image zoomée (souris, tactile et
+    // stylet unifiés via les Pointer Events). N'agit que si zoomée
+    // au-delà de 100% - sinon l'image tient déjà entièrement, rien à
+    // déplacer.
+    (function() {{
+        const img = document.getElementById('lightbox-img');
+
+        img.addEventListener('pointerdown', function(e) {{
+            if (currentZoom <= 100) return;
+            isDragging = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            panStartX = panX;
+            panStartY = panY;
+            img.setPointerCapture(e.pointerId);
+            img.classList.add('dragging');
+            e.preventDefault();
+        }});
+
+        img.addEventListener('pointermove', function(e) {{
+            if (!isDragging) return;
+            panX = panStartX + (e.clientX - dragStartX);
+            panY = panStartY + (e.clientY - dragStartY);
+            clampPan();
+            applyPan();
+        }});
+
+        function stopDragging() {{
+            isDragging = false;
+            img.classList.remove('dragging');
+        }}
+        img.addEventListener('pointerup', stopDragging);
+        img.addEventListener('pointercancel', stopDragging);
+    }})();
 
     function toggleInfo() {{
         document.getElementById('lightbox-info').classList.toggle('open');
@@ -804,14 +865,14 @@ class HTMLGalleryGenerator:
     }});
 
     // Molette de la souris, uniquement au-dessus de la visionneuse (jamais
-    // sur la page/le navigateur en arrière-plan, grâce à preventDefault +
-    // overscroll-behavior: contain sur .lightbox ci-dessus) :
+    // sur la page/le navigateur en arrière-plan, grâce à preventDefault) :
     // - Ctrl/Alt/Cmd + molette : zoome, comme le geste natif du navigateur
     //   mais limité à la seule photo affichée (empêche aussi le zoom natif
     //   de la page de se déclencher en plus).
     // - Molette seule : passe à la photo suivante/précédente - sauf si
-    //   déjà zoomée au-delà de 100 %, où la molette doit plutôt déplacer
-    //   l'image agrandie (défilement natif du conteneur, non intercepté).
+    //   déjà zoomée au-delà de 100 %, où la molette déplace directement
+    //   l'image agrandie (panX/panY, voir applyPan) plutôt que de changer
+    //   de photo.
     document.getElementById('lightbox').addEventListener('wheel', function(e) {{
         const now = Date.now();
         if (e.ctrlKey || e.metaKey || e.altKey) {{
@@ -821,7 +882,14 @@ class HTMLGalleryGenerator:
             if (e.deltaY < 0) zoomIn(); else zoomOut();
             return;
         }}
-        if (currentZoom > 100) return;
+        if (currentZoom > 100) {{
+            e.preventDefault();
+            panX -= e.deltaX;
+            panY -= e.deltaY;
+            clampPan();
+            applyPan();
+            return;
+        }}
         e.preventDefault();
         if (now - lastWheelAction < WHEEL_THROTTLE_MS) return;
         lastWheelAction = now;
