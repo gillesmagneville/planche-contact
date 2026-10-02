@@ -9,8 +9,9 @@ htmlgallery.py) réimplémentait sa propre logique de mise en page et ses
 propres couleurs en dur - voir PROJECT_CONTEXT.md. Ce package centralise :
 
 - profile.py        : modèle de données (Profil) + (dé)sérialisation JSON
-- layout_engine.py  : calcul de géométrie (à venir)
-- captions.py       : résolution des légendes EXIF (à venir)
+- layout_engine.py  : calcul de géométrie
+- captions.py       : résolution des légendes EXIF (formatage - voir
+                      portfolio.utils.get_exif_metadata() pour l'extraction)
 - themes.py         : palettes de couleurs (à venir)
 
 Règle générale, valable pour tout le package : l'ABSENCE de profil, ou un
@@ -36,6 +37,7 @@ from .layout_engine import (
     canvas_size_px,
     mm_to_px,
 )
+from .captions import resolve_caption_lines
 
 __all__ = [
     "Profile",
@@ -52,4 +54,5 @@ __all__ = [
     "compute_effective_per_page",
     "canvas_size_px",
     "mm_to_px",
+    "resolve_caption_lines",
 ]
