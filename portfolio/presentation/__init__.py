@@ -36,6 +36,7 @@ from .layout_engine import (
     compute_effective_per_page,
     canvas_size_px,
     mm_to_px,
+    pt_to_px,
 )
 from .captions import resolve_caption_lines
 from .themes import Palette, THEME_PALETTES, get_palette, resolve_theme, apply_custom_colors
@@ -55,6 +56,7 @@ __all__ = [
     "compute_effective_per_page",
     "canvas_size_px",
     "mm_to_px",
+    "pt_to_px",
     "resolve_caption_lines",
     "Palette",
     "THEME_PALETTES",

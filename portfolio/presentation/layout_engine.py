@@ -100,6 +100,17 @@ def mm_to_px(mm: float, dpi: int = DPI) -> int:
     return int(mm * dpi / 25.4)
 
 
+def pt_to_px(pt: float, dpi: int = DPI) -> int:
+    """Convertit une taille en points typographiques (1 pt = 1/72 pouce -
+    l'unité de CaptionSettings.font_size, choisie pour avoir un sens
+    identique côté PIL (ici) ET côté CSS de la galerie HTML, qui
+    l'utilisera directement en "pt" sans conversion) en pixels à la
+    résolution donnée. Volontairement distincte des tailles de police de
+    l'en-tête/pied de page (54/36/26/20), qui sont des valeurs en pixels
+    déjà choisies empiriquement, sans équivalent en points défini."""
+    return int(pt * dpi / 72)
+
+
 def canvas_size_px(page_format: str, orientation: str = "portrait", dpi: int = DPI) -> tuple[int, int]:
     """Taille de la page en pixels. Reprend exactement
     contactsheet.py._get_canvas_size() quand orientation="portrait" (son
