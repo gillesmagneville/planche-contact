@@ -178,4 +178,5 @@ STRINGS = {
     "prefs.title": "Einstellungen",
     "gallery.wrap_forward": "Ende der Galerie — zurück zur ersten Seite.",
     "gallery.wrap_backward": "Anfang der Galerie — zurück zur letzten Seite.",
+    "gallery.theme_toggle": "Zwischen hellem und dunklem Thema wechseln",
 }

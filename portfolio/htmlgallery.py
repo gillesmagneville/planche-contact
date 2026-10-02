@@ -2,14 +2,16 @@ from pathlib import Path
 import json
 import shutil
 from concurrent.futures import ProcessPoolExecutor
+from html import escape as html_escape
 import logging
 import multiprocessing
 import os
 from PIL import Image, ImageOps
 
 from .rawloader import load_image, is_raw_file, get_original_dimensions
-from .utils import apply_watermark, get_exif_date, format_file_size
+from .utils import apply_watermark, get_exif_date, format_file_size, get_exif_metadata
 from .i18n import _, get_language
+from .presentation import get_palette, apply_custom_colors, resolve_caption_lines
 
 # Taille max. (plus grand côté) des images "pleine taille" de la galerie
 # HTML. Une photo RAW de 45 Mpx pleinement dématricée puis enregistrée telle
@@ -17,6 +19,20 @@ from .i18n import _, get_language
 # charger dans un navigateur qu'utile pour une vue agrandie à l'écran :
 # 2000px de long côté est largement suffisant pour un affichage plein écran.
 GALLERY_FULL_MAX_SIZE = 2000
+
+
+def _css_vars(palette) -> str:
+    """Sérialise une Palette (portfolio/presentation/themes.py) en une
+    liste de déclarations de propriétés personnalisées CSS, pour être
+    injectée telle quelle à l'intérieur d'un bloc `{ ... }` (voir
+    HTMLGalleryGenerator._build_theme_style_block())."""
+    return (
+        f"--bg: {palette.background}; "
+        f"--text: {palette.text}; "
+        f"--text-secondary: {palette.text_secondary}; "
+        f"--accent: {palette.accent}; "
+        f"--border: {palette.border};"
+    )
 
 
 def _init_worker_logging(log_path):
@@ -120,6 +136,35 @@ class HTMLGalleryGenerator:
         self.watermark_opacity = getattr(config, 'watermark_opacity', 40)
         self.watermark_orientation = getattr(config, 'watermark_orientation', 'Horizontal')
 
+        # Thème graphique et légendes personnalisables (cahier des charges
+        # §1/§4) : même Profil (portfolio/presentation/profile.py) que
+        # ContactSheetGenerator - voir Config.__post_init__() pour la
+        # synchronisation rétrocompatible quand aucun Profil explicite n'a
+        # été fourni.
+        self.profile = config.profile
+        self.theme = self.profile.theme
+        # Les trois palettes fixes sont toutes pré-calculées (couleurs
+        # personnalisées éventuelles déjà appliquées - voir
+        # presentation.themes.apply_custom_colors) : la galerie HTML a
+        # besoin des TROIS à la fois, quel que soit le mode choisi, pour
+        # construire à la fois le thème par défaut de la page ET le
+        # sélecteur discret qui permet au visiteur de basculer lui-même
+        # entre clair/sombre dans son navigateur (voir
+        # _build_theme_style_block()) - contrairement aux planches JPEG/PDF
+        # (contactsheet.py), qui ne résolvent qu'UNE seule palette statique
+        # au moment du rendu.
+        self._palettes = {
+            mode: apply_custom_colors(get_palette(mode), self.theme.custom)
+            for mode in ("light", "dark", "neutral")
+        }
+        # Légendes personnalisables (cahier des charges §1) : comme pour
+        # ContactSheetGenerator, on ne relit les métadonnées EXIF de
+        # chaque photo (coûteux, un accès fichier de plus par photo) QUE
+        # si au moins un champ de légende est effectivement configuré -
+        # comportement par défaut (aucune légende) sans coût supplémentaire
+        # ni changement visuel de la grille existante.
+        self.caption_fields = self.profile.captions.effective_fields()
+
     @staticmethod
     def display_filename(image_path) -> str:
         """
@@ -131,6 +176,70 @@ class HTMLGalleryGenerator:
         if is_raw_file(path):
             return path.stem + ".jpg"
         return path.name
+
+    def _build_theme_style_block(self) -> str:
+        """Construit les déclarations CSS de thème (cahier des charges
+        §4) : un jeu de variables `:root` par défaut (le thème choisi dans
+        le Profil), plus - uniquement en mode "system" - une media query
+        `prefers-color-scheme: dark` laissant le NAVIGATEUR décider (voir
+        presentation/themes.py, qui documente explicitement cette
+        approche, propre au rendu HTML). Les trois blocs
+        `:root[data-theme="..."]` sont eux TOUJOURS émis, quel que soit le
+        mode choisi : ils alimentent le sélecteur discret ci-dessous
+        (_theme_toggle_html), qui permet au visiteur de basculer lui-même
+        le thème dans son propre navigateur, indépendamment du thème par
+        défaut choisi pour la galerie.
+
+        Les sélecteurs `:root[data-theme="..."]` ont une spécificité CSS
+        strictement supérieure à celle du simple `:root` utilisé par la
+        media query ci-dessous (deux sélecteurs contre un) : ils
+        l'emportent donc automatiquement dès qu'un attribut data-theme est
+        posé sur <html>, sans avoir à dupliquer de règle `:not()`."""
+        light_vars = _css_vars(self._palettes["light"])
+        dark_vars = _css_vars(self._palettes["dark"])
+        neutral_vars = _css_vars(self._palettes["neutral"])
+        baseline_vars = self._palettes.get(self.theme.mode)
+        # Mode "system" (pas de palette statique propre) : "light" sert de
+        # valeur de repli tant que ni la media query ci-dessous, ni le
+        # sélecteur manuel, n'ont encore pris la main (navigateurs sans
+        # support de prefers-color-scheme, par exemple).
+        baseline_vars = _css_vars(baseline_vars) if baseline_vars is not None else light_vars
+
+        media_block = ""
+        if self.theme.mode == "system":
+            media_block = f"""
+        @media (prefers-color-scheme: dark) {{
+            :root {{ {dark_vars} }}
+        }}"""
+
+        return f"""
+        :root {{ {baseline_vars} }}{media_block}
+        :root[data-theme="light"] {{ {light_vars} }}
+        :root[data-theme="dark"] {{ {dark_vars} }}
+        :root[data-theme="neutral"] {{ {neutral_vars} }}"""
+
+    def _effective_dark_js_expr(self) -> str:
+        """Expression JS (booléenne) donnant le sens initial du bouton
+        bascule clair/sombre (_theme_toggle_html) quand le visiteur ne l'a
+        encore jamais utilisé lui-même (aucun data-theme mémorisé) : "le
+        thème actuellement affiché est-il sombre ?", pour que le premier
+        clic bascule dans la direction opposée plutôt que de risquer de
+        "revenir" vers le thème déjà affiché."""
+        if self.theme.mode == "dark":
+            return "true"
+        if self.theme.mode == "system":
+            return "prefersDark"
+        return "false"  # "light" et "neutral" sont tous deux des thèmes clairs/moyens
+
+    def _theme_toggle_html(self) -> str:
+        """Bouton de bascule clair/sombre discret (cahier des charges
+        §4 : « sélecteur de thème discret »), disponible quel que soit le
+        thème choisi pour la galerie - voir _build_theme_style_block()."""
+        label = html_escape(_("gallery.theme_toggle"))
+        return (
+            f'<button type="button" class="theme-toggle" onclick="toggleTheme()" '
+            f'aria-label="{label}" title="{label}">&#9680;</button>'
+        )
 
     def create_gallery(self, images, output_dir: Path):
         if output_dir.exists():
@@ -263,26 +372,40 @@ class HTMLGalleryGenerator:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{display_title}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }}
-        .header {{ text-align: center; margin-bottom: 20px; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-        .header h1 {{ margin: 0; color: #222; }}
+    <script>
+        // Appliqué avant le premier rendu (tête du document, avant le CSS
+        // des couleurs), pour éviter tout "flash" visible d'un thème vers
+        // l'autre chez un visiteur ayant déjà choisi le sien (voir
+        // toggleTheme(), plus bas dans la page) - lui seul lit/écrit cette
+        // clé localStorage, propre à ce visiteur/ce navigateur.
+        (function() {{
+            try {{
+                var t = localStorage.getItem('planche-contact-theme');
+                if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+            }} catch (e) {{}}
+        }})();
+    </script>
+    <style>{self._build_theme_style_block()}
+        body {{ font-family: Arial, sans-serif; margin: 0; padding: 20px; background: var(--bg); color: var(--text); }}
+        .header {{ text-align: center; margin-bottom: 20px; padding: 15px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .header h1 {{ margin: 0; color: var(--text); }}
         .nav {{ text-align: center; margin: 15px 0; font-size: 1.05em; }}
-        .nav a {{ margin: 0 6px; text-decoration: none; color: #0066cc; }}
+        .nav a {{ margin: 0 6px; text-decoration: none; color: var(--accent); }}
         .nav a:hover {{ text-decoration: underline; }}
         .nav .current {{
             margin: 0 6px;
             font-weight: bold;
-            color: #222;
-            background: #e0e0e0;
+            color: var(--text);
+            background: var(--border);
             padding: 2px 8px;
             border-radius: 4px;
         }}
         .nav .ellipsis {{
             margin: 0 4px;
-            color: #888;
+            color: var(--text-secondary);
         }}
         .gallery {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; max-width: 1400px; margin: 0 auto; }}
+        .gallery-item {{ display: flex; flex-direction: column; }}
         .gallery img {{
             width: 100%;
             height: auto;
@@ -291,7 +414,27 @@ class HTMLGalleryGenerator:
             transition: transform 0.2s;
         }}
         .gallery img:hover {{ transform: scale(1.03); }}
-        .footer {{ text-align: center; margin-top: 30px; color: #666; }}
+        .gallery-caption {{
+            margin-top: 4px;
+            font-size: 0.8em;
+            line-height: 1.3;
+            text-align: center;
+            color: var(--text-secondary);
+        }}
+        .footer {{ text-align: center; margin-top: 30px; color: var(--text-secondary); }}
+        .theme-toggle {{
+            margin-top: 10px;
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            padding: 3px 10px;
+            font-size: 0.95em;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }}
+        .theme-toggle:hover {{ opacity: 1; }}
 
         .lightbox {{
             display: none;
@@ -503,9 +646,31 @@ class HTMLGalleryGenerator:
                 "size": meta.get("size") or _("gallery.unknown"),
                 "date": meta.get("date") or _("gallery.unknown"),
             })
-            html += f''' <a href="images/{filename}" onclick="return openLightbox(event, {position})">
+
+            thumb_link = f''' <a href="images/{filename}" onclick="return openLightbox(event, {position})">
         <img src="thumbs/{thumb_filename}" alt="">
     </a>\n'''
+
+            # Légendes personnalisables (cahier des charges §1), lues
+            # directement sur la photo SOURCE (voir utils.get_exif_metadata) -
+            # distinctes des métadonnées légères ci-dessus (déjà calculées
+            # par le worker parallèle pour la visionneuse). Aucune lecture
+            # supplémentaire si aucun champ n'est configuré (self.caption_fields
+            # vide par défaut) : grille strictement identique à avant.
+            if self.caption_fields and image_path:
+                exif_metadata = get_exif_metadata(image_path)
+                caption_lines = resolve_caption_lines(self.profile, exif_metadata)
+                if caption_lines:
+                    caption_html = "<br>".join(html_escape(line) for line in caption_lines)
+                    html += (
+                        ' <div class="gallery-item">\n'
+                        f'{thumb_link}'
+                        f'    <div class="gallery-caption">{caption_html}</div>\n'
+                        ' </div>\n'
+                    )
+                    continue
+
+            html += thumb_link
 
         goto_page_html = ""
         if total_pages > 1:
@@ -531,6 +696,7 @@ class HTMLGalleryGenerator:
 <div class="footer">
     <p>{_('gallery.footer')}</p>
     <p>{_('gallery.footer_credit', name='Gilles MAGNEVILLE')}</p>
+    {self._theme_toggle_html()}
 </div>
 
 <div id="lightbox" class="lightbox" onclick="if (event.target === this) closeLightbox()">
@@ -584,6 +750,20 @@ class HTMLGalleryGenerator:
 
     function pageUrl(n) {{
         return n === 1 ? 'index.html' : 'page_' + String(n).padStart(3, '0') + '.html';
+    }}
+
+    // Sélecteur de thème discret (cahier des charges §4) : bascule entre
+    // clair et sombre indépendamment du thème choisi pour la galerie, et
+    // mémorise le choix du visiteur (propre à son navigateur - voir le
+    // script en tête de page, qui applique ce choix avant le premier
+    // rendu pour éviter tout flash).
+    function toggleTheme() {{
+        const current = document.documentElement.getAttribute('data-theme');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const effectiveIsDark = current ? (current === 'dark') : ({self._effective_dark_js_expr()});
+        const next = effectiveIsDark ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        try {{ localStorage.setItem('planche-contact-theme', next); }} catch (e) {{}}
     }}
 
     function openLightbox(event, index) {{

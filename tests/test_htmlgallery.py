@@ -1,0 +1,194 @@
+# -*- coding: utf-8 -*-
+"""
+Tests de non-régression pour le câblage du thème graphique et des légendes
+personnalisables (cahier des charges §1/§4) dans HTMLGalleryGenerator -
+même Profil que ContactSheetGenerator (voir tests/test_contactsheet.py),
+mais rendu CSS/HTML plutôt que PIL : ces tests vérifient le MARQUAGE
+produit (chaînes attendues dans le HTML/CSS généré), la visionneuse
+('lightbox') étant volontairement laissée hors de propos (voir
+portfolio/presentation/themes.py - elle reste intentionnellement sombre,
+indépendante du thème choisi pour la page).
+
+Une vérification visuelle complémentaire (captures d'écran Playwright,
+thème clair/sombre/système, bascule manuelle, persistance) a par ailleurs
+été effectuée manuellement lors du développement de ce câblage - voir
+CHANGELOG.md.
+"""
+import pytest
+from PIL import Image
+from PIL.ExifTags import IFD
+
+from portfolio.config import Config
+from portfolio.thumbnail import ThumbnailGenerator
+from portfolio.htmlgallery import HTMLGalleryGenerator
+from portfolio.presentation import (
+    Profile, LayoutSettings, CaptionSettings, ThemeSettings, ThemeCustomColors, get_palette,
+)
+
+
+def _make_images(tmp_path, n, *, with_exif=False, color=(90, 140, 200), size=(800, 600)):
+    img_dir = tmp_path / "photos"
+    img_dir.mkdir(exist_ok=True)
+    paths = []
+    for i in range(n):
+        p = img_dir / f"img_{i:02d}.jpg"
+        if with_exif:
+            img = Image.new("RGB", size, color)
+            exif = Image.Exif()
+            exif[0x010F] = "Canon"
+            exif[0x0110] = "EOS R5"
+            exif_ifd = exif.get_ifd(IFD.Exif)
+            exif_ifd[0x829D] = 2.8
+            exif_ifd[0x8827] = 400
+            img.save(p, format="JPEG", quality=95, exif=exif.tobytes())
+        else:
+            Image.new("RGB", size, color).save(p, quality=95)
+        paths.append(p)
+    return img_dir, [{"path": p} for p in paths]
+
+
+def _generate(tmp_path, images, profile, *, per_page=12):
+    img_dir = images[0]["path"].parent
+    out_dir = tmp_path / "out"
+    config = Config(
+        input_dir=img_dir, output_dir=out_dir, num_per_sheet=per_page,
+        page_format="A4", profile=profile,
+    )
+    gallery_gen = HTMLGalleryGenerator(config, ThumbnailGenerator(config))
+    gallery_gen.create_gallery(images, out_dir)
+    return (out_dir / "index.html").read_text(encoding="utf-8")
+
+
+def test_default_profile_grid_markup_is_unchanged(tmp_path):
+    """Sans légende configurée (Profil par défaut), la grille doit garder
+    EXACTEMENT son marquage historique (un <a> par photo, sans wrapper
+    supplémentaire) : aucune régression visuelle pour l'utilisateur qui ne
+    touche à rien de nouveau."""
+    _, images = _make_images(tmp_path, 3)
+    html = _generate(tmp_path, images, Profile())
+
+    assert '<div class="gallery-caption">' not in html
+    assert '<div class="gallery-item">' not in html
+    assert ' <a href="images/img_00.jpg" onclick="return openLightbox(event, 0)">' in html
+
+
+def test_exif_metadata_is_never_read_when_no_caption_field_is_configured(tmp_path, monkeypatch):
+    """Même garde que ContactSheetGenerator (voir test_contactsheet.py) :
+    pas de lecture EXIF coûteuse par photo si aucune légende n'est
+    demandée."""
+    import portfolio.htmlgallery as htmlgallery_module
+
+    def _boom(_path):
+        raise AssertionError("get_exif_metadata() ne doit pas être appelé sans légende configurée")
+
+    monkeypatch.setattr(htmlgallery_module, "get_exif_metadata", _boom)
+
+    _, images = _make_images(tmp_path, 3)
+    _generate(tmp_path, images, Profile())
+
+
+def test_captions_are_rendered_when_configured(tmp_path):
+    """Légendes EXIF réellement lues sur chaque photo SOURCE (cahier des
+    charges §1) et affichées sous chaque vignette de la grille."""
+    _, images = _make_images(tmp_path, 2, with_exif=True)
+    profile = Profile(captions=CaptionSettings(fields=["filename", "camera", "aperture", "iso"], lines=2))
+    html = _generate(tmp_path, images, profile)
+
+    assert '<div class="gallery-item">' in html
+    assert '<div class="gallery-caption">img_00.jpg · Canon EOS R5<br>f/2.8 · ISO 400</div>' in html
+
+
+def test_caption_text_is_html_escaped(tmp_path):
+    """Un nom de fichier contenant des caractères spéciaux HTML ne doit
+    jamais casser le marquage ni permettre une injection."""
+    img_dir = tmp_path / "photos"
+    img_dir.mkdir()
+    tricky_name = "a_<b>_&_amp.jpg"
+    p = img_dir / tricky_name
+    Image.new("RGB", (800, 600), (90, 140, 200)).save(p, quality=95)
+    images = [{"path": p}]
+
+    profile = Profile(captions=CaptionSettings(fields=["filename"]))
+    html = _generate(tmp_path, images, profile, per_page=1)
+
+    after = html.split('<div class="gallery-caption">')[1]
+    caption_content = after.split('</div>')[0]
+    assert caption_content == "a_&lt;b&gt;_&amp;_amp.jpg"
+
+
+def test_light_theme_is_the_default_and_never_emits_a_media_query(tmp_path):
+    """Le thème "light" (défaut du Profil) doit correspondre exactement à
+    la palette partagée (portfolio/presentation/themes.py) - et un mode
+    fixe ne doit jamais dépendre des préférences systèmes du visiteur
+    (voir vérification visuelle : OS en sombre, page restée claire)."""
+    _, images = _make_images(tmp_path, 2)
+    html = _generate(tmp_path, images, Profile())
+
+    light = get_palette("light")
+    assert f":root {{ --bg: {light.background}; --text: {light.text}; " in html
+    assert "@media (prefers-color-scheme: dark)" not in html
+
+
+def test_dark_theme_fixed_mode_never_emits_a_media_query(tmp_path):
+    _, images = _make_images(tmp_path, 2)
+    profile = Profile(theme=ThemeSettings(mode="dark"))
+    html = _generate(tmp_path, images, profile)
+
+    dark = get_palette("dark")
+    assert f":root {{ --bg: {dark.background}; --text: {dark.text}; " in html
+    assert "@media (prefers-color-scheme: dark)" not in html
+
+
+def test_system_mode_emits_prefers_color_scheme_media_query_with_dark_palette(tmp_path):
+    """Seul le mode "system" doit laisser le NAVIGATEUR choisir (cahier
+    des charges §4) - stratégie documentée dans themes.py : combiner les
+    palettes claire et sombre de part et d'autre d'une media query CSS."""
+    _, images = _make_images(tmp_path, 2)
+    profile = Profile(theme=ThemeSettings(mode="system"))
+    html = _generate(tmp_path, images, profile)
+
+    light = get_palette("light")
+    dark = get_palette("dark")
+    assert f":root {{ --bg: {light.background};" in html, "repli clair tant que la media query ne s'applique pas"
+    media_block = html.split("@media (prefers-color-scheme: dark)")[1].split("}")[0]
+    assert dark.background in media_block
+    assert dark.text in media_block
+
+
+@pytest.mark.parametrize("mode", ["light", "dark", "neutral", "system"])
+def test_theme_toggle_and_all_three_overrides_are_always_present(tmp_path, mode):
+    """Le sélecteur de thème discret (cahier des charges §4) doit toujours
+    permettre au visiteur de basculer manuellement, quel que soit le mode
+    choisi par défaut pour la galerie - vérifié visuellement : bascule au
+    clic, persistance après rechargement (localStorage)."""
+    _, images = _make_images(tmp_path, 2)
+    profile = Profile(theme=ThemeSettings(mode=mode))
+    html = _generate(tmp_path, images, profile)
+
+    assert 'class="theme-toggle" onclick="toggleTheme()"' in html
+    for palette_mode in ("light", "dark", "neutral"):
+        palette = get_palette(palette_mode)
+        assert f':root[data-theme="{palette_mode}"] {{ --bg: {palette.background};' in html
+
+
+def test_custom_accent_color_is_applied_to_every_theme_override(tmp_path):
+    """Une couleur personnalisée (cahier des charges §4.3) s'applique de
+    façon cohérente à TOUTES les variantes claire/sombre/neutre du
+    sélecteur, pas seulement au thème par défaut choisi pour la page."""
+    _, images = _make_images(tmp_path, 2)
+    custom = ThemeCustomColors(accent="#ff00aa")
+    profile = Profile(theme=ThemeSettings(mode="light", custom=custom))
+    html = _generate(tmp_path, images, profile)
+
+    assert html.count("--accent: #ff00aa;") == 4  # :root + les 3 overrides data-theme
+
+
+def test_lightbox_styling_is_independent_of_the_page_theme(tmp_path):
+    """La visionneuse (lightbox) reste volontairement sombre quel que soit
+    le thème choisi pour la page (voir le commentaire de conception dans
+    portfolio/presentation/themes.py) - vérifié aussi visuellement."""
+    _, images = _make_images(tmp_path, 2)
+    profile = Profile(theme=ThemeSettings(mode="dark"))
+    html = _generate(tmp_path, images, profile)
+
+    assert "background: rgba(0,0,0,0.92);" in html  # fond du calque .lightbox, jamais var(--bg)

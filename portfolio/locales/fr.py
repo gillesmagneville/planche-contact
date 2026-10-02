@@ -180,4 +180,5 @@ STRINGS = {
     "prefs.title": "Préférences",
     "gallery.wrap_forward": "Fin de la galerie — retour à la première page.",
     "gallery.wrap_backward": "Début de la galerie — retour à la dernière page.",
+    "gallery.theme_toggle": "Basculer entre thème clair et sombre",
 }
