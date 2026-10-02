@@ -68,6 +68,12 @@ from portfolio.config import Config
 from portfolio.scanner import ImageScanner
 from portfolio.rawloader import load_image
 from portfolio.i18n import _, set_language, get_language, AVAILABLE_LANGUAGES, detect_system_language
+from portfolio.presentation import (
+    Profile, LayoutSettings, CaptionSettings, ThemeSettings, ThemeCustomColors,
+    CAPTION_FIELDS, LAYOUT_TEMPLATES, FIT_MODES, ORIENTATIONS, CAPTION_POSITIONS,
+    CAPTION_ALIGNMENTS, THEME_MODES, default_profile, load_profile, save_profile,
+    compute_effective_per_page,
+)
 
 
 def glib_idle_add(function, *args):
@@ -93,6 +99,10 @@ def glib_idle_add(function, *args):
 PREVIEW_PAGE_SIZE = 10
 PREVIEW_THUMB_SIZE = 90
 DIALOG_PREVIEW_PAGE_SIZE = PREVIEW_PAGE_SIZE * 2  # 2 lignes de 10 dans le sélecteur de dossier
+
+#: Couleur personnalisée attendue au format "#rrggbb" (cahier des charges
+#: §4.3) - voir PlancheContactGTK._hex_or_none().
+_HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 def _pagination_sequence(current, total, window=2):
@@ -332,6 +342,10 @@ class PlancheContactGTK(Gtk.Application):
         self._output_debounce_id = None
         self._last_result = None
         self._pending_result = None
+        # Référence conservée tant qu'une boîte de dialogue Gtk.FileChooserNative
+        # (enregistrer/charger un profil) est ouverte, pour éviter qu'elle soit
+        # collectée par Python avant que l'utilisateur n'y réponde.
+        self._active_file_dialog = None
         self.load_settings()
         # Résolu AVANT toute construction d'interface : tous les widgets
         # créés dans do_activate() appellent _() en supposant la langue
@@ -683,6 +697,15 @@ class PlancheContactGTK(Gtk.Application):
 
         box.append(grid)
 
+        # Mise en page/légendes/thème personnalisables (cahier des charges
+        # §1/§2/§4) : repliée par défaut, clairement à l'écart des réglages
+        # simples/courants ci-dessus - voir _build_advanced_section().
+        self.adv_expander = Gtk.Expander(label=_("adv.expander_label"))
+        self.adv_expander.set_margin_top(4)
+        self.adv_expander.set_child(self._build_advanced_section())
+        box.append(self.adv_expander)
+        self._apply_profile_to_widgets(default_profile())
+
         # Boutons
         hbox = Gtk.Box(spacing=10)
         self.run_button = Gtk.Button(label=_("gen.run"))
@@ -765,6 +788,574 @@ class PlancheContactGTK(Gtk.Application):
 
         return box
 
+    # ====================== MISE EN PAGE/LÉGENDES/THÈME AVANCÉS ======================
+    # Cahier des charges §1/§2/§4 : ces réglages alimentent un Profil
+    # (portfolio/presentation/profile.py), la même source unique de vérité
+    # que les planches JPEG/PDF (contactsheet.py) et la galerie HTML
+    # (htmlgallery.py) - jamais de règle de mise en page/légende/thème
+    # dupliquée ici. Le nombre de photos par planche et le format de page
+    # restent pilotés par les réglages simples existants (num_combo/
+    # format_combo) : Config.__post_init__() les synchronise déjà
+    # automatiquement dans le Profil, exactement comme pour le CLI sans
+    # --profile (voir tests/test_portfolio_cli.py) - ils ne sont donc PAS
+    # dupliqués ici pour éviter toute ambiguïté entre deux réglages du
+    # même nombre.
+
+    @staticmethod
+    def _make_choice_dropdown(values, label_keys, selected_index=0):
+        """Un Gtk.DropDown dont chaque option affiche une traduction
+        (label_keys) tout en gardant la valeur INTERNE (values, ex :
+        LAYOUT_TEMPLATES) récupérable via _dropdown_value() - même principe
+        que self._orient_values pour le filigrane, généralisé."""
+        model = Gtk.StringList()
+        for key in label_keys:
+            model.append(_(key))
+        dropdown = Gtk.DropDown(model=model)
+        dropdown.set_selected(selected_index)
+        dropdown._pc_values = tuple(values)
+        return dropdown
+
+    @staticmethod
+    def _dropdown_value(dropdown):
+        return dropdown._pc_values[dropdown.get_selected()]
+
+    @staticmethod
+    def _set_dropdown_value(dropdown, value):
+        try:
+            index = dropdown._pc_values.index(value)
+        except ValueError:
+            index = 0
+        dropdown.set_selected(index)
+
+    @staticmethod
+    def _spin_or_none(spin_button):
+        """0 = automatique (None) - utilisé pour les colonnes/lignes du
+        modèle "Libre" (LayoutSettings.columns/rows)."""
+        value = int(spin_button.get_value())
+        return value if value > 0 else None
+
+    @staticmethod
+    def _hex_or_none(entry):
+        """Couleur personnalisée valide ("#rrggbb") ou None (champ vide ou
+        invalide) - jamais d'exception, la couleur par défaut du thème
+        s'applique alors simplement (voir ThemeCustomColors). Un contenu
+        non vide mais invalide est signalé visuellement (bordure rouge),
+        sans bloquer la génération pour autant."""
+        text = entry.get_text().strip()
+        if not text:
+            entry.remove_css_class("error")
+            return None
+        if _HEX_COLOR_RE.match(text):
+            entry.remove_css_class("error")
+            return text
+        entry.add_css_class("error")
+        return None
+
+    def _build_advanced_section(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        box.set_margin_top(10)
+        box.set_margin_bottom(10)
+        box.set_margin_start(10)
+        box.set_margin_end(10)
+
+        def subtitle(key):
+            lbl = Gtk.Label()
+            lbl.set_markup(f"<b>{_(key)}</b>")
+            lbl.set_xalign(0)
+            lbl.set_margin_top(6)
+            return lbl
+
+        # --- Mise en page (cahier des charges §2) --------------------------
+        box.append(subtitle("adv.layout_subtitle"))
+        grid = Gtk.Grid(column_spacing=10, row_spacing=6)
+        box.append(grid)
+
+        grid.attach(Gtk.Label(label=_("adv.template_label"), xalign=0), 0, 0, 1, 1)
+        self.adv_template_dd = self._make_choice_dropdown(
+            LAYOUT_TEMPLATES, [f"adv.template.{t}" for t in LAYOUT_TEMPLATES]
+        )
+        self.adv_template_dd.connect("notify::selected", self._update_advanced_sensitivity)
+        grid.attach(self.adv_template_dd, 1, 0, 1, 1)
+
+        orient_label = Gtk.Label(label=_("adv.orientation_label"), xalign=0)
+        orient_label.set_margin_start(20)
+        grid.attach(orient_label, 2, 0, 1, 1)
+        self.adv_orientation_dd = self._make_choice_dropdown(
+            ORIENTATIONS, [f"adv.orientation.{o}" for o in ORIENTATIONS]
+        )
+        grid.attach(self.adv_orientation_dd, 3, 0, 1, 1)
+
+        fit_label = Gtk.Label(label=_("adv.fit_mode_label"), xalign=0)
+        fit_label.set_margin_start(20)
+        grid.attach(fit_label, 4, 0, 1, 1)
+        self.adv_fit_mode_dd = self._make_choice_dropdown(
+            FIT_MODES, [f"adv.fit_mode.{m}" for m in FIT_MODES]
+        )
+        grid.attach(self.adv_fit_mode_dd, 5, 0, 1, 1)
+
+        grid.attach(Gtk.Label(label=_("adv.margin_label"), xalign=0), 0, 1, 1, 1)
+        self.adv_margin_spin = Gtk.SpinButton.new_with_range(0, 60, 1)
+        grid.attach(self.adv_margin_spin, 1, 1, 1, 1)
+
+        spacing_label = Gtk.Label(label=_("adv.spacing_label"), xalign=0)
+        spacing_label.set_margin_start(20)
+        grid.attach(spacing_label, 2, 1, 1, 1)
+        self.adv_spacing_spin = Gtk.SpinButton.new_with_range(0, 40, 1)
+        grid.attach(self.adv_spacing_spin, 3, 1, 1, 1)
+
+        cols_label = Gtk.Label(label=_("adv.free_columns_label"), xalign=0)
+        cols_label.set_margin_start(20)
+        grid.attach(cols_label, 4, 1, 1, 1)
+        self.adv_free_cols_spin = Gtk.SpinButton.new_with_range(0, 12, 1)
+        grid.attach(self.adv_free_cols_spin, 5, 1, 1, 1)
+
+        rows_label = Gtk.Label(label=_("adv.free_rows_label"), xalign=0)
+        rows_label.set_margin_start(20)
+        grid.attach(rows_label, 6, 1, 1, 1)
+        self.adv_free_rows_spin = Gtk.SpinButton.new_with_range(0, 12, 1)
+        grid.attach(self.adv_free_rows_spin, 7, 1, 1, 1)
+
+        # --- Légendes par photo (cahier des charges §1) ---------------------
+        box.append(subtitle("adv.captions_subtitle"))
+        grid = Gtk.Grid(column_spacing=10, row_spacing=6)
+        box.append(grid)
+
+        grid.attach(Gtk.Label(label=_("adv.caption_position_label"), xalign=0), 0, 0, 1, 1)
+        self.adv_caption_position_dd = self._make_choice_dropdown(
+            CAPTION_POSITIONS, [f"adv.caption_position.{p}" for p in CAPTION_POSITIONS]
+        )
+        self.adv_caption_position_dd.connect("notify::selected", self._update_advanced_sensitivity)
+        grid.attach(self.adv_caption_position_dd, 1, 0, 1, 1)
+
+        area_label = Gtk.Label(label=_("adv.caption_area_label"), xalign=0)
+        area_label.set_margin_start(20)
+        grid.attach(area_label, 2, 0, 1, 1)
+        self.adv_caption_area_spin = Gtk.SpinButton.new_with_range(4, 40, 1)
+        grid.attach(self.adv_caption_area_spin, 3, 0, 1, 1)
+
+        lines_label = Gtk.Label(label=_("adv.caption_lines_label"), xalign=0)
+        lines_label.set_margin_start(20)
+        grid.attach(lines_label, 4, 0, 1, 1)
+        self.adv_caption_lines_spin = Gtk.SpinButton.new_with_range(1, 4, 1)
+        grid.attach(self.adv_caption_lines_spin, 5, 0, 1, 1)
+
+        grid.attach(Gtk.Label(label=_("adv.caption_font_size_label"), xalign=0), 0, 1, 1, 1)
+        self.adv_caption_font_spin = Gtk.SpinButton.new_with_range(6, 24, 1)
+        grid.attach(self.adv_caption_font_spin, 1, 1, 1, 1)
+
+        align_label = Gtk.Label(label=_("adv.caption_alignment_label"), xalign=0)
+        align_label.set_margin_start(20)
+        grid.attach(align_label, 2, 1, 1, 1)
+        self.adv_caption_alignment_dd = self._make_choice_dropdown(
+            CAPTION_ALIGNMENTS, [f"adv.caption_alignment.{a}" for a in CAPTION_ALIGNMENTS]
+        )
+        grid.attach(self.adv_caption_alignment_dd, 3, 1, 1, 1)
+
+        fields_label = Gtk.Label(label=_("adv.caption_fields_label"), xalign=0)
+        fields_label.set_margin_top(4)
+        box.append(fields_label)
+
+        fields_flow = Gtk.FlowBox()
+        fields_flow.set_selection_mode(Gtk.SelectionMode.NONE)
+        fields_flow.set_min_children_per_line(3)
+        fields_flow.set_max_children_per_line(6)
+        fields_flow.set_row_spacing(2)
+        fields_flow.set_column_spacing(14)
+        box.append(fields_flow)
+
+        self.adv_caption_field_checks = {}
+        for field_name in CAPTION_FIELDS:
+            label = _(f"adv.field.{field_name}")
+            check = Gtk.CheckButton(label=label)
+            if field_name == "gps":
+                check.set_tooltip_text(_("adv.field_gps_warning"))
+            self.adv_caption_field_checks[field_name] = check
+            fields_flow.append(check)
+
+        # --- Thème graphique (cahier des charges §4) ------------------------
+        box.append(subtitle("adv.theme_subtitle"))
+        grid = Gtk.Grid(column_spacing=10, row_spacing=6)
+        box.append(grid)
+
+        grid.attach(Gtk.Label(label=_("adv.theme_mode_label"), xalign=0), 0, 0, 1, 1)
+        self.adv_theme_mode_dd = self._make_choice_dropdown(
+            THEME_MODES, [f"adv.theme_mode.{m}" for m in THEME_MODES]
+        )
+        grid.attach(self.adv_theme_mode_dd, 1, 0, 1, 1)
+
+        colors_label = Gtk.Label(label=_("adv.custom_colors_label"), xalign=0)
+        colors_label.set_margin_top(4)
+        box.append(colors_label)
+
+        colors_box = Gtk.Box(spacing=10)
+        box.append(colors_box)
+
+        def make_color_entry(label_key):
+            colors_box.append(Gtk.Label(label=_(label_key)))
+            entry = Gtk.Entry()
+            entry.set_width_chars(9)
+            entry.set_placeholder_text(_("adv.custom_color_placeholder"))
+            colors_box.append(entry)
+            return entry
+
+        self.adv_color_bg_entry = make_color_entry("adv.custom_background_label")
+        self.adv_color_text_entry = make_color_entry("adv.custom_text_label")
+        self.adv_color_accent_entry = make_color_entry("adv.custom_accent_label")
+        self.adv_color_border_entry = make_color_entry("adv.custom_border_label")
+
+        # --- Profils réutilisables (cahier des charges §2/§4.4) + aperçu ----
+        actions_box = Gtk.Box(spacing=10)
+        actions_box.set_margin_top(10)
+        self.adv_preview_btn = Gtk.Button(label=_("adv.preview_button"))
+        self.adv_preview_btn.connect("clicked", self._on_preview_clicked)
+        actions_box.append(self.adv_preview_btn)
+
+        self.adv_save_profile_btn = Gtk.Button(label=_("adv.save_profile_button"))
+        self.adv_save_profile_btn.connect("clicked", self._on_save_profile_clicked)
+        actions_box.append(self.adv_save_profile_btn)
+
+        self.adv_load_profile_btn = Gtk.Button(label=_("adv.load_profile_button"))
+        self.adv_load_profile_btn.connect("clicked", self._on_load_profile_clicked)
+        actions_box.append(self.adv_load_profile_btn)
+
+        box.append(actions_box)
+
+        return box
+
+    def _update_advanced_sensitivity(self, *args):
+        is_free = self._dropdown_value(self.adv_template_dd) == "free"
+        self.adv_free_cols_spin.set_sensitive(is_free)
+        self.adv_free_rows_spin.set_sensitive(is_free)
+
+        has_caption = self._dropdown_value(self.adv_caption_position_dd) != "none"
+        self.adv_caption_area_spin.set_sensitive(has_caption)
+        self.adv_caption_lines_spin.set_sensitive(has_caption)
+        self.adv_caption_font_spin.set_sensitive(has_caption)
+        self.adv_caption_alignment_dd.set_sensitive(has_caption)
+        for check in self.adv_caption_field_checks.values():
+            check.set_sensitive(has_caption)
+
+    def _profile_from_widgets(self) -> Profile:
+        """Construit le Profil correspondant à l'état courant des widgets
+        avancés - layout.per_page/page_format restent volontairement à
+        leur valeur par défaut (voir l'en-tête de cette section) :
+        Config.__post_init__() les aligne sur num_combo/format_combo."""
+        layout = LayoutSettings(
+            template=self._dropdown_value(self.adv_template_dd),
+            columns=self._spin_or_none(self.adv_free_cols_spin),
+            rows=self._spin_or_none(self.adv_free_rows_spin),
+            margin_mm=self.adv_margin_spin.get_value(),
+            spacing_mm=self.adv_spacing_spin.get_value(),
+            orientation=self._dropdown_value(self.adv_orientation_dd),
+            fit_mode=self._dropdown_value(self.adv_fit_mode_dd),
+            caption_position=self._dropdown_value(self.adv_caption_position_dd),
+            caption_area_mm=self.adv_caption_area_spin.get_value(),
+        )
+
+        show_gps = self.adv_caption_field_checks["gps"].get_active()
+        fields = [
+            field_name for field_name in CAPTION_FIELDS
+            if field_name != "gps" and self.adv_caption_field_checks[field_name].get_active()
+        ]
+        if show_gps:
+            fields.append("gps")
+
+        captions = CaptionSettings(
+            fields=fields,
+            lines=int(self.adv_caption_lines_spin.get_value()),
+            font_size=int(self.adv_caption_font_spin.get_value()),
+            alignment=self._dropdown_value(self.adv_caption_alignment_dd),
+            show_gps=show_gps,
+        )
+
+        custom = ThemeCustomColors(
+            background=self._hex_or_none(self.adv_color_bg_entry),
+            text=self._hex_or_none(self.adv_color_text_entry),
+            accent=self._hex_or_none(self.adv_color_accent_entry),
+            border=self._hex_or_none(self.adv_color_border_entry),
+        )
+        theme = ThemeSettings(mode=self._dropdown_value(self.adv_theme_mode_dd), custom=custom)
+
+        return Profile(layout=layout, captions=captions, theme=theme)
+
+    def _apply_profile_to_widgets(self, profile: Profile):
+        """Réciproque de _profile_from_widgets() : reflète un Profil
+        (chargé depuis un fichier, ou default_profile() pour réinitialiser)
+        dans l'état des widgets avancés."""
+        self._set_dropdown_value(self.adv_template_dd, profile.layout.template)
+        self._set_dropdown_value(self.adv_orientation_dd, profile.layout.orientation)
+        self._set_dropdown_value(self.adv_fit_mode_dd, profile.layout.fit_mode)
+        self.adv_margin_spin.set_value(profile.layout.margin_mm)
+        self.adv_spacing_spin.set_value(profile.layout.spacing_mm)
+        self.adv_free_cols_spin.set_value(profile.layout.columns or 0)
+        self.adv_free_rows_spin.set_value(profile.layout.rows or 0)
+
+        self._set_dropdown_value(self.adv_caption_position_dd, profile.layout.caption_position)
+        self.adv_caption_area_spin.set_value(profile.layout.caption_area_mm)
+        self.adv_caption_lines_spin.set_value(profile.captions.lines)
+        self.adv_caption_font_spin.set_value(profile.captions.font_size)
+        self._set_dropdown_value(self.adv_caption_alignment_dd, profile.captions.alignment)
+        for field_name, check in self.adv_caption_field_checks.items():
+            is_active = field_name in profile.captions.fields or (
+                field_name == "gps" and profile.captions.show_gps
+            )
+            check.set_active(is_active)
+
+        self._set_dropdown_value(self.adv_theme_mode_dd, profile.theme.mode)
+        self.adv_color_bg_entry.set_text(profile.theme.custom.background or "")
+        self.adv_color_text_entry.set_text(profile.theme.custom.text or "")
+        self.adv_color_accent_entry.set_text(profile.theme.custom.accent or "")
+        self.adv_color_border_entry.set_text(profile.theme.custom.border or "")
+
+        self._update_advanced_sensitivity()
+
+    def _on_save_profile_clicked(self, button):
+        dialog = Gtk.FileChooserNative.new(
+            _("adv.save_profile_dialog_title"), self.win,
+            Gtk.FileChooserAction.SAVE, _("folder_picker.select"), _("folder_picker.cancel"),
+        )
+        dialog.set_current_name("profil.json")
+        json_filter = Gtk.FileFilter()
+        json_filter.set_name("JSON")
+        json_filter.add_pattern("*.json")
+        dialog.add_filter(json_filter)
+
+        def on_response(dlg, response):
+            if response == Gtk.ResponseType.ACCEPT:
+                gfile = dlg.get_file()
+                path = gfile.get_path() if gfile else None
+                if path:
+                    if not path.lower().endswith(".json"):
+                        path += ".json"
+                    try:
+                        save_profile(self._profile_from_widgets(), path)
+                        self._log(_("adv.profile_saved", path=path))
+                    except OSError as e:
+                        self._log(_("adv.profile_save_error", error=e))
+            dlg.destroy()
+            self._active_file_dialog = None
+
+        self._active_file_dialog = dialog
+        dialog.connect("response", on_response)
+        dialog.show()
+
+    def _on_load_profile_clicked(self, button):
+        dialog = Gtk.FileChooserNative.new(
+            _("adv.load_profile_dialog_title"), self.win,
+            Gtk.FileChooserAction.OPEN, _("folder_picker.select"), _("folder_picker.cancel"),
+        )
+        json_filter = Gtk.FileFilter()
+        json_filter.set_name("JSON")
+        json_filter.add_pattern("*.json")
+        dialog.add_filter(json_filter)
+
+        def on_response(dlg, response):
+            if response == Gtk.ResponseType.ACCEPT:
+                gfile = dlg.get_file()
+                path = gfile.get_path() if gfile else None
+                if path:
+                    # load_profile() ne lève jamais d'exception (voir
+                    # presentation/profile.py) : un fichier invalide
+                    # retombe silencieusement sur les valeurs par défaut.
+                    profile = load_profile(path)
+                    self._apply_profile_to_widgets(profile)
+                    self._log(_("adv.profile_loaded", path=path))
+            dlg.destroy()
+            self._active_file_dialog = None
+
+        self._active_file_dialog = dialog
+        dialog.connect("response", on_response)
+        dialog.show()
+
+    # ====================== APERÇU DE LA PLANCHE (CAHIER DES CHARGES §3) ======================
+    # Un VRAI aperçu : réutilise le même moteur (ContactSheetGenerator,
+    # portfolio/presentation/) que la génération finale - mais dans un
+    # SOUS-PROCESSUS CLI séparé (portfolio.py --preview-output), exactement
+    # comme la génération réelle (_on_generate ci-dessous), plutôt que dans
+    # un thread d'arrière-plan interne à cette application GTK.
+    #
+    # Ce n'est pas qu'une question de cohérence architecturale : un premier
+    # essai avec ContactSheetGenerator appelé directement depuis un thread
+    # de cette appli a révélé, à l'usage (tests sous GTK4 réel), un bug de
+    # concurrence réel et reproductible. Le rendu du titre/numéro de page
+    # (texte dessiné par Pillow - voir
+    # ContactSheetGenerator._draw_header()/_draw_page_number()) utilise
+    # FreeType, tout comme Pango pour l'affichage des widgets de la boucle
+    # GTK principale restée active pendant ce temps : les deux sollicitant
+    # FreeType en concurrence (threads différents, même processus), son
+    # initialisation interne peut être corrompue et produire un masque de
+    # glyphe de taille aberrante - jusqu'à faire échouer le rendu avec une
+    # PIL.Image.DecompressionBombError (reproduit à plusieurs reprises,
+    # avec des tailles de masque différentes à chaque fois - signature
+    # typique d'une véritable concurrence, pas d'un problème déterministe).
+    # Un sous-processus séparé, sans fenêtre ni boucle GTK, élimine cette
+    # concurrence structurellement plutôt que de tenter de la fiabiliser
+    # (verrou, pré-chauffage de FreeType - essayé, insuffisant : la
+    # corruption peut survenir sur n'importe quel appel, pas seulement le
+    # premier).
+    #
+    # Le sous-processus refait son propre scan du dossier d'entrée (comme
+    # _on_generate le fait déjà pour la génération réelle) plutôt que de
+    # réutiliser la liste déjà affichée par l'aperçu du dossier
+    # (self.input_preview) : cohérent avec le reste de l'application, et
+    # sans conséquence pratique (même dossier, quelques instants plus
+    # tard). self.input_preview._files sert uniquement ici à un
+    # retour immédiat si le dossier ne contient visiblement aucune photo,
+    # avant même de lancer un sous-processus pour rien.
+
+    def _on_preview_clicked(self, button):
+        input_dir = self.input_entry.get_text().strip()
+        if not input_dir or not Path(input_dir).is_dir():
+            self._log(_("gen.select_input_first"))
+            return
+
+        if not self.input_preview._files:
+            self._show_no_viewer_dialog(_("adv.preview_title"), _("adv.preview_no_photos"))
+            return
+
+        num_per_sheet = int(self.num_combo.get_selected_item().get_string())
+        page_format = self.format_combo.get_selected_item().get_string()
+        title = self.project_title_entry.get_text().strip() or None
+        author = self.author_entry.get_text().strip() or None
+        watermark = self.watermark_entry.get_text().strip() or None
+        orientation = self._orient_values[self.watermark_orient_combo.get_selected()]
+        opacity = int(self.watermark_opacity_scale.get_value())
+        advanced_profile = self._profile_from_widgets()
+
+        # Nombre de photos effectivement affichées sur cette planche
+        # (le modèle "large_thumbs" peut le réduire - voir
+        # compute_effective_per_page) : uniquement pour le message affiché
+        # sous l'aperçu, le sous-processus refait ce même calcul de son
+        # côté pour la planche elle-même.
+        config_for_count = Config(
+            input_dir=Path(input_dir), output_dir=Path(input_dir),
+            num_per_sheet=num_per_sheet, page_format=page_format,
+            profile=advanced_profile,
+        )
+        shown_count = min(
+            len(self.input_preview._files),
+            compute_effective_per_page(config_for_count.profile),
+        )
+
+        if getattr(sys, "frozen", False):
+            cmd = [sys.executable, "--run-cli"]
+        else:
+            cli_path = str(Path(__file__).parent / "portfolio" / "portfolio.py")
+            cmd = [sys.executable, cli_path]
+
+        fd, preview_png_path = tempfile.mkstemp(suffix=".png", prefix="planche-contact-preview-")
+        os.close(fd)
+
+        cmd += [
+            "-i", input_dir,
+            "-n", str(num_per_sheet),
+            "--format", page_format,
+            "--language", self._language,
+            "--preview-output", preview_png_path,
+        ]
+        if title:
+            cmd.extend(["--title", title])
+        if author:
+            cmd.extend(["--author", author])
+        if watermark:
+            cmd.extend(["--watermark", watermark])
+            cmd.extend(["--watermark-orientation", orientation])
+            cmd.extend(["--watermark-opacity", str(opacity)])
+        if self.recursive_check.get_active():
+            cmd.append("-r")
+
+        profile_path = None
+        if advanced_profile != default_profile():
+            fd, profile_path = tempfile.mkstemp(suffix=".json", prefix="planche-contact-profile-")
+            os.close(fd)
+            save_profile(advanced_profile, profile_path)
+            cmd.extend(["--profile", profile_path])
+
+        dialog, picture, status_label = self._build_preview_dialog()
+        dialog.present()
+        status_label.set_text(_("adv.preview_generating"))
+
+        threading.Thread(
+            target=self._generate_preview,
+            args=(cmd, preview_png_path, profile_path, picture, status_label, shown_count),
+            daemon=True,
+        ).start()
+
+    def _build_preview_dialog(self):
+        dialog = Gtk.Window(transient_for=self.win, modal=True)
+        dialog.set_title(_("adv.preview_title"))
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        box.set_margin_top(14)
+        box.set_margin_bottom(14)
+        box.set_margin_start(14)
+        box.set_margin_end(14)
+        dialog.set_child(box)
+
+        status_label = Gtk.Label(label="")
+        status_label.set_xalign(0)
+        status_label.add_css_class("dim-label")
+        status_label.set_wrap(True)
+        box.append(status_label)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_min_content_width(500)
+        scroll.set_min_content_height(500)
+        scroll.set_max_content_width(900)
+        scroll.set_max_content_height(760)
+        picture = Gtk.Picture()
+        picture.set_content_fit(Gtk.ContentFit.CONTAIN)
+        scroll.set_child(picture)
+        box.append(scroll)
+
+        btn_box = Gtk.Box(spacing=10)
+        btn_box.set_halign(Gtk.Align.END)
+        btn_box.set_margin_top(4)
+        close_btn = Gtk.Button(label=_("adv.preview_close"))
+        close_btn.add_css_class("suggested-action")
+        close_btn.connect("clicked", lambda b: dialog.destroy())
+        btn_box.append(close_btn)
+        box.append(btn_box)
+
+        return dialog, picture, status_label
+
+    def _generate_preview(self, cmd, preview_png_path, profile_path, picture, status_label, shown_count):
+        """Exécuté en arrière-plan : lance et attend le sous-processus CLI
+        (potentiellement coûteux - décodage/filigrane/dessin réels, voir
+        ContactSheetGenerator) - voir le commentaire au-dessus de
+        _on_preview_clicked pour la raison de cet isolement en
+        sous-processus plutôt qu'un appel direct ici. Ne touche à aucun
+        widget GTK directement, uniquement via glib_idle_add."""
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0 or not Path(preview_png_path).is_file():
+                raise RuntimeError(result.stderr.strip() or _("adv.preview_empty_result"))
+            with open(preview_png_path, "rb") as f:
+                data = f.read()
+        except Exception as e:
+            glib_idle_add(status_label.set_text, _("adv.preview_error", error=e))
+            return
+        finally:
+            for path in (preview_png_path, profile_path):
+                if path:
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+        glib_idle_add(self._apply_preview_image, data, picture, status_label, shown_count)
+
+    def _apply_preview_image(self, data, picture, status_label, shown_count):
+        try:
+            stream = Gio.MemoryInputStream.new_from_data(data, None)
+            pixbuf = GdkPixbuf.Pixbuf.new_from_stream(stream, None)
+            texture = Gdk.Texture.new_for_pixbuf(pixbuf)
+            picture.set_paintable(texture)
+        except Exception as e:
+            status_label.set_text(_("adv.preview_error", error=e))
+            return False
+        status_label.set_text(_("adv.preview_note", count=shown_count))
+        return False
+
     def _snap_html_per_page(self, scale):
         value = scale.get_value()
         snapped = round((value - 12) / 4) * 4 + 12
@@ -787,6 +1378,7 @@ class PlancheContactGTK(Gtk.Application):
         self.pdf_check.set_active(True)
         self.html_check.set_active(True)
         self.csv_check.set_active(True)
+        self._apply_profile_to_widgets(default_profile())
         self.log_buffer.set_text("")
         self.status_label.set_text("")
         self.progress.set_fraction(0.0)
@@ -1241,6 +1833,18 @@ class PlancheContactGTK(Gtk.Application):
             cmd.append("--html")
         if self.csv_check.get_active():
             cmd.append("--csv")
+
+        # Mise en page/légendes/thème avancés (cahier des charges §2/§4.4) :
+        # --profile n'est transmis que si l'utilisateur a réellement
+        # personnalisé quelque chose, pour ne jamais changer le
+        # comportement par défaut (voir Config.__post_init__, déjà
+        # strictement rétrocompatible sans profil explicite).
+        advanced_profile = self._profile_from_widgets()
+        if advanced_profile != default_profile():
+            fd, profile_path = tempfile.mkstemp(suffix=".json", prefix="planche-contact-profile-")
+            os.close(fd)
+            save_profile(advanced_profile, profile_path)
+            cmd.extend(["--profile", profile_path])
 
         self._log(_("gen.starting"))
         self.run_button.set_sensitive(False)

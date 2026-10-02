@@ -30,7 +30,7 @@ from PIL import Image
 
 import portfolio.portfolio as cli_module
 from portfolio.config import Config as RealConfig
-from portfolio.presentation import Profile, LayoutSettings, save_profile
+from portfolio.presentation import Profile, LayoutSettings, ThemeSettings, save_profile
 from portfolio.presentation.layout_engine import LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE
 
 
@@ -196,3 +196,111 @@ def test_profile_already_customized_format_wins_over_explicit_format_flag(tmp_pa
     cli_module.main()
 
     assert captured["config"].profile.layout.page_format == "A2"
+
+
+# ====================== MODE PRÉVISUALISATION (--preview-output) ======================
+# Usage interne par l'interface graphique (planche-contact-gtk.py,
+# _on_preview_clicked) - voir le commentaire de l'argument --preview-output
+# et la docstring de portfolio.portfolio._generate_preview_sheet() pour le
+# pourquoi (isolement en sous-processus, pour éviter une concurrence
+# Pillow/Pango sur FreeType constatée empiriquement quand la génération de
+# l'aperçu avait lieu directement dans un thread de l'application GTK).
+
+def test_preview_output_generates_single_png_without_touching_real_output(tmp_path, monkeypatch):
+    img_dir = tmp_path / "photos"
+    out_dir = tmp_path / "out"
+    preview_png = tmp_path / "preview.png"
+    _make_photos(img_dir, 20)
+
+    monkeypatch.setattr(
+        sys, "argv",
+        [
+            "portfolio.py", "-i", str(img_dir), "-o", str(out_dir),
+            "--preview-output", str(preview_png), "-n", "12", "--format", "A4",
+        ],
+    )
+    cli_module.main()
+
+    assert preview_png.is_file(), "le PNG d'aperçu doit être créé au chemin demandé"
+    with Image.open(preview_png) as img:
+        # A4 à 300 DPI (voir presentation.layout_engine.canvas_size_px) :
+        # exactement la même géométrie qu'une planche réelle au même format.
+        assert img.size == (2480, 3507)
+
+    # Le mode aperçu ne doit jamais créer/toucher le VRAI dossier de sortie
+    # (ni planches/, ni portfolio.pdf, ni rien d'autre) : seul le PNG
+    # autonome demandé doit exister.
+    assert not out_dir.exists(), (
+        "une prévisualisation ne doit jamais créer le dossier de sortie réel "
+        "(sans quoi elle se comporterait comme une génération partielle)"
+    )
+
+
+def test_preview_output_never_overwrites_an_existing_generation(tmp_path, monkeypatch):
+    """Garde-fou de non-régression : si --output pointe (comme c'est le cas
+    normal depuis l'interface graphique) vers un dossier qui contient déjà
+    une génération précédente, la prévisualisation ne doit ni la nettoyer
+    ni en écraser le moindre fichier."""
+    img_dir = tmp_path / "photos"
+    out_dir = tmp_path / "out"
+    preview_png = tmp_path / "preview.png"
+    _make_photos(img_dir, 5)
+
+    planches_dir = out_dir / "planches"
+    planches_dir.mkdir(parents=True)
+    sentinel_planche = planches_dir / "planche_001.jpg"
+    sentinel_planche.write_bytes(b"ancienne planche, ne doit pas bouger")
+    sentinel_pdf = out_dir / "portfolio.pdf"
+    sentinel_pdf.write_bytes(b"ancien pdf, ne doit pas bouger")
+
+    monkeypatch.setattr(
+        sys, "argv",
+        ["portfolio.py", "-i", str(img_dir), "-o", str(out_dir), "--preview-output", str(preview_png)],
+    )
+    cli_module.main()
+
+    assert preview_png.is_file()
+    assert sentinel_planche.read_bytes() == b"ancienne planche, ne doit pas bouger"
+    assert sentinel_pdf.read_bytes() == b"ancien pdf, ne doit pas bouger"
+
+
+def test_preview_output_with_no_photos_creates_no_file(tmp_path, monkeypatch, caplog):
+    img_dir = tmp_path / "photos"
+    img_dir.mkdir()
+    preview_png = tmp_path / "preview.png"
+
+    monkeypatch.setattr(
+        sys, "argv",
+        ["portfolio.py", "-i", str(img_dir), "--preview-output", str(preview_png)],
+    )
+    cli_module.main()
+
+    assert not preview_png.exists()
+
+
+def test_preview_output_respects_profile_flag(tmp_path, monkeypatch):
+    """La prévisualisation doit utiliser exactement le même Profil (mise en
+    page/légendes/thème) qu'une génération réelle avec le même --profile -
+    ici vérifié via un thème sombre, dont la couleur de fond est facile à
+    distinguer du blanc par défaut sur le PNG produit."""
+    img_dir = tmp_path / "photos"
+    preview_png = tmp_path / "preview.png"
+    _make_photos(img_dir, 3)
+
+    profile_path = tmp_path / "profil_sombre.json"
+    save_profile(Profile(theme=ThemeSettings(mode="dark")), profile_path)
+
+    monkeypatch.setattr(
+        sys, "argv",
+        ["portfolio.py", "-i", str(img_dir), "--preview-output", str(preview_png), "--profile", str(profile_path)],
+    )
+    cli_module.main()
+
+    with Image.open(preview_png) as img:
+        corner_pixel = img.convert("RGB").getpixel((5, 5))
+    # Thème sombre : le coin de la planche (hors toute vignette) doit être
+    # sombre, jamais blanc/clair (comportement par défaut).
+    assert sum(corner_pixel) < 200, (
+        f"le profil --profile (thème sombre) n'a pas été appliqué à l'aperçu : "
+        f"couleur de coin {corner_pixel}"
+    )

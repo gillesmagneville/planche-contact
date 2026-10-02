@@ -87,12 +87,92 @@ def parse_args():
     # --format/--num ci-dessous (Config.__post_init__).
     parser.add_argument("--profile", type=Path, default=None, help=_("cli.help_profile"))
 
+    # Mode prévisualisation (cahier des charges §3), réservé à un usage
+    # interne par l'interface graphique (planche-contact-gtk.py,
+    # _on_preview_clicked) : génère UNE SEULE planche (la première page,
+    # avec le nombre de photos réellement affichées dessus - voir
+    # compute_effective_per_page) dans ce sous-processus CLI totalement
+    # séparé de l'application GTK, puis écrit le résultat en PNG au chemin
+    # donné et s'arrête - sans jamais toucher au dossier de sortie réel ni
+    # générer de PDF/CSV/galerie HTML. Voir _generate_preview_sheet()
+    # ci-dessous pour la raison de cet isolement en sous-processus.
+    parser.add_argument("--preview-output", type=Path, default=None, help=_("cli.help_preview_output"))
+
     return parser.parse_args()
+
+
+def _generate_preview_sheet(args, profile_kwargs):
+    """Génère une planche unique pour la prévisualisation (--preview-output)
+    et rien d'autre - voir le commentaire de l'argument ci-dessus.
+
+    Volontairement un chemin de code à part, indépendant du reste de
+    main() : ne crée jamais le dossier de sortie réel, ne configure pas de
+    logging dedans, ne nettoie/écrase rien d'une génération précédente, et
+    ne produit ni PDF, ni CSV, ni galerie HTML - seulement l'image PNG de
+    la planche demandée.
+
+    Isolement en sous-processus (plutôt qu'un simple appel direct depuis
+    l'interface graphique, dans un fil d'arrière-plan de l'application
+    GTK) : constat empirique (tests sous GTK4 réel) qu'un rendu de texte
+    Pillow (titre/numéro de page de la planche - voir
+    ContactSheetGenerator._draw_header()/_draw_page_number()) exécuté en
+    concurrence avec Pango - qui s'appuie, lui aussi, sur FreeType, pour
+    l'affichage des widgets de la boucle GTK principale restée active -
+    peut corrompre l'initialisation interne de FreeType et produire un
+    masque de glyphe de taille aberrante, jusqu'à faire échouer le rendu
+    (PIL.Image.DecompressionBombError). Un sous-processus séparé, sans la
+    moindre fenêtre ni boucle GTK, élimine structurellement cette
+    concurrence plutôt que de tenter de la fiabiliser."""
+    config = Config(
+        input_dir=args.input,
+        # Jamais créé ni écrit : ce mode ne génère qu'un PNG autonome, au
+        # chemin --preview-output fourni par l'appelant.
+        output_dir=args.input,
+        recursive=args.recursive,
+        sort_by=args.sort,
+        num_per_sheet=args.num,
+        thumb_size=args.thumb,
+        page_format=args.format,
+        title=args.title,
+        author=args.author,
+        watermark_text=args.watermark,
+        watermark_orientation=args.watermark_orientation,
+        watermark_opacity=args.watermark_opacity,
+        **profile_kwargs,
+    )
+
+    scanner = ImageScanner(config)
+    images = scanner.scan()
+    if not images:
+        return
+
+    n = compute_effective_per_page(config.profile)
+    total_pages = (len(images) + n - 1) // n
+    batch = images[:n]
+
+    thumb_gen = ThumbnailGenerator(config)
+    cs_gen = ContactSheetGenerator(config, thumb_gen)
+    sheet = cs_gen.create_contact_sheet(batch, 1, total_pages)
+    if sheet is not None:
+        args.preview_output.parent.mkdir(parents=True, exist_ok=True)
+        sheet.save(args.preview_output, "PNG")
 
 
 def main():
     args = parse_args()
     start = time.time()
+
+    profile_kwargs = {}
+    if args.profile is not None:
+        profile_kwargs["profile"] = load_profile(args.profile)
+
+    if args.preview_output is not None:
+        # Mode prévisualisation : voir _generate_preview_sheet() - un
+        # chemin de code totalement séparé du reste de cette fonction, qui
+        # retourne avant la moindre création/modification du dossier de
+        # sortie réel.
+        _generate_preview_sheet(args, profile_kwargs)
+        return
 
     output_dir = args.output or (args.input / "Portfolio")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -113,11 +193,8 @@ def main():
     # docstring pour la limite actuelle de cette heuristique) : --format/
     # --num ne l'emportent que s'ils ont été explicitement changés par
     # rapport à leur valeur par défaut ET que le profil n'a, lui, pas déjà
-    # personnalisé ce même réglage.
-    profile_kwargs = {}
-    if args.profile is not None:
-        profile_kwargs["profile"] = load_profile(args.profile)
-
+    # personnalisé ce même réglage. (profile_kwargs est calculé plus haut,
+    # avant même l'embranchement vers le mode prévisualisation.)
     config = Config(
         input_dir=args.input,
         output_dir=output_dir,
