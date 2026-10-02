@@ -152,6 +152,7 @@ STRINGS = {
     "cli.help_watermark_orientation": "Orientación de la marca de agua",
     "cli.help_watermark_opacity": "Opacidad de la marca de agua, de 0 a 100 (por defecto: 40)",
     "cli.help_language": "Idioma de los mensajes y de la galería HTML generada (por defecto: idioma del sistema)",
+    "cli.help_profile": "Archivo de perfil JSON (diseño, leyendas, tema - véase --format/--num más arriba, sustituidos por el perfil si ya los personaliza); ausente o no válido: valores por defecto (comportamiento actual)",
     "cli.log_starting": "Iniciando la generación para {input}",
     "cli.log_no_images": "No se encontraron imágenes.",
     "cli.log_error_sheet": "Error en la hoja {page}: {error}",

@@ -6,6 +6,10 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 ## [Non publié]
 
+### Ajouté
+
+- **Nouvelle option `--profile fichier.json`** (cahier des charges §2/§4.4) : charge un profil de mise en page/légendes/thème réutilisable (voir `portfolio/presentation/profile.py`, `save_profile()`/`load_profile()`) et l'applique à la génération (planches JPEG/PDF et galerie HTML). Un fichier absent, illisible ou invalide retombe silencieusement sur le profil par défaut (comportement actuel inchangé), sans jamais interrompre la génération. En cas d'utilisation combinée avec `--format`/`--num` : ces derniers ne l'emportent sur le profil que s'ils sont explicitement différents de leur valeur par défaut ET que le profil n'a, lui, pas déjà personnalisé ce même réglage (sinon le profil, plus spécifique, l'emporte silencieusement - voir `Config.__post_init__`). Pas encore d'interface graphique pour créer ces profils (étape ultérieure) : à écrire/modifier à la main pour l'instant.
+
 ### Corrigé
 
 - **Latent, pas encore atteignable depuis l'interface** : la pagination de `portfolio.py` (`main()`) répartissait les photos par lots de `config.num_per_sheet` directement, sans tenir compte de la réduction que le modèle « grandes vignettes » (« large_thumbs ») peut s'appliquer à lui-même (voir `presentation.layout_engine.compute_effective_per_page`) pour garantir de grandes vignettes quel que soit le nombre demandé. Les photos excédentaires d'une page ainsi trop chargée auraient été silencieusement perdues (jamais reportées sur une page supplémentaire) - corrigé en paginant sur ce nombre EFFECTIF plutôt que sur le réglage brut. Aucune régression possible aujourd'hui (le CLI n'expose pas encore de sélection de modèle/Profil - étape `--profile` à venir), corrigé par anticipation et verrouillé par un nouveau test (`tests/test_portfolio_cli.py`, qui échoue bien sans le correctif : 1 page générée au lieu des 3 attendues pour 20 photos).

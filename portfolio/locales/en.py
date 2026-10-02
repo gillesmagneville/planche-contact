@@ -154,6 +154,7 @@ STRINGS = {
     "cli.help_watermark_orientation": "Watermark orientation",
     "cli.help_watermark_opacity": "Watermark opacity, from 0 to 100 (default: 40)",
     "cli.help_language": "Language of the messages and the generated HTML gallery (default: system language)",
+    "cli.help_profile": "JSON profile file (layout, captions, theme - see --format/--num above, overridden by the profile if it already customizes them); missing or invalid: default values (current behavior)",
     "cli.log_starting": "Starting generation for {input}",
     "cli.log_no_images": "No images found.",
     "cli.log_error_sheet": "Error on sheet {page}: {error}",

@@ -30,6 +30,7 @@ from PIL import Image
 
 import portfolio.portfolio as cli_module
 from portfolio.config import Config as RealConfig
+from portfolio.presentation import Profile, LayoutSettings, save_profile
 from portfolio.presentation.layout_engine import LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE
 
 
@@ -77,3 +78,121 @@ def test_large_thumbs_repaginates_instead_of_dropping_excess_photos(tmp_path, mo
         "directement - sans quoi des photos seraient perdues sans la "
         "moindre page supplementaire pour les accueillir"
     )
+
+
+def _capture_config(monkeypatch):
+    """Intercepte le VRAI objet Config construit par main() (pour
+    l'inspecter ensuite), sans en modifier le comportement."""
+    captured = {}
+
+    def wrapper(*args, **kwargs):
+        cfg = RealConfig(*args, **kwargs)
+        captured["config"] = cfg
+        return cfg
+
+    monkeypatch.setattr(cli_module, "Config", wrapper)
+    return captured
+
+
+def test_profile_flag_is_loaded_and_applied(tmp_path, monkeypatch):
+    """--profile (cahier des charges §2/§4.4) doit charger le fichier JSON
+    et l'appliquer tel quel quand --format/--num restent à leur valeur par
+    défaut (aucun conflit à arbitrer)."""
+    img_dir = tmp_path / "photos"
+    out_dir = tmp_path / "out"
+    _make_photos(img_dir, 3)
+
+    profile_path = tmp_path / "mon_profil.json"
+    save_profile(Profile(layout=LayoutSettings(template="large_thumbs", per_page=8, page_format="A3")), profile_path)
+
+    captured = _capture_config(monkeypatch)
+    monkeypatch.setattr(
+        sys, "argv",
+        ["portfolio.py", "-i", str(img_dir), "-o", str(out_dir), "--profile", str(profile_path)],
+    )
+    cli_module.main()
+
+    profile = captured["config"].profile
+    assert profile.layout.template == "large_thumbs"
+    assert profile.layout.per_page == 8
+    assert profile.layout.page_format == "A3"
+
+
+def test_profile_flag_absent_keeps_default_profile(tmp_path, monkeypatch):
+    """Sans --profile, le comportement actuel (profil par défaut) ne doit
+    strictement pas changer."""
+    img_dir = tmp_path / "photos"
+    out_dir = tmp_path / "out"
+    _make_photos(img_dir, 3)
+
+    captured = _capture_config(monkeypatch)
+    monkeypatch.setattr(sys, "argv", ["portfolio.py", "-i", str(img_dir), "-o", str(out_dir)])
+    cli_module.main()
+
+    profile = captured["config"].profile
+    assert profile.layout.template == "grid"
+    assert profile.layout.per_page == 12
+    assert profile.layout.page_format == "A4"
+
+
+def test_nonexistent_profile_falls_back_silently_to_default(tmp_path, monkeypatch, caplog):
+    """Un chemin de profil invalide ne doit jamais interrompre la
+    génération (voir presentation.load_profile(), jamais d'exception)."""
+    img_dir = tmp_path / "photos"
+    out_dir = tmp_path / "out"
+    _make_photos(img_dir, 3)
+
+    captured = _capture_config(monkeypatch)
+    monkeypatch.setattr(
+        sys, "argv",
+        ["portfolio.py", "-i", str(img_dir), "-o", str(out_dir), "--profile", str(tmp_path / "absent.json")],
+    )
+    cli_module.main()  # ne doit lever aucune exception
+
+    assert captured["config"].profile.layout.template == "grid"
+    assert (out_dir / "planches" / "planche_001.jpg").exists()
+
+
+def test_explicit_format_overrides_a_profile_left_at_its_default(tmp_path, monkeypatch):
+    """Précédence documentée dans Config.__post_init__ : --format
+    l'emporte sur le profil SEULEMENT si celui-ci n'a pas déjà personnalisé
+    page_format (ici laissé à "A4", la valeur par défaut)."""
+    img_dir = tmp_path / "photos"
+    out_dir = tmp_path / "out"
+    _make_photos(img_dir, 3)
+
+    profile_path = tmp_path / "profil_format_defaut.json"
+    save_profile(Profile(layout=LayoutSettings(template="landscape")), profile_path)  # page_format reste "A4"
+
+    captured = _capture_config(monkeypatch)
+    monkeypatch.setattr(
+        sys, "argv",
+        ["portfolio.py", "-i", str(img_dir), "-o", str(out_dir), "--profile", str(profile_path), "--format", "A3"],
+    )
+    cli_module.main()
+
+    profile = captured["config"].profile
+    assert profile.layout.template == "landscape"  # le reste du profil est conserve
+    assert profile.layout.page_format == "A3"  # --format explicite l'emporte
+
+
+def test_profile_already_customized_format_wins_over_explicit_format_flag(tmp_path, monkeypatch):
+    """Précédence inverse, documentée comme limite explicite de
+    l'heuristique (Config.__post_init__) : si le profil a DÉJÀ un
+    page_format différent de la valeur par défaut, --format est purement
+    et simplement ignoré."""
+    img_dir = tmp_path / "photos"
+    out_dir = tmp_path / "out"
+    _make_photos(img_dir, 3)
+
+    profile_path = tmp_path / "profil_format_personnalise.json"
+    save_profile(Profile(layout=LayoutSettings(page_format="A2")), profile_path)
+
+    captured = _capture_config(monkeypatch)
+    monkeypatch.setattr(
+        sys, "argv",
+        ["portfolio.py", "-i", str(img_dir), "-o", str(out_dir), "--profile", str(profile_path), "--format", "A3"],
+    )
+    cli_module.main()
+
+    assert captured["config"].profile.layout.page_format == "A2"

@@ -20,7 +20,7 @@ from portfolio.htmlgallery import HTMLGalleryGenerator
 from portfolio.csvindex import CSVIndexGenerator
 from portfolio.utils import setup_logging
 from portfolio.i18n import _, set_language, AVAILABLE_LANGUAGES
-from portfolio.presentation import compute_effective_per_page
+from portfolio.presentation import compute_effective_per_page, load_profile
 
 
 def _pre_resolve_language():
@@ -80,6 +80,12 @@ def parse_args():
     # planche-contact-gtk.py, _on_generate) et l'affiche dans --help.
     parser.add_argument("--language", default="system", choices=AVAILABLE_LANGUAGES,
                         help=_("cli.help_language"))
+    # Mise en page/légendes/thème personnalisables (cahier des charges
+    # §2/§4.4) : un profil JSON réutilisable, enregistré via
+    # presentation.save_profile() (interface graphique, étape ultérieure)
+    # ou écrit/modifié à la main. Voir la note de précédence avec
+    # --format/--num ci-dessous (Config.__post_init__).
+    parser.add_argument("--profile", type=Path, default=None, help=_("cli.help_profile"))
 
     return parser.parse_args()
 
@@ -95,6 +101,22 @@ def main():
     logger = logging.getLogger(__name__)
 
     logger.info(_("cli.log_starting", input=args.input))
+
+    # Profil JSON optionnel (cahier des charges §2/§4.4, --profile) : un
+    # fichier absent/illisible/invalide retombe silencieusement sur le
+    # profil par défaut (voir presentation.load_profile(), jamais
+    # d'exception) - aucun argument "profile=" n'est alors passé à Config
+    # ci-dessous, pour laisser sa propre valeur par défaut
+    # (default_profile()) s'appliquer normalement. Quand un profil EST
+    # fourni, Config.__post_init__() arbitre lui-même la précédence avec
+    # --format/--num quand les deux sont donnés à la fois (voir son
+    # docstring pour la limite actuelle de cette heuristique) : --format/
+    # --num ne l'emportent que s'ils ont été explicitement changés par
+    # rapport à leur valeur par défaut ET que le profil n'a, lui, pas déjà
+    # personnalisé ce même réglage.
+    profile_kwargs = {}
+    if args.profile is not None:
+        profile_kwargs["profile"] = load_profile(args.profile)
 
     config = Config(
         input_dir=args.input,
@@ -113,6 +135,7 @@ def main():
         watermark_text=args.watermark,
         watermark_orientation=args.watermark_orientation,
         watermark_opacity=args.watermark_opacity,
+        **profile_kwargs,
     )
 
     # Phase 1: Scan

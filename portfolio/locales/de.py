@@ -152,6 +152,7 @@ STRINGS = {
     "cli.help_watermark_orientation": "Ausrichtung des Wasserzeichens",
     "cli.help_watermark_opacity": "Deckkraft des Wasserzeichens, von 0 bis 100 (Standard: 40)",
     "cli.help_language": "Sprache der Meldungen und der erstellten HTML-Galerie (Standard: Systemsprache)",
+    "cli.help_profile": "JSON-Profildatei (Layout, Bildunterschriften, Thema - siehe --format/--num oben, die vom Profil überschrieben werden, falls es sie bereits anpasst); fehlend oder ungültig: Standardwerte (aktuelles Verhalten)",
     "cli.log_starting": "Erstellung wird gestartet für {input}",
     "cli.log_no_images": "Keine Bilder gefunden.",
     "cli.log_error_sheet": "Fehler bei Kontaktbogen {page}: {error}",

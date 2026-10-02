@@ -154,6 +154,7 @@ STRINGS = {
     "cli.help_watermark_orientation": "Orientation du filigrane",
     "cli.help_watermark_opacity": "Opacité du filigrane, de 0 à 100 (défaut : 40)",
     "cli.help_language": "Langue des messages et de la galerie HTML générée (défaut : langue système)",
+    "cli.help_profile": "Fichier de profil JSON (mise en page, légendes, thème - voir --format/--num ci-dessus, repris par le profil s'il les personnalise déjà) ; absent ou invalide : valeurs par défaut (comportement actuel)",
     "cli.log_starting": "Démarrage de la génération pour {input}",
     "cli.log_no_images": "Aucune image trouvée.",
     "cli.log_error_sheet": "Erreur planche {page}: {error}",
