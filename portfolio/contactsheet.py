@@ -51,9 +51,22 @@ class ContactSheetGenerator:
 
         thumb_size = max(best_thumb_size, 70)
         cols = best_cols
+        rows = math.ceil(self.num_per_sheet / cols)
 
         max_thumb_w = (available_w - (cols - 1) * spacing) // cols
         thumb_size = min(thumb_size, max_thumb_w)
+
+        # Bug corrigé : seul l'espacement HORIZONTAL entre colonnes était
+        # retranché de la largeur disponible ci-dessus ; l'espacement
+        # VERTICAL entre lignes n'était lui jamais retranché de la hauteur
+        # disponible (cell_h = available_h // rows, sans tenir compte des
+        # (rows - 1) espacements qui s'ajoutent réellement entre les
+        # lignes lors du placement). Pour certaines combinaisons nombre
+        # d'images par planche / format de page (ex : 24 images en A4),
+        # les vignettes de la dernière ligne débordaient donc légèrement
+        # du bas physique de la planche. Voir CHANGELOG.md.
+        max_thumb_h = (available_h - (rows - 1) * spacing) // rows
+        thumb_size = min(thumb_size, max_thumb_h)
 
         thumbnails = self.thumb_gen.generate_parallel(images, thumb_size)
 
