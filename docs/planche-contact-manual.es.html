@@ -93,7 +93,7 @@ El soporte de archivos RAW se basa en la biblioteca <code>rawpy</code>, instalad
 <tr><th>Campo / Opción</th><th>Descripción</th></tr>
 <tr><td><strong>Título del proyecto</strong></td><td>Texto mostrado en grande en la parte superior de cada hoja. En la misma línea que el nombre del autor.</td></tr>
 <tr><td><strong>Nombre del autor</strong></td><td>Nombre mostrado debajo del título (en negrita, más pequeño).</td></tr>
-<tr><td><strong>Carpeta de entrada</strong></td><td>Carpeta que contiene las fotografías a procesar (obligatoria). Muestra automáticamente una vista previa de las fotos de la carpeta (véase §3.3).</td></tr>
+<tr><td><strong>Carpeta de entrada</strong></td><td>Carpeta que contiene las fotografías a procesar (obligatoria). Muestra automáticamente una vista previa de las fotos de la carpeta (véase §3.5).</td></tr>
 <tr><td><strong>Carpeta de salida</strong></td><td>Carpeta donde se crearán los resultados. Por defecto: <code>Portfolio/</code> dentro de la carpeta de origen. Se crea automáticamente si aún no existe.</td></tr>
 <tr><td><strong>Búsqueda recursiva</strong></td><td>Si está marcada, también analiza todas las subcarpetas.</td></tr>
 <tr><td><strong>Imágenes por hoja</strong></td><td>Número de miniaturas por página (de 8 a 48, en pasos de 4). En la misma línea que los tres campos siguientes.</td></tr>
@@ -113,10 +113,43 @@ El soporte de archivos RAW se basa en la biblioteca <code>rawpy</code>, instalad
 
 <p>Si ninguno de los campos Título / Autor / Marca de agua está rellenado, el encabezado de las hojas muestra por defecto el nombre de la carpeta de entrada (sin su ruta completa), para evitar una hoja completamente anónima.</p>
 
-<h3>3.3 Vista previa de la carpeta de entrada</h3>
+<h3>3.3 Diseño, leyendas y tema (ajustes avanzados)</h3>
+<p>Un segundo bloque, plegado por defecto (haga clic en su título para desplegarlo), permite personalizar con detalle el diseño, las leyendas y el tema gráfico de las hojas de contacto — sin cambiar en nada el comportamiento por defecto mientras permanezca cerrado.</p>
+
+<p><strong>Diseño</strong></p>
+<table>
+<tr><th>Ajuste</th><th>Descripción</th></tr>
+<tr><td><strong>Plantilla</strong></td><td>Cuadrícula (comportamiento por defecto), Horizontal, Vertical, Miniaturas grandes (reduce automáticamente el número de fotos por página para garantizar miniaturas grandes), Libre (columnas/filas elegidas manualmente).</td></tr>
+<tr><td><strong>Orientación</strong></td><td>Vertical u Horizontal para la propia página.</td></tr>
+<tr><td><strong>Modo de ajuste</strong></td><td>Cómo se adapta cada foto a su celda: Contener (comportamiento por defecto, sin recorte) o Rellenar (recortada para llenar toda la celda).</td></tr>
+<tr><td><strong>Márgenes / Espaciado</strong></td><td>En milímetros, alrededor de la página y entre las miniaturas.</td></tr>
+<tr><td><strong>Columnas / Filas</strong></td><td>Solo para la plantilla Libre (0 = automático).</td></tr>
+</table>
+
+<p><strong>Leyendas por foto</strong></p>
+<p>Puede mostrarse una leyenda debajo (o encima) de cada miniatura, construida a partir de los metadatos EXIF de la foto:</p>
+<ul>
+<li>Nombre de archivo, fecha de la toma, cámara (marca/modelo), objetivo, distancia focal, distancia focal equivalente a 35&nbsp;mm, apertura, velocidad de obturación, sensibilidad ISO, dimensiones de la imagen, posición GPS.</li>
+<li>La posición, el área reservada (mm), el número de líneas, el tamaño de fuente y la alineación son todos ajustables.</li>
+<li>Un metadato ausente en una foto concreta (por ejemplo, sin datos GPS) simplemente se omite de su leyenda, sin provocar nunca un error.</li>
+</ul>
+<div class="note">
+La posición GPS, si está activada, se muestra en texto claro en la hoja generada — actívela solo si realmente desea compartir esa información (se muestra una advertencia al pasar el cursor sobre la casilla correspondiente).
+</div>
+
+<p><strong>Tema gráfico</strong></p>
+<p>Cuatro modos, aplicados de forma idéntica a las hojas JPEG, al PDF y a la galería HTML: <strong>Claro</strong> (por defecto), <strong>Oscuro</strong>, <strong>Neutro</strong> y <strong>Sistema</strong> (sigue la preferencia del sistema operativo para las hojas/PDF; para la galería HTML, sigue el navegador de cada visitante, con un pequeño botón discreto que le permite cambiar él mismo entre claro y oscuro — véase §6). Los colores de fondo, texto, acento y borde también pueden personalizarse individualmente (formato hexadecimal <code>#rrggbb</code>).</p>
+
+<p><strong>Guardar / Cargar un perfil</strong></p>
+<p>Todos estos ajustes (diseño, leyendas y tema) pueden guardarse en un archivo JSON reutilizable (botón «Guardar perfil…»), y volver a cargarse más tarde (botón «Cargar perfil…») — útil para aplicar los mismos ajustes a varios proyectos, o para compartirlos. Este mismo archivo puede pasarse a la línea de comandos mediante <code>--profile</code> (véase §4.1).</p>
+
+<h3>3.4 Vista previa de la hoja</h3>
+<p>El botón «Vista previa de la hoja…» muestra, en una ventana dedicada, la hoja de contacto tal y como se producirá realmente — diseño, leyendas, tema y marca de agua incluidos — a partir de las primeras fotos de la carpeta de entrada (el mismo número que colocaría la generación real en esa primera página). Útil para comprobar el efecto de un ajuste antes de lanzar una generación completa, especialmente en una carpeta con muchas fotos.</p>
+
+<h3>3.5 Vista previa de la carpeta de entrada</h3>
 <p>En cuanto se indica una carpeta de entrada válida (al iniciar, si ya se había guardado una carpeta, o tras escribirla/seleccionarla), una franja de vista previa muestra automáticamente las miniaturas de las fotos que contiene, en páginas de 10, con una paginación numerada (<code>← Anterior 1 … 4 5 6 … 19 Siguiente →</code>). El análisis y la generación de miniaturas se realizan en segundo plano: la interfaz no se congela, ni siquiera con una carpeta que contenga cientos de fotos.</p>
 
-<h3>3.4 Selector de carpetas personalizado</h3>
+<h3>3.6 Selector de carpetas personalizado</h3>
 <p>El botón «Elegir...» (carpeta de entrada o de salida) abre un navegador de carpetas construido enteramente por la aplicación, en lugar del cuadro de diálogo nativo del sistema:</p>
 <ul>
     <li>Solo se muestran <strong>carpetas</strong> (ningún archivo), para una navegación más clara.</li>
@@ -126,7 +159,7 @@ El soporte de archivos RAW se basa en la biblioteca <code>rawpy</code>, instalad
     <li>Al hacer doble clic en una carpeta se entra en ella; el botón <strong>«Seleccionar esta carpeta»</strong> confirma la carpeta actualmente mostrada.</li>
 </ul>
 
-<h3>3.5 Botón «Ver resultados»</h3>
+<h3>3.7 Botón «Ver resultados»</h3>
 <p>Tras una generación correcta, este botón desplegable permite abrir directamente los resultados con las aplicaciones predeterminadas del sistema, sin agrandar la ventana principal:</p>
 <table>
 <tr><th>Opción</th><th>Acción</th></tr>
@@ -137,7 +170,7 @@ El soporte de archivos RAW se basa en la biblioteca <code>rawpy</code>, instalad
 </table>
 <p>Cada opción solo se activa si el elemento correspondiente se generó realmente (según las casillas marcadas durante la generación). Si no hay ninguna aplicación predeterminada configurada en el sistema para un tipo de archivo dado, aparece una ventana de aviso con una sugerencia de aplicación para instalar.</p>
 
-<h3>3.6 Pestaña «Acerca de»</h3>
+<h3>3.8 Pestaña «Acerca de»</h3>
 <p>Muestra el número de versión, la fecha de compilación, una breve descripción, el autor, la licencia (<strong>GNU GPL v3</strong>) y un enlace en el que se puede hacer clic al repositorio GitHub del proyecto. Incluye también el selector de idioma — véase la nota siguiente.</p>
 <div class="note">
 Un cambio de idioma solo tiene efecto tras reiniciar la aplicación. El idioma elegido también se utiliza para la línea de comandos y para cualquier galería HTML generada posteriormente — véanse §4 y §5.
@@ -165,6 +198,7 @@ Un cambio de idioma solo tiene efecto tras reiniciar la aplicación. El idioma e
 <tr><td><code>--sort</code></td><td>Orden de las fotos: <code>date</code> (EXIF) o <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Número de imágenes por página en la galería HTML (por defecto: 48)</td><td><code>--html-per-page 60</code></td></tr>
 <tr><td><code>--language</code></td><td>Idioma de los mensajes y de la galería HTML generada: <code>system</code> (por defecto), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language es</code></td></tr>
+<tr><td><code>--profile</code></td><td>Archivo de perfil JSON (diseño, leyendas, tema — véase §3.3), generado con el botón «Guardar perfil…» de la interfaz gráfica, o escrito/editado a mano. Un archivo ausente o no válido recurre silenciosamente a los valores por defecto.</td><td><code>--profile mi-perfil.json</code></td></tr>
 </table>
 <div class="note">
 Los valores de <code>--watermark-orientation</code> permanecen internamente en francés independientemente del <code>--language</code> elegido (<code>"Horizontal"</code>, <code>"Diagonale horaire"</code>, <code>"Diagonale anti-horaire"</code>) — es el contrato interno del motor y no tiene relación con el idioma de visualización.

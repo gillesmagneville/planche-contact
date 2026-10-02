@@ -222,8 +222,8 @@ and troubleshooting.
 
 # Roadmap
 
-- Internationalization (i18n)
-- Custom contact sheet templates
+- ~~Internationalization (i18n)~~ — **done**: GUI, CLI, generated HTML gallery and user manual (English, French, German, Spanish).
+- ~~Custom contact sheet templates~~ — **done**: customizable EXIF captions (filename, date, camera, lens, focal length, aperture, shutter speed, ISO, dimensions, GPS), layout templates (grid, landscape, portrait, large thumbnails, free), light/dark/neutral/system themes with optional custom colors, and a live preview before generation — all shared across JPEG/PDF contact sheets and the HTML gallery, and savable as reusable JSON profiles. See the [user manual](docs/planche-contact-manual.html) or the "Advanced" section in the app for details.
 - Additional export formats
 - Improved PDF customization
 

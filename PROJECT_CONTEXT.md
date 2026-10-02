@@ -57,12 +57,13 @@ interactive, options `-Major/-Minor/-Patch`).
 | `rawloader.py` | Chargement unifié image/RAW : aperçu JPEG embarqué en priorité (rapide), dématriçage complet (`rawpy`) uniquement si cet aperçu est absent ou trop petit ; `get_original_dimensions()` : résolution réelle d'origine (métadonnées seules, orientation EXIF/RAW appliquée), utilisée par la visionneuse de la galerie HTML |
 | `thumbnail.py` | Génération de vignettes en parallèle (`ProcessPoolExecutor`, contexte `spawn` forcé) |
 | `contactsheet.py` | Génère les planches contact (en-tête, grille de vignettes, pied de page, numéro de page) |
+| `presentation/` | Moteur commun de mise en page/légendes/thème (`profile.py` : dataclass `Profile` + JSON ; `layout_engine.py` : géométrie des gabarits grille/paysage/portrait/grandes vignettes/libre ; `captions.py` : résolution des légendes EXIF ; `themes.py` : palettes Clair/Sombre/Neutre/Système). **Source unique de vérité**, utilisée à la fois par `contactsheet.py` (planches JPEG/PDF) et `htmlgallery.py` (galerie HTML) — jamais de règle de mise en page/légende/couleur dupliquée entre les deux. L'absence de Profil (ou un Profil partiel/invalide) ne change jamais le comportement par défaut ni ne lève d'exception (`default_profile()`) ; `Config.__post_init__()` synchronise rétrocompatiblement les réglages "simples" historiques (`page_format`/`num_per_sheet`) dans le Profil tant que celui-ci ne les a pas déjà personnalisés |
 | `pdfexport.py` | Assemble les planches en PDF (`reportlab`) ; marge haute réduite indépendamment des autres marges |
 | `htmlgallery.py` | Galerie HTML paginée ; **une seule passe de décodage** par photo (la vignette est dérivée de l'image pleine taille déjà décodée, pas un second décodage) ; `ImageOps.exif_transpose()` appliqué systématiquement pour respecter l'orientation (voir §5) ; filigrane appliqué **une seule fois** sur l'image pleine taille, la vignette étant dérivée par redimensionnement de cette version déjà filigranée (voir §5, évite un motif disproportionné/tronqué) ; visionneuse plein écran en JS vanilla intégrée à chaque page générée (précédent/suivant **franchissant les pages** avec bouclage sur l'ensemble de la galerie (avertissement affiché aux deux extrémités, voir §5), clavier, molette de la souris, sans dépendance externe) avec indicateur de page, saut direct à une page, nom du fichier, téléchargement (via blob, voir §5 — dégradé en `file://`), panneau d'informations (résolution/taille/date, calculées par le worker en même temps que l'image), zoom 50-200 % en largeur/hauteur réelles, toujours centrée, déplaçable au glisser-déposer une fois zoomée (souris/tactile via Pointer Events, bornée pour ne jamais sortir complètement du cadre — voir §5, boutons, clavier, Ctrl/Alt+molette pour zoomer et molette seule pour déplacer, jamais `transform: scale()` pour le zoom, réinitialisé à chaque changement de photo) et bascule plein écran (`Fullscreen API`) ; pied de page avec mention développeur/licence ; **entièrement traduite** dans la langue active au moment de la génération (`<html lang="...">` compris), via `i18n.py` |
 | `csvindex.py` | Génère l'index CSV |
 | `utils.py` | `get_font()` (police embarquée, mise en cache), `apply_watermark()` (filigrane en mosaïque, **fonction unique** utilisée par les planches, le PDF et la galerie), `get_exif_date()` (date de prise de vue, RAW compris — **fonction unique** utilisée par le tri de `scanner.py` et les informations de la visionneuse de `htmlgallery.py`), `format_file_size()`, `setup_logging()` |
 | `i18n.py` | Internationalisation de **l'interface graphique, du CLI et de la galerie HTML générée** (voir §5) : `_()`, `set_language()`, `get_language()`, `detect_system_language()`. Dictionnaires Python (`locales/{fr,en,de,es}.py`), pas gettext/.po/.mo — aucune étape de compilation ni dépendance supplémentaire à empaqueter |
-| `portfolio.py` | Point d'entrée CLI (`argparse`), orchestre tout ce qui précède, affiche des lignes `PROGRESS:X/100 message` sur stdout (lues par l'interface graphique — préfixe volontairement jamais traduit, voir §5) ; `--language` résolu *avant* la construction du parser pour que `--help` s'affiche déjà dans la bonne langue |
+| `portfolio.py` | Point d'entrée CLI (`argparse`), orchestre tout ce qui précède, affiche des lignes `PROGRESS:X/100 message` sur stdout (lues par l'interface graphique — préfixe volontairement jamais traduit, voir §5) ; `--language` résolu *avant* la construction du parser pour que `--help` s'affiche déjà dans la bonne langue ; `--profile fichier.json` applique un Profil réutilisable (`presentation/`) ; `--preview-output chemin.png` (usage interne par l'interface graphique, voir §2.3) génère une planche unique en PNG et s'arrête, sans jamais toucher au dossier de sortie réel ni générer PDF/CSV/galerie HTML |
 | `fonts/` | Police DejaVu Sans (normale + gras) embarquée avec le projet — licence Bitstream Vera, redistribution autorisée |
 
 ### 2.3 L'interface graphique (`planche-contact-gtk.py`)
@@ -116,6 +117,33 @@ Composants principaux :
   (`docs/planche-contact-manual.{en,de,es}.html`) l'est également —
   l'onglet Aide ouvre la version correspondant à la langue active, avec
   repli sur le français si le fichier de cette langue est absent.
+- **Section « avancée »** (`_build_advanced_section()`) : mise en
+  page/légendes/thème (`presentation/`), dans un `Gtk.Expander` **replié
+  par défaut**, bien à l'écart des réglages simples au-dessus (nombre de
+  photos/format, inchangés — toujours seuls réglages actifs tant que cette
+  section n'est pas ouverte). Modèle de mise en page, orientation,
+  ajustement, marges/espacements, colonnes/lignes (modèle libre), position/
+  zone/lignes/police/alignement des légendes, champs de légende (case à
+  cocher par champ, avertissement dédié sur le champ GPS), thème (mode +
+  couleurs personnalisées). `_profile_from_widgets()`/
+  `_apply_profile_to_widgets()` font l'aller-retour avec un `Profile` ;
+  transmis au sous-processus CLI (`--profile`, fichier JSON temporaire) **
+  uniquement si différent du profil par défaut** (`!= default_profile()`),
+  pour ne jamais changer le comportement de qui n'ouvre jamais cette
+  section. Boutons Enregistrer/Charger un profil (`Gtk.FileChooserNative`,
+  référence gardée dans `self._active_file_dialog` tant que la boîte est
+  ouverte, pour éviter sa collecte prématurée par Python).
+- **Aperçu avant génération** (`_on_preview_clicked()`) : génère la
+  planche telle qu'elle sera réellement produite (même moteur, mêmes
+  réglages simples/avancés) sur les premières photos du dossier d'entrée,
+  affichée dans une fenêtre dédiée. **Toujours via un sous-processus CLI
+  séparé** (`portfolio.py --preview-output`), jamais par un appel direct
+  à `ContactSheetGenerator` dans un fil d'arrière-plan de cette
+  application — voir §6 pour la raison (bug de concurrence réel et
+  reproductible entre Pillow et Pango sur FreeType, découvert
+  empiriquement). Fichier PNG temporaire + Profil JSON temporaire
+  (réutilise le même mécanisme que `_on_generate`), tous deux supprimés
+  dès lecture du résultat, succès ou échec.
 
 ---
 
@@ -529,7 +557,11 @@ en cause sans en connaître la raison) :
 | `fpm` (`build-deb.sh`) : scripts de maintenance via `--after-install`/`--after-remove`, jamais un dossier `DEBIAN/` dans les sources `-C` | Contrairement à `dpkg-deb --build` natif, `fpm` ne traite jamais spécialement un dossier nommé `DEBIAN/` parmi ses sources : un tel dossier finit comme contenu de données inerte (installé tel quel sur la machine cible), jamais reconnu comme scripts de maintenance ni exécuté par dpkg |
 | `IntFmt` NSIS : toujours le style printf (`"0x%X"`), jamais la syntaxe mnémonique (`"0xX"`) | `"0xX"` est documentée sur le wiki NSIS (valable en NSIS 2.x) mais ne convertit plus rien en NSIS 3.x — elle retourne la chaîne littérale inchangée, faisant silencieusement échouer tout `WriteRegDWORD` qui en dépend (ex : `EstimatedSize`, repli à 0) |
 | `makensis` + Wine installables via `apt` dans le bac à sable Linux de Claude | Permet de **compiler ET exécuter** un vrai installeur NSIS pour reproduire/valider un bug Windows sans accès à une machine Windows réelle. Nécessite `nsis` (paquet universe), et pour un installeur NSIS 32 bits par défaut : `dpkg --add-architecture i386` + `wine32:i386` (le simple `wine64` ne suffit pas). Les écritures registre sont vérifiables avec `wine reg query`. Ne remplace pas un vrai test utilisateur (thème visuel, UAC réel, etc.) mais permet de confirmer/infirmer un correctif de logique avant de le transmettre |
-| GTK4 + Xvfb installables via `apt` dans le bac à sable Linux de Claude | Permet d'**exécuter réellement** `planche-contact-gtk.py` (pas juste vérifier sa syntaxe) : `apt-get install gir1.2-gtk-4.0 python3-gi`, puis `Xvfb :99 & DISPLAY=:99 python3 script.py`. Piloter l'appli par introspection directe des widgets (`app.win`, `app.run_button.get_label()`, `dropdown.set_selected(i)`...) via `GLib.timeout_add()` après `app.connect("activate", ...)`, plutôt qu'un outil d'automatisation UI dédié. **Xvfb ne survit jamais entre deux appels d'outil séparés** (comme les serveurs HTTP de test) : démarrer Xvfb et lancer le script Python dans la **même** commande shell, jamais deux commandes séparées |
+| GTK4 + Xvfb installables via `apt` dans le bac à sable Linux de Claude | Permet d'**exécuter réellement** `planche-contact-gtk.py` (pas juste vérifier sa syntaxe) : `apt-get install gir1.2-gtk-4.0 python3-gi`, puis `Xvfb :99 & DISPLAY=:99 python3 script.py`. Piloter l'appli par introspection directe des widgets (`app.win`, `app.run_button.get_label()`, `dropdown.set_selected(i)`...) via `GLib.timeout_add()` après `app.connect("activate", ...)`, plutôt qu'un outil d'automatisation UI dédié. **Xvfb ne survit jamais entre deux appels d'outil séparés** (comme les serveurs HTTP de test) : démarrer Xvfb et lancer le script Python dans la **même** commande shell, jamais deux commandes séparées (`xvfb-run -a cmd...` gère ça automatiquement, préférable à un `Xvfb &` manuel) |
+| Environnement de test GTK4 : `python3.12` + `gir1.2-gtk-4.0` spécifiquement, pas le `python3` par défaut du bac à sable | L'extension compilée de PyGObject (`_gi.cpython-312-*.so`) ne correspond qu'à Python 3.12 dans cet environnement (le `python3` par défaut est 3.13 → `ImportError` sur `gi`) ; et le typelib `Gtk-4.0` nécessite le paquet `gir1.2-gtk-4.0` en plus de `libgtk-4-1` (sinon `ValueError: Namespace Gtk not available`). Installer aussi les dépendances du moteur pour cet interpréteur spécifique (`python3.12 -m pip install --break-system-packages Pillow reportlab exifread numpy pytest`) |
+| Tout script de test qui pilote `planche-contact-gtk.py` doit lui-même garder TOUT code à effet de bord (instanciation de `Gtk.Application`, création de fichiers...) sous `if __name__ == "__main__":` | `ThumbnailGenerator.generate_parallel()` utilise `multiprocessing` en contexte `spawn`, qui **réexécute le script lanceur entier** dans chaque processus worker (sous le nom de module `__mp_main__`, pas `__main__` — donc un `if __name__ == "__main__":` correctement placé protège bien le code qu'il entoure). Un script de test dont le code de préparation (ex: `app = PlancheContactGTK()`, création de photos de test) est en dehors de ce garde se retrouve réexécuté par chaque worker, provoquant des blocages/une récursion en cascade (observé : un script de test provoquant un blocage de plusieurs minutes, diagnostiqué comme ce bug de harnais de test, pas un bug produit) |
+| Prévisualisation de planche (interface graphique) générée par un **sous-processus CLI séparé** (`portfolio.py --preview-output`), jamais par un appel direct à `ContactSheetGenerator` dans un fil d'arrière-plan de l'application GTK | Constaté empiriquement (tests sous GTK4 réel, `xvfb-run`) : un appel direct dans un fil d'arrière-plan plaçait le rendu de texte Pillow (titre/numéro de page, via FreeType) en concurrence avec Pango (texte de l'interface GTK elle-même, dont la boucle principale reste active pendant ce temps) sur la bibliothèque FreeType **partagée par les deux** dans le même processus — pouvant corrompre le calcul de la taille d'un masque de glyphe au point de lever une `PIL.Image.DecompressionBombError` et faire échouer l'aperçu. Reproduit à plusieurs reprises, avec une taille de masque différente à chaque fois (signature d'une vraie concurrence, pas d'un bug déterministe) ; un pré-chauffage du rendu Pillow au démarrage, avant toute activité GTK, a été essayé et s'est révélé **insuffisant** (la corruption peut survenir sur n'importe quel appel, pas seulement le premier). Un sous-processus séparé, dépourvu de toute fenêtre/boucle GTK, élimine cette concurrence structurellement plutôt que de tenter de la fiabiliser — **ne jamais revenir à un appel direct en thread pour ce besoin** |
+| `pkill -f <motif>` dans une commande shell lancée par Claude : toujours entourer le motif d'un caractère de classe (`pkill -9 -f "[s]moke_test"` plutôt que `"smoke_test"`) | `pkill -f` compare au texte complet de la ligne de commande de CHAQUE processus, y compris celle du shell qui exécute la commande `pkill` elle-même : si le motif cherché apparaît littéralement dans la commande `pkill` tapée (ex: `pkill -9 -f smoke_test`), elle se retrouve tuer son propre shell parent, interrompant silencieusement le reste de la commande composée (piège rencontré et diagnostiqué dans cette session). La classe de caractères (`[s]moke_test`) casse ce faux positif sans changer le motif recherché dans les VRAIS processus cibles |
 
 
 ---
@@ -550,7 +582,13 @@ en cause sans en connaître la raison) :
 - Internationalisation (i18n) : **fait**, sur l'ensemble du projet —
   interface graphique, CLI, galerie HTML générée et manuel utilisateur
   (anglais, français, allemand, espagnol — voir §2.2/§2.3/§5).
-- Modèles de planches contact personnalisables.
+- Modèles de planches contact personnalisables : **fait** — légendes EXIF
+  personnalisables, modèles de mise en page (grille/paysage/portrait/
+  grandes vignettes/libre) enregistrables en profils JSON réutilisables,
+  thèmes graphiques (Clair/Sombre/Neutre/Système, couleurs personnalisées)
+  et véritable aperçu avant génération, le tout partagé par les planches
+  JPEG/PDF et la galerie HTML (voir §2.2 `presentation/`, §2.3 section
+  avancée de l'interface graphique).
 - Formats d'export supplémentaires.
 - Personnalisation PDF plus poussée.
 - *(Optionnel, si budget)* Certificat de signature de code pour supprimer

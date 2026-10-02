@@ -93,7 +93,7 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
 <tr><th>Champ / Option</th><th>Description</th></tr>
 <tr><td><strong>Titre du projet</strong></td><td>Texte affiché en grand en haut de chaque planche. Sur la même ligne que le nom de l'auteur.</td></tr>
 <tr><td><strong>Nom de l'auteur</strong></td><td>Nom affiché sous le titre (en gras, plus petit).</td></tr>
-<tr><td><strong>Dossier d'entrée</strong></td><td>Dossier contenant les photographies à traiter (obligatoire). Affiche automatiquement un aperçu des photos du dossier (voir §3.3).</td></tr>
+<tr><td><strong>Dossier d'entrée</strong></td><td>Dossier contenant les photographies à traiter (obligatoire). Affiche automatiquement un aperçu des photos du dossier (voir §3.5).</td></tr>
 <tr><td><strong>Dossier de sortie</strong></td><td>Dossier où seront créés les résultats. Par défaut : <code>Portfolio/</code> dans le dossier source. Créé automatiquement s'il n'existe pas encore.</td></tr>
 <tr><td><strong>Recherche récursive</strong></td><td>Si coché, analyse aussi tous les sous-dossiers.</td></tr>
 <tr><td><strong>Images par planche</strong></td><td>Nombre de vignettes par page (8 à 48, par pas de 4). Sur la même ligne que les trois champs suivants.</td></tr>
@@ -113,10 +113,43 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
 
 <p>Si aucun des trois champs Titre / Auteur / Filigrane n'est renseigné, l'en-tête des planches affiche par défaut le nom du dossier d'entrée (sans son chemin complet), pour éviter une planche totalement anonyme.</p>
 
-<h3>3.3 Aperçu du dossier d'entrée</h3>
+<h3>3.3 Mise en page, légendes et thème (réglages avancés)</h3>
+<p>Un second bloc, replié par défaut (cliquer sur son titre pour l'ouvrir), permet de personnaliser en détail la mise en page, les légendes et le thème graphique des planches — sans rien changer au comportement par défaut tant qu'il reste fermé.</p>
+
+<p><strong>Mise en page</strong></p>
+<table>
+<tr><th>Réglage</th><th>Description</th></tr>
+<tr><td><strong>Modèle</strong></td><td>Grille (comportement par défaut), Paysage, Portrait, Grandes vignettes (réduit automatiquement le nombre de photos par page pour garantir de grandes vignettes), Libre (colonnes/lignes choisies manuellement).</td></tr>
+<tr><td><strong>Orientation</strong></td><td>Portrait ou Paysage pour la page elle-même.</td></tr>
+<tr><td><strong>Ajustement</strong></td><td>Comment chaque photo s'adapte à sa cellule : Contenir (comportement par défaut, aucun recadrage) ou Remplir (recadrage pour remplir toute la cellule).</td></tr>
+<tr><td><strong>Marges / Espacement</strong></td><td>En millimètres, autour de la page et entre les vignettes.</td></tr>
+<tr><td><strong>Colonnes / Lignes</strong></td><td>Uniquement pour le modèle Libre (0 = automatique).</td></tr>
+</table>
+
+<p><strong>Légendes par photo</strong></p>
+<p>Une légende peut être affichée sous (ou au-dessus de) chaque vignette, construite à partir des métadonnées EXIF de la photo :</p>
+<ul>
+<li>Nom de fichier, date de prise de vue, appareil (marque/modèle), objectif, focale, focale équivalente 35&nbsp;mm, ouverture, vitesse d'obturation, sensibilité ISO, dimensions de l'image, position GPS.</li>
+<li>Position, zone réservée (mm), nombre de lignes, taille de police et alignement sont tous réglables.</li>
+<li>Une métadonnée absente d'une photo donnée (par exemple pas de position GPS) est simplement omise de sa légende, sans jamais provoquer d'erreur.</li>
+</ul>
+<div class="note">
+La position GPS, si cochée, est affichée en clair sur la planche produite — à n'activer que si la diffusion de cette information est souhaitée (un avertissement est affiché au survol de la case correspondante).
+</div>
+
+<p><strong>Thème graphique</strong></p>
+<p>Quatre modes, appliqués de façon identique aux planches JPEG, au PDF et à la galerie HTML : <strong>Clair</strong> (par défaut), <strong>Sombre</strong>, <strong>Neutre</strong>, et <strong>Système</strong> (suit les préférences du système d'exploitation pour les planches/PDF ; pour la galerie HTML, suit le navigateur de chaque visiteur, avec un petit bouton discret lui permettant de basculer lui-même entre clair et sombre — voir §6). Les couleurs de fond, de texte, d'accent et de bordure peuvent en plus être personnalisées individuellement (format hexadécimal <code>#rrggbb</code>).</p>
+
+<p><strong>Enregistrer / Charger un profil</strong></p>
+<p>L'ensemble de ces réglages (mise en page, légendes et thème) peut être enregistré dans un fichier JSON réutilisable (bouton « Enregistrer le profil... »), puis rechargé plus tard (bouton « Charger un profil... ») — pratique pour appliquer les mêmes réglages à plusieurs projets, ou pour les partager. Ce même fichier peut être transmis à la ligne de commande via <code>--profile</code> (voir §4.1).</p>
+
+<h3>3.4 Aperçu de la planche</h3>
+<p>Le bouton « Aperçu de la planche... » affiche, dans une fenêtre dédiée, la planche telle qu'elle sera réellement produite — mise en page, légendes, thème et filigrane compris — à partir des premières photos du dossier d'entrée (le même nombre que la génération réelle en placerait sur cette première page). Pratique pour vérifier l'effet d'un réglage avant de lancer une génération complète, en particulier sur un dossier contenant de nombreuses photos.</p>
+
+<h3>3.5 Aperçu du dossier d'entrée</h3>
 <p>Dès qu'un dossier d'entrée valide est renseigné (au démarrage si un dossier était déjà mémorisé, ou après saisie/sélection), une bande d'aperçu affiche automatiquement les vignettes des photos qu'il contient, par pages de 10, avec une pagination numérotée (<code>← Précédent 1 … 4 5 6 … 19 Suivant →</code>). Le scan et la génération des vignettes se font en arrière-plan : l'interface ne se fige pas, même sur un dossier contenant des centaines de photos.</p>
 
-<h3>3.4 Sélecteur de dossier personnalisé</h3>
+<h3>3.6 Sélecteur de dossier personnalisé</h3>
 <p>Le bouton « Choisir... » (dossier d'entrée ou de sortie) ouvre un navigateur de dossiers entièrement construit par l'application, plutôt que la boîte de dialogue native du système :</p>
 <ul>
     <li><strong>Uniquement des dossiers</strong> sont affichés (aucun fichier), pour une navigation épurée.</li>
@@ -126,7 +159,7 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
     <li>Double-cliquer sur un dossier y entre ; le bouton <strong>« Sélectionner ce dossier »</strong> valide le dossier actuellement affiché.</li>
 </ul>
 
-<h3>3.5 Bouton « Afficher les résultats »</h3>
+<h3>3.7 Bouton « Afficher les résultats »</h3>
 <p>Après une génération réussie, ce bouton (à liste déroulante) permet d'ouvrir directement les résultats avec les applications par défaut du système, sans agrandir la fenêtre principale :</p>
 <table>
 <tr><th>Option</th><th>Action</th></tr>
@@ -137,7 +170,7 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
 </table>
 <p>Chaque option n'est activée que si l'élément correspondant a bien été généré (selon les cases cochées lors de la génération). Si aucune application par défaut n'est configurée sur le système pour un type de fichier donné, une fenêtre d'avertissement s'affiche, avec une suggestion d'application à installer.</p>
 
-<h3>3.6 Onglet « À propos »</h3>
+<h3>3.8 Onglet « À propos »</h3>
 <p>Affiche le numéro de version, la date de build, une courte description, l'auteur, la licence (<strong>GNU GPL v3</strong>) et un lien cliquable vers le dépôt GitHub du projet. Comprend aussi le sélecteur de langue — voir la note ci-dessous.</p>
 <div class="note">
 Un changement de langue ne prend effet qu'au redémarrage de l'application. La langue choisie est aussi utilisée pour la ligne de commande et pour toute galerie HTML générée par la suite — voir §4 et §5.
@@ -165,6 +198,7 @@ Un changement de langue ne prend effet qu'au redémarrage de l'application. La l
 <tr><td><code>--sort</code></td><td>Tri des photos : <code>date</code> (EXIF) ou <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Nombre d'images par page dans la galerie HTML (défaut : 48)</td><td><code>--html-per-page 60</code></td></tr>
 <tr><td><code>--language</code></td><td>Langue des messages et de la galerie HTML générée : <code>system</code> (défaut), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language fr</code></td></tr>
+<tr><td><code>--profile</code></td><td>Fichier de profil JSON (mise en page, légendes, thème — voir §3.3), produit par le bouton « Enregistrer le profil... » de l'interface graphique, ou écrit/modifié à la main. Un fichier absent ou invalide retombe silencieusement sur les réglages par défaut.</td><td><code>--profile mon-profil.json</code></td></tr>
 </table>
 <div class="note">
 Les valeurs de <code>--watermark-orientation</code> restent en français en interne quelle que soit la <code>--language</code> choisie (<code>"Horizontal"</code>, <code>"Diagonale horaire"</code>, <code>"Diagonale anti-horaire"</code>) — c'est le contrat interne du moteur, indépendant de la langue d'affichage.

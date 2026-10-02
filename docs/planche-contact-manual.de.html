@@ -93,7 +93,7 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
 <tr><th>Feld / Option</th><th>Beschreibung</th></tr>
 <tr><td><strong>Projekttitel</strong></td><td>Groß angezeigter Text oben auf jedem Kontaktbogen. Auf derselben Zeile wie der Name des Autors.</td></tr>
 <tr><td><strong>Name des Autors</strong></td><td>Unter dem Titel angezeigter Name (fett, kleiner).</td></tr>
-<tr><td><strong>Quellordner</strong></td><td>Ordner mit den zu verarbeitenden Fotografien (erforderlich). Zeigt automatisch eine Vorschau der Fotos im Ordner (siehe §3.3).</td></tr>
+<tr><td><strong>Quellordner</strong></td><td>Ordner mit den zu verarbeitenden Fotografien (erforderlich). Zeigt automatisch eine Vorschau der Fotos im Ordner (siehe §3.5).</td></tr>
 <tr><td><strong>Zielordner</strong></td><td>Ordner, in dem die Ergebnisse erstellt werden. Standard: <code>Portfolio/</code> im Quellordner. Wird automatisch erstellt, falls er noch nicht existiert.</td></tr>
 <tr><td><strong>Rekursive Suche</strong></td><td>Wenn aktiviert, werden auch alle Unterordner durchsucht.</td></tr>
 <tr><td><strong>Bilder pro Kontaktbogen</strong></td><td>Anzahl der Miniaturbilder pro Seite (8 bis 48, in Schritten von 4). Auf derselben Zeile wie die nächsten drei Felder.</td></tr>
@@ -113,10 +113,43 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
 
 <p>Wenn keines der Felder Titel / Autor / Wasserzeichen ausgefüllt ist, zeigt die Kopfzeile der Kontaktbögen standardmäßig den Namen des Quellordners (ohne vollständigen Pfad) an, um einen völlig anonymen Kontaktbogen zu vermeiden.</p>
 
-<h3>3.3 Vorschau des Quellordners</h3>
+<h3>3.3 Layout, Bildunterschriften und Thema (erweiterte Einstellungen)</h3>
+<p>Ein zweiter Bereich, standardmäßig eingeklappt (Titel anklicken zum Öffnen), ermöglicht die detaillierte Anpassung von Layout, Bildunterschriften und grafischem Thema der Kontaktbögen — ohne das Standardverhalten zu ändern, solange er geschlossen bleibt.</p>
+
+<p><strong>Layout</strong></p>
+<table>
+<tr><th>Einstellung</th><th>Beschreibung</th></tr>
+<tr><td><strong>Vorlage</strong></td><td>Raster (Standardverhalten), Querformat, Hochformat, Große Miniaturbilder (reduziert automatisch die Anzahl der Fotos pro Seite, um große Miniaturbilder zu gewährleisten), Frei (Spalten/Zeilen manuell gewählt).</td></tr>
+<tr><td><strong>Ausrichtung</strong></td><td>Hochformat oder Querformat für die Seite selbst.</td></tr>
+<tr><td><strong>Anpassungsmodus</strong></td><td>Wie sich jedes Foto in seine Zelle einfügt: Einpassen (Standardverhalten, kein Zuschneiden) oder Füllen (zugeschnitten, um die gesamte Zelle zu füllen).</td></tr>
+<tr><td><strong>Ränder / Abstand</strong></td><td>In Millimetern, um die Seite und zwischen den Miniaturbildern.</td></tr>
+<tr><td><strong>Spalten / Zeilen</strong></td><td>Nur für die Vorlage „Frei" (0 = automatisch).</td></tr>
+</table>
+
+<p><strong>Bildunterschriften pro Foto</strong></p>
+<p>Unter (oder über) jedem Miniaturbild kann eine Bildunterschrift angezeigt werden, die aus den EXIF-Metadaten des Fotos erstellt wird:</p>
+<ul>
+<li>Dateiname, Aufnahmedatum, Kamera (Marke/Modell), Objektiv, Brennweite, KB-äquivalente Brennweite (35&nbsp;mm), Blende, Verschlusszeit, ISO-Empfindlichkeit, Bildabmessungen, GPS-Position.</li>
+<li>Position, reservierter Bereich (mm), Zeilenanzahl, Schriftgröße und Ausrichtung sind alle einstellbar.</li>
+<li>Ein bei einem bestimmten Foto fehlendes Metadatenfeld (z. B. keine GPS-Daten) wird einfach aus seiner Bildunterschrift weggelassen, ohne jemals einen Fehler zu verursachen.</li>
+</ul>
+<div class="note">
+Die GPS-Position wird, falls aktiviert, im Klartext auf dem erstellten Kontaktbogen angezeigt — nur aktivieren, wenn diese Information tatsächlich weitergegeben werden soll (ein Warnhinweis erscheint beim Überfahren des entsprechenden Kontrollkästchens mit der Maus).
+</div>
+
+<p><strong>Grafisches Thema</strong></p>
+<p>Vier Modi, die identisch auf die JPEG-Kontaktbögen, das PDF und die HTML-Galerie angewendet werden: <strong>Hell</strong> (Standard), <strong>Dunkel</strong>, <strong>Neutral</strong> und <strong>System</strong> (folgt der Einstellung des Betriebssystems für Kontaktbögen/PDF; für die HTML-Galerie folgt es dem Browser jedes Besuchers, mit einer kleinen dezenten Schaltfläche, mit der er selbst zwischen Hell und Dunkel wechseln kann — siehe §6). Hintergrund-, Text-, Akzent- und Rahmenfarbe können zusätzlich einzeln angepasst werden (Hexadezimalformat <code>#rrggbb</code>).</p>
+
+<p><strong>Profil speichern / laden</strong></p>
+<p>Alle diese Einstellungen (Layout, Bildunterschriften und Thema) können in einer wiederverwendbaren JSON-Datei gespeichert werden (Schaltfläche „Profil speichern…"), und später wieder geladen werden (Schaltfläche „Profil laden…") — praktisch, um dieselben Einstellungen auf mehrere Projekte anzuwenden oder sie weiterzugeben. Dieselbe Datei kann über <code>--profile</code> an die Befehlszeile übergeben werden (siehe §4.1).</p>
+
+<h3>3.4 Vorschau des Kontaktbogens</h3>
+<p>Die Schaltfläche „Kontaktbogen-Vorschau…" zeigt in einem eigenen Fenster den Kontaktbogen genau so an, wie er tatsächlich erstellt wird — einschließlich Layout, Bildunterschriften, Thema und Wasserzeichen —, anhand der ersten Fotos im Quellordner (dieselbe Anzahl, die die tatsächliche Erstellung auf dieser ersten Seite platzieren würde). Praktisch, um die Wirkung einer Einstellung zu überprüfen, bevor eine vollständige Erstellung gestartet wird, insbesondere bei einem Ordner mit vielen Fotos.</p>
+
+<h3>3.5 Vorschau des Quellordners</h3>
 <p>Sobald ein gültiger Quellordner angegeben ist (beim Start, wenn bereits ein Ordner gespeichert war, oder nach Eingabe/Auswahl), zeigt ein Vorschaustreifen automatisch Miniaturbilder der enthaltenen Fotos an, in Seiten zu je 10, mit nummerierter Seitennavigation (<code>← Zurück 1 … 4 5 6 … 19 Weiter →</code>). Das Scannen und Erstellen der Miniaturbilder erfolgt im Hintergrund: Die Benutzeroberfläche friert nicht ein, selbst bei einem Ordner mit Hunderten von Fotos.</p>
 
-<h3>3.4 Eigener Ordnerauswahldialog</h3>
+<h3>3.6 Eigener Ordnerauswahldialog</h3>
 <p>Die Schaltfläche „Auswählen..." (Quell- oder Zielordner) öffnet einen vollständig von der Anwendung erstellten Ordner-Browser, anstelle des systemeigenen Dialogs:</p>
 <ul>
     <li>Es werden <strong>ausschließlich Ordner</strong> angezeigt (keine Dateien), für eine übersichtliche Navigation.</li>
@@ -126,7 +159,7 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
     <li>Ein Doppelklick auf einen Ordner öffnet ihn; die Schaltfläche <strong>„Diesen Ordner auswählen"</strong> bestätigt den aktuell angezeigten Ordner.</li>
 </ul>
 
-<h3>3.5 Schaltfläche „Ergebnisse anzeigen"</h3>
+<h3>3.7 Schaltfläche „Ergebnisse anzeigen"</h3>
 <p>Nach einer erfolgreichen Erstellung ermöglicht diese Auswahlschaltfläche, die Ergebnisse direkt mit den Standardanwendungen des Systems zu öffnen, ohne das Hauptfenster zu vergrößern:</p>
 <table>
 <tr><th>Option</th><th>Aktion</th></tr>
@@ -137,7 +170,7 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
 </table>
 <p>Jede Option ist nur aktiviert, wenn das entsprechende Element tatsächlich erstellt wurde (je nach bei der Erstellung ausgewählten Kontrollkästchen). Ist auf dem System keine Standardanwendung für einen bestimmten Dateityp konfiguriert, erscheint ein Warnfenster mit einem Vorschlag für eine zu installierende Anwendung.</p>
 
-<h3>3.6 Reiter „Über"</h3>
+<h3>3.8 Reiter „Über"</h3>
 <p>Zeigt die Versionsnummer, das Build-Datum, eine kurze Beschreibung, den Autor, die Lizenz (<strong>GNU GPL v3</strong>) und einen anklickbaren Link zum GitHub-Repository des Projekts an. Enthält außerdem die Sprachauswahl — siehe Hinweis unten.</p>
 <div class="note">
 Eine Sprachänderung wird erst nach einem Neustart der Anwendung wirksam. Die gewählte Sprache wird auch für die Kommandozeile und für jede danach erstellte HTML-Galerie verwendet — siehe §4 und §5.
@@ -165,6 +198,7 @@ Eine Sprachänderung wird erst nach einem Neustart der Anwendung wirksam. Die ge
 <tr><td><code>--sort</code></td><td>Sortierung der Fotos: <code>date</code> (EXIF) oder <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Anzahl der Bilder pro HTML-Galerieseite (Standard: 48)</td><td><code>--html-per-page 60</code></td></tr>
 <tr><td><code>--language</code></td><td>Sprache der Meldungen und der erstellten HTML-Galerie: <code>system</code> (Standard), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language de</code></td></tr>
+<tr><td><code>--profile</code></td><td>JSON-Profildatei (Layout, Bildunterschriften, Thema — siehe §3.3), erstellt über die Schaltfläche „Profil speichern…" der grafischen Oberfläche, oder von Hand geschrieben/bearbeitet. Eine fehlende oder ungültige Datei greift stillschweigend auf die Standardeinstellungen zurück.</td><td><code>--profile mein-profil.json</code></td></tr>
 </table>
 <div class="note">
 Die Werte für <code>--watermark-orientation</code> bleiben intern immer auf Französisch, unabhängig von der gewählten <code>--language</code> (<code>"Horizontal"</code>, <code>"Diagonale horaire"</code>, <code>"Diagonale anti-horaire"</code>) — dies ist die interne Vorgabe des Programmkerns und hat nichts mit der Anzeigesprache zu tun.

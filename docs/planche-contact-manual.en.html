@@ -93,7 +93,7 @@ RAW support relies on the <code>rawpy</code> library, installed automatically in
 <tr><th>Field / Option</th><th>Description</th></tr>
 <tr><td><strong>Project title</strong></td><td>Text shown in large type at the top of each sheet. On the same line as the author's name.</td></tr>
 <tr><td><strong>Author name</strong></td><td>Name shown under the title (bold, smaller).</td></tr>
-<tr><td><strong>Input folder</strong></td><td>Folder containing the photographs to process (required). Automatically shows a preview of the photos in the folder (see §3.3).</td></tr>
+<tr><td><strong>Input folder</strong></td><td>Folder containing the photographs to process (required). Automatically shows a preview of the photos in the folder (see §3.5).</td></tr>
 <tr><td><strong>Output folder</strong></td><td>Folder where the results will be created. Default: <code>Portfolio/</code> inside the source folder. Created automatically if it doesn't exist yet.</td></tr>
 <tr><td><strong>Recursive search</strong></td><td>If checked, also scans all subfolders.</td></tr>
 <tr><td><strong>Images per sheet</strong></td><td>Number of thumbnails per page (8 to 48, in steps of 4). On the same line as the next three fields.</td></tr>
@@ -113,10 +113,43 @@ RAW support relies on the <code>rawpy</code> library, installed automatically in
 
 <p>If none of the Title / Author / Watermark fields is filled in, the sheet header defaults to showing the input folder's name (without its full path), to avoid a completely anonymous sheet.</p>
 
-<h3>3.3 Input folder preview</h3>
+<h3>3.3 Layout, captions and theme (advanced settings)</h3>
+<p>A second block, collapsed by default (click its title to expand it), lets you fine-tune the layout, captions and graphical theme of the contact sheets — without changing the default behavior at all while it stays closed.</p>
+
+<p><strong>Layout</strong></p>
+<table>
+<tr><th>Setting</th><th>Description</th></tr>
+<tr><td><strong>Template</strong></td><td>Grid (default behavior), Landscape, Portrait, Large thumbnails (automatically reduces the number of photos per page to keep thumbnails large), Free (columns/rows chosen manually).</td></tr>
+<tr><td><strong>Orientation</strong></td><td>Portrait or Landscape for the page itself.</td></tr>
+<tr><td><strong>Fit mode</strong></td><td>How each photo fits its cell: Contain (default behavior, no cropping) or Fill (cropped to fill the whole cell).</td></tr>
+<tr><td><strong>Margins / Spacing</strong></td><td>In millimeters, around the page and between thumbnails.</td></tr>
+<tr><td><strong>Columns / Rows</strong></td><td>Only for the Free template (0 = automatic).</td></tr>
+</table>
+
+<p><strong>Per-photo captions</strong></p>
+<p>A caption can be shown below (or above) each thumbnail, built from the photo's EXIF metadata:</p>
+<ul>
+<li>Filename, date taken, camera (make/model), lens, focal length, 35&nbsp;mm-equivalent focal length, aperture, shutter speed, ISO sensitivity, image dimensions, GPS position.</li>
+<li>Position, reserved area (mm), number of lines, font size and alignment are all configurable.</li>
+<li>A metadata field missing from a given photo (for example no GPS data) is simply left out of its caption, never causing an error.</li>
+</ul>
+<div class="note">
+GPS position, if enabled, is shown in plain text on the generated sheet — only turn it on if you actually want to share that information (a warning is shown when hovering over the corresponding checkbox).
+</div>
+
+<p><strong>Graphical theme</strong></p>
+<p>Four modes, applied identically to the JPEG contact sheets, the PDF and the HTML gallery: <strong>Light</strong> (default), <strong>Dark</strong>, <strong>Neutral</strong>, and <strong>System</strong> (follows the operating system's preference for sheets/PDF; for the HTML gallery, it follows each visitor's own browser, with a small discreet button letting them switch between light and dark themselves — see §6). Background, text, accent and border colors can also be customized individually (hex format <code>#rrggbb</code>).</p>
+
+<p><strong>Save / Load a profile</strong></p>
+<p>All of these settings (layout, captions and theme) can be saved to a reusable JSON file ("Save profile..." button), then loaded again later ("Load profile..." button) — handy for applying the same settings to several projects, or for sharing them. This same file can be passed to the command line via <code>--profile</code> (see §4.1).</p>
+
+<h3>3.4 Contact sheet preview</h3>
+<p>The "Preview sheet..." button shows, in a dedicated window, the contact sheet exactly as it will actually be produced — layout, captions, theme and watermark included — using the first photos in the input folder (the same number the real generation would place on that first page). Handy for checking the effect of a setting before running a full generation, especially on a folder containing many photos.</p>
+
+<h3>3.5 Input folder preview</h3>
 <p>As soon as a valid input folder is set (at startup if a folder was already remembered, or after typing/choosing one), a preview strip automatically shows thumbnails of the photos it contains, in pages of 10, with numbered pagination (<code>← Previous 1 … 4 5 6 … 19 Next →</code>). Scanning and generating thumbnails happens in the background: the interface never freezes, even for a folder containing hundreds of photos.</p>
 
-<h3>3.4 Custom folder picker</h3>
+<h3>3.6 Custom folder picker</h3>
 <p>The "Choose..." button (input or output folder) opens a folder browser entirely built by the application, rather than the system's native dialog:</p>
 <ul>
     <li><strong>Only folders</strong> are shown (no files), for a clean navigation experience.</li>
@@ -126,7 +159,7 @@ RAW support relies on the <code>rawpy</code> library, installed automatically in
     <li>Double-clicking a folder enters it; the <strong>"Select this folder"</strong> button confirms the currently displayed folder.</li>
 </ul>
 
-<h3>3.5 "View results" button</h3>
+<h3>3.7 "View results" button</h3>
 <p>After a successful generation, this dropdown button lets you open the results directly with the system's default applications, without enlarging the main window:</p>
 <table>
 <tr><th>Option</th><th>Action</th></tr>
@@ -137,7 +170,7 @@ RAW support relies on the <code>rawpy</code> library, installed automatically in
 </table>
 <p>Each option is only enabled if the corresponding item was actually generated (based on the checkboxes selected during generation). If no default application is configured on the system for a given file type, a warning window appears, suggesting an application to install.</p>
 
-<h3>3.6 "About" tab</h3>
+<h3>3.8 "About" tab</h3>
 <p>Shows the version number, build date, a short description, the author, the license (<strong>GNU GPL v3</strong>) and a clickable link to the project's GitHub repository. Also includes the language selector — see the note below.</p>
 <div class="note">
 Changing the language takes effect after restarting the application. The chosen language is also used for the command line and for any HTML gallery generated afterwards — see §4 and §5.
@@ -165,6 +198,7 @@ Changing the language takes effect after restarting the application. The chosen 
 <tr><td><code>--sort</code></td><td>Sort photos by: <code>date</code> (EXIF) or <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Number of images per HTML gallery page (default: 48)</td><td><code>--html-per-page 60</code></td></tr>
 <tr><td><code>--language</code></td><td>Language of the messages and of the generated HTML gallery: <code>system</code> (default), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language en</code></td></tr>
+<tr><td><code>--profile</code></td><td>JSON profile file (layout, captions, theme — see §3.3), produced by the "Save profile..." button in the graphical interface, or written/edited by hand. A missing or invalid file silently falls back to the default settings.</td><td><code>--profile my-profile.json</code></td></tr>
 </table>
 <div class="note">
 The values for <code>--watermark-orientation</code> stay in French internally regardless of the chosen <code>--language</code> (<code>"Horizontal"</code>, <code>"Diagonale horaire"</code>, <code>"Diagonale anti-horaire"</code>) — this is the engine's internal contract and is unrelated to the display language.
