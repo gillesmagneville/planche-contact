@@ -32,6 +32,9 @@ ENV/
 *.swp
 *.swo
 
+# Tests
+.pytest_cache/
+
 # Fichiers temporaires
 *.log
 *.tmp
