@@ -3,30 +3,34 @@
 Tests du moteur de mise en page (portfolio/presentation/layout_engine.py).
 
 La partie la plus importante de ce fichier est la non-régression du modèle
-"grid" : une copie fidèle de l'algorithme ACTUEL de
-ContactSheetGenerator.create_contact_sheet() (avant toute intégration du
-nouveau moteur) sert de référence, et doit produire exactement les mêmes
-valeurs (thumb_size, cols) que compute_page_layout() pour un Profil par
-défaut, sur toute la plage de réglages existants (8 à 48 images/planche,
-par pas de 4 - valeurs réellement proposées par le curseur de l'interface
-graphique - et les 5 formats de page prix en charge). Si cette référence
-diverge un jour volontairement de contactsheet.py (bug corrigé des deux
-côtés), les deux doivent être mis à jour ensemble.
+"grid" : une copie fidèle de l'algorithme ACTUEL (corrigé - voir
+CHANGELOG.md) de ContactSheetGenerator.create_contact_sheet() sert de
+référence, et doit produire exactement les mêmes valeurs (thumb_size,
+cols) que compute_page_layout() pour un Profil par défaut, sur toute la
+plage de réglages existants (8 à 48 images/planche, par pas de 4 - valeurs
+réellement proposées par le curseur de l'interface graphique - et les 5
+formats de page pris en charge). Si cette référence diverge un jour de
+contactsheet.py, les deux doivent être mis à jour ensemble.
 """
 import math
 
 import pytest
 
-from portfolio.presentation import Profile, LayoutSettings, compute_page_layout
+from portfolio.presentation import (
+    Profile, LayoutSettings, compute_page_layout, compute_effective_per_page,
+)
 from portfolio.presentation.layout_engine import (
     PAPER_SIZES_MM, mm_to_px, canvas_size_px, MIN_THUMB_SIZE_PX,
+    LARGE_THUMBS_MAX_COLUMNS_TESTED, LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE,
 )
 
 
 def _reference_grid_fit(num_per_sheet: int, page_format: str = "A4") -> tuple[int, int]:
     """Copie fidèle, pour comparaison, de l'algorithme actuellement codé
-    en dur dans ContactSheetGenerator.create_contact_sheet() (avant
-    intégration du nouveau moteur) - voir portfolio/contactsheet.py."""
+    en dur dans ContactSheetGenerator.create_contact_sheet() - voir
+    portfolio/contactsheet.py (y compris son correctif du débordement
+    vertical, voir CHANGELOG.md : l'espacement entre cellules est
+    retranché aussi bien de la hauteur disponible que de la largeur)."""
     DPI = 300
     width_mm, height_mm = PAPER_SIZES_MM.get(page_format, PAPER_SIZES_MM["A4"])
     canvas_w, canvas_h = int(width_mm * DPI / 25.4), int(height_mm * DPI / 25.4)
@@ -48,8 +52,11 @@ def _reference_grid_fit(num_per_sheet: int, page_format: str = "A4") -> tuple[in
 
     thumb_size = max(best_thumb_size, 70)
     cols = best_cols
+    rows = math.ceil(num_per_sheet / cols)
     max_thumb_w = (available_w - (cols - 1) * spacing) // cols
     thumb_size = min(thumb_size, max_thumb_w)
+    max_thumb_h = (available_h - (rows - 1) * spacing) // rows
+    thumb_size = min(thumb_size, max_thumb_h)
     return thumb_size, cols
 
 
@@ -88,10 +95,10 @@ def test_grid_cells_count_matches_actual_photo_count_not_per_page():
 def test_cells_do_not_overlap_and_stay_within_canvas():
     """Vérification géométrique générique, indépendante de contactsheet.py :
     quel que soit le modèle, aucune cellule ne doit déborder horizontalement
-    du canevas ni en chevaucher une autre. Le débordement VERTICAL n'est
-    vérifié que pour les modèles nouveaux (voir test dédié ci-dessous pour
-    "grid", qui hérite volontairement d'un défaut préexistant de
-    contactsheet.py)."""
+    NI verticalement du canevas, ni en chevaucher une autre. Le débordement
+    vertical est désormais vérifié pour "grid" comme pour les autres
+    modèles, puisque contactsheet.py lui-même a été corrigé (voir
+    CHANGELOG.md) et que ce module reproduit son comportement corrigé."""
     for template in ("grid", "landscape", "portrait", "large_thumbs"):
         profile = Profile(layout=LayoutSettings(template=template, per_page=24, page_format="A4"))
         page = compute_page_layout(profile, photo_count=24)
@@ -101,28 +108,23 @@ def test_cells_do_not_overlap_and_stay_within_canvas():
         for cell in page.cells:
             assert 0 <= cell.photo_x
             assert cell.photo_x + cell.photo_w <= page.canvas_w, template
-            if template != "grid":
-                assert cell.photo_y + cell.photo_h <= page.canvas_h, template
+            assert cell.photo_y + cell.photo_h <= page.canvas_h, template
             assert (cell.row, cell.col) not in seen_positions
             seen_positions.add((cell.row, cell.col))
 
 
-def test_grid_known_preexisting_vertical_overflow_bug():
-    """CARACTÉRISATION D'UN DÉFAUT PRÉEXISTANT, découvert en écrivant ces
-    tests (pas introduit par ce module) : l'algorithme ACTUEL de
-    contactsheet.py (reproduit fidèlement par le modèle "grid") ne retranche
-    l'espacement entre cellules que de la LARGEUR disponible, jamais de la
-    hauteur (voir _apply_spacing_clamp) - pour certaines combinaisons de
-    per_page/format de page, les vignettes de la dernière ligne peuvent donc
-    déborder du bas physique de la planche. Ce test documente volontairement
-    ce comportement actuel plutôt que de le masquer ; si contactsheet.py est
-    corrigé un jour pour ce cas précis (hors périmètre de cette étape, qui ne
-    doit rien changer au rendu "grid" existant - voir docstring du module),
-    ce test devra être mis à jour en même temps."""
+def test_grid_vertical_overflow_bug_is_fixed():
+    """Non-régression du correctif apporté à contactsheet.py (voir
+    CHANGELOG.md) : le cas ayant révélé le débordement vertical (24 images
+    en A4) ne doit plus déborder du bas physique de la planche, pour le
+    modèle "grid" comme pour les autres. Avant le correctif, ce même test
+    (alors nommé test_grid_known_preexisting_vertical_overflow_bug)
+    vérifiait l'inverse - voir l'historique Git pour l'ancienne
+    caractérisation du défaut."""
     profile = Profile(layout=LayoutSettings(template="grid", per_page=24, page_format="A4"))
     page = compute_page_layout(profile, photo_count=24)
     last_cell = page.cells[-1]
-    assert last_cell.photo_y + last_cell.photo_h > page.canvas_h
+    assert last_cell.photo_y + last_cell.photo_h <= page.canvas_h
 
 
 def test_caption_position_below_reserves_vertical_space():
@@ -209,42 +211,78 @@ def test_free_template_without_any_override_behaves_like_grid():
 
 
 def test_large_thumbs_never_exceeds_its_column_cap():
-    """Garantie RÉELLE du modèle "large_thumbs" tel qu'implémenté : le
-    nombre de colonnes ne dépasse jamais LARGE_THUMBS_MAX_COLUMNS_TESTED,
-    quel que soit per_page. Il ne garantit PAS une vignette plus grande que
-    "grid" à per_page égal : restreindre l'espace de colonnes exploré par
-    la même recherche de maximisation ne peut mathématiquement jamais faire
-    mieux, seulement égal ou moins bon, si per_page force de toute façon
-    beaucoup de lignes (voir le commentaire détaillé dans
-    compute_page_layout, qui signale ce point comme à valider avec le
-    mainteneur avant l'intégration réelle de ce modèle)."""
-    from portfolio.presentation.layout_engine import LARGE_THUMBS_MAX_COLUMNS_TESTED
-
+    """Le nombre de colonnes ne dépasse jamais
+    LARGE_THUMBS_MAX_COLUMNS_TESTED, quel que soit per_page."""
     for per_page in (8, 12, 24, 48):
         profile = Profile(layout=LayoutSettings(template="large_thumbs", per_page=per_page))
         page = compute_page_layout(profile, photo_count=per_page)
         assert page.cols <= LARGE_THUMBS_MAX_COLUMNS_TESTED
 
 
-def test_large_thumbs_matches_grid_columns_when_per_page_is_already_modest():
-    """Dans le cas d'usage réellement visé (peu de photos par page), la
-    restriction de colonnes de "large_thumbs" choisit le MÊME nombre de
-    colonnes que la recherche non restreinte de "grid" (déjà dans la plage
-    autorisée). La taille de vignette peut légèrement différer : "grid"
-    reste pixel-identique au bug préexistant de contactsheet.py (pas de
-    clampage vertical, voir test_grid_known_preexisting_vertical_overflow_bug),
-    tandis que "large_thumbs", nouveau et sans contrainte de
-    rétrocompatibilité, applique ce clampage et ne déborde donc jamais -
-    au prix d'une vignette parfois légèrement plus petite que la valeur
-    (buguée) de "grid" à colonnes égales."""
-    profile_grid = Profile(layout=LayoutSettings(template="grid", per_page=8))
-    profile_large = Profile(layout=LayoutSettings(template="large_thumbs", per_page=8))
+def test_large_thumbs_reduces_effective_per_page_above_its_cap():
+    """Cahier des charges : "pour le modèle « grandes vignettes », qu'il
+    réduise lui-même ce nombre pour garantir de grandes vignettes dans
+    tous les cas." compute_effective_per_page() doit donc plafonner le
+    nombre de photos réellement placées par page à
+    LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE dès que per_page le dépasse, et
+    laisser per_page inchangé en-deçà."""
+    for per_page in (8, 12, 24, 48):
+        profile = Profile(layout=LayoutSettings(template="large_thumbs", per_page=per_page))
+        expected = min(per_page, LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE)
+        assert compute_effective_per_page(profile) == expected
 
-    grid_page = compute_page_layout(profile_grid, photo_count=8)
-    large_page = compute_page_layout(profile_large, photo_count=8)
+        page = compute_page_layout(profile, photo_count=per_page)
+        assert page.effective_per_page == expected
+        assert len(page.cells) == expected
+
+
+def test_large_thumbs_guarantees_same_thumb_size_whatever_per_page_is_configured():
+    """LA garantie recherchée par le cahier des charges : contrairement à
+    l'ancienne conception (qui ne bridait que le nombre de colonnes
+    testées, donc ne garantissait rien dès que per_page forçait beaucoup
+    de lignes - voir l'historique Git), la taille de vignette de
+    "large_thumbs" ne dépend plus QUE du format de page une fois per_page
+    au-delà de LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE : demander 12, 24 ou 48
+    photos par planche produit alors exactement la même géométrie."""
+    pages = []
+    for per_page in (LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE, 24, 48):
+        profile = Profile(layout=LayoutSettings(template="large_thumbs", per_page=per_page, page_format="A4"))
+        pages.append(compute_page_layout(profile, photo_count=per_page))
+
+    reference = pages[0]
+    for page in pages[1:]:
+        assert page.thumb_size == reference.thumb_size
+        assert page.cols == reference.cols
+        assert page.rows == reference.rows
+
+
+def test_large_thumbs_never_overflows_canvas_regardless_of_per_page():
+    for per_page in (8, 12, 24, 48):
+        profile = Profile(layout=LayoutSettings(template="large_thumbs", per_page=per_page, page_format="A4"))
+        page = compute_page_layout(profile, photo_count=per_page)
+        for cell in page.cells:
+            assert cell.photo_x + cell.photo_w <= page.canvas_w
+            assert cell.photo_y + cell.photo_h <= page.canvas_h
+
+
+def test_large_thumbs_matches_grid_columns_when_per_page_is_already_modest():
+    """Dans le cas d'usage réellement visé (peu de photos par page, sous le
+    plafond LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE), la réduction d'effectif
+    de "large_thumbs" ne change rien (per_page déjà sous le plafond) : seule
+    la restriction de colonnes testées distingue encore ce modèle de "grid"
+    - avec un per_page assez petit pour que les deux recherches aboutissent
+    au même nombre de colonnes, les deux produisent une géométrie identique
+    (les deux appliquent désormais le même clampage d'espacement, voir
+    CHANGELOG.md)."""
+    per_page = min(8, LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE)
+    profile_grid = Profile(layout=LayoutSettings(template="grid", per_page=per_page))
+    profile_large = Profile(layout=LayoutSettings(template="large_thumbs", per_page=per_page))
+
+    grid_page = compute_page_layout(profile_grid, photo_count=per_page)
+    large_page = compute_page_layout(profile_large, photo_count=per_page)
 
     assert large_page.cols == grid_page.cols
-    assert large_page.thumb_size <= grid_page.thumb_size
+    assert large_page.thumb_size == grid_page.thumb_size
     for cell in large_page.cells:
         assert cell.photo_y + cell.photo_h <= large_page.canvas_h
 

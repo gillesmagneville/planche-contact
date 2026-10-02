@@ -32,6 +32,7 @@ from .layout_engine import (
     PageLayout,
     CellLayout,
     compute_page_layout,
+    compute_effective_per_page,
     canvas_size_px,
     mm_to_px,
 )
@@ -48,6 +49,7 @@ __all__ = [
     "PageLayout",
     "CellLayout",
     "compute_page_layout",
+    "compute_effective_per_page",
     "canvas_size_px",
     "mm_to_px",
 ]

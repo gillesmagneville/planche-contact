@@ -9,17 +9,15 @@ TOUJOURS la même géométrie, par construction (cahier des charges §5 :
 [...] pour éviter qu'une même règle de mise en page soit implémentée
 différemment dans plusieurs parties du programme").
 
-Le modèle "grid" reproduit EXACTEMENT l'algorithme actuellement codé en dur
-dans ContactSheetGenerator.create_contact_sheet() (recherche du nombre de
+Le modèle "grid" reproduit l'algorithme de
+ContactSheetGenerator.create_contact_sheet() (recherche du nombre de
 colonnes maximisant la taille des vignettes, réservation fixe de 180 px
-pour l'en-tête, clampage de la largeur de vignette après coup pour tenir
-compte de l'espacement) - y compris ses petites imperfections déjà
-présentes (ex : l'espacement vertical n'est pas clampé symétriquement à
-l'espacement horizontal). Ce portage est DÉLIBÉRÉMENT fidèle au pixel près :
-l'objectif de cette étape est de centraliser le calcul, pas de corriger un
-comportement existant - toute amélioration de l'algorithme "grid" lui-même
-se fera dans une étape ultérieure séparée, explicitement validée comme
-telle (voir CHANGELOG.md), jamais mélangée à ce portage.
+pour l'en-tête), Y COMPRIS son correctif du débordement vertical (voir
+CHANGELOG.md « Planches contact : les vignettes de la dernière ligne
+pouvaient légèrement déborder... ») : l'espacement entre cellules est
+désormais retranché aussi bien de la hauteur disponible que de la largeur,
+pour TOUS les modèles sans exception - il n'existe plus de modèle
+« fidèle au bug » depuis que contactsheet.py lui-même a été corrigé.
 
 La galerie HTML (htmlgallery.py) n'utilise PAS directement les coordonnées
 en pixels de ce module (une grille CSS responsive n'a pas de sens en
@@ -68,6 +66,31 @@ GRID_MAX_COLUMNS_TESTED = 8
 #: d'en caser le plus possible par page.
 LARGE_THUMBS_MAX_COLUMNS_TESTED = 4
 
+#: Nombre de lignes maximal admis par le modèle "grandes vignettes", pour
+#: la même raison que LARGE_THUMBS_MAX_COLUMNS_TESTED ci-dessus : brider
+#: UNIQUEMENT le nombre de colonnes testées ne suffit pas à garantir de
+#: grandes vignettes, puisque rien n'empêche alors un nombre de LIGNES
+#: élevé dès que `per_page` est grand (ex : 48 photos sur 4 colonnes
+#: imposerait 12 lignes, donnant des vignettes minuscules - l'inverse du
+#: but recherché). Voir LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE et
+#: compute_effective_per_page().
+LARGE_THUMBS_MAX_ROWS_TESTED = 2
+
+#: Nombre de photos que le modèle "grandes vignettes" s'autorise à placer
+#: au maximum sur UNE page, INDÉPENDAMMENT du nombre de photos par planche
+#: réellement configuré par l'utilisateur (layout.per_page) : cahier des
+#: charges - "qu'il réduise lui-même ce nombre pour garantir de grandes
+#: vignettes dans tous les cas". Avec ce nombre de cellules borné (et donc
+#: un nombre de lignes/colonnes borné via la recherche de
+#: _grid_search), la taille de vignette obtenue ne dépend plus QUE du
+#: format de page - jamais du nombre de photos par planche demandé. Les
+#: photos excédentaires (au-delà de cette limite) basculent sur les pages
+#: suivantes - c'est le rôle de compute_effective_per_page(), dont la
+#: valeur doit être utilisée par l'appelant pour la pagination réelle
+#: (répartition des photos en pages), pas layout.per_page, quand ce modèle
+#: est sélectionné.
+LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE = LARGE_THUMBS_MAX_COLUMNS_TESTED * LARGE_THUMBS_MAX_ROWS_TESTED
+
 #: Taille de vignette minimale absolue (px), quel que soit le modèle -
 #: reprise de contactsheet.py (max(best_thumb_size, 70)).
 MIN_THUMB_SIZE_PX = 70
@@ -86,6 +109,23 @@ def canvas_size_px(page_format: str, orientation: str = "portrait", dpi: int = D
     if orientation == "landscape":
         width_mm, height_mm = height_mm, width_mm
     return mm_to_px(width_mm, dpi), mm_to_px(height_mm, dpi)
+
+
+def compute_effective_per_page(profile: Profile) -> int:
+    """Nombre de photos RÉELLEMENT placées sur une page pour le modèle de
+    mise en page de ce Profil. Égal à profile.layout.per_page pour tous
+    les modèles (comportement actuel inchangé), SAUF "large_thumbs" qui se
+    réduit lui-même (voir LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE) pour
+    garantir de grandes vignettes quel que soit per_page configuré.
+
+    L'appelant responsable de la pagination (répartition des photos d'une
+    génération sur plusieurs pages) doit se baser sur CETTE valeur, et non
+    directement sur profile.layout.per_page, pour obtenir le nombre réel
+    de photos par page une fois ce module intégré à contactsheet.py."""
+    layout = profile.layout
+    if layout.template == "large_thumbs":
+        return min(layout.per_page, LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE)
+    return layout.per_page
 
 
 @dataclass
@@ -110,8 +150,15 @@ class CellLayout:
 class PageLayout:
     """Géométrie complète d'une page. `cells` ne contient que les
     emplacements effectivement occupés par une photo (jusqu'à
-    min(photo_count, layout.per_page)), jamais de cellules vides -
-    cohérent avec la boucle actuelle de create_contact_sheet()."""
+    min(photo_count, effective_per_page)), jamais de cellules vides -
+    cohérent avec la boucle actuelle de create_contact_sheet().
+
+    `effective_per_page` est le nombre de photos pour lequel cette
+    géométrie a été calculée - identique à profile.layout.per_page pour
+    tous les modèles, sauf "large_thumbs" (voir
+    compute_effective_per_page()). C'est cette valeur, pas
+    profile.layout.per_page, qui doit piloter la pagination une fois ce
+    module intégré à contactsheet.py."""
     canvas_w: int
     canvas_h: int
     margin_px: int
@@ -120,6 +167,7 @@ class PageLayout:
     cols: int
     rows: int
     thumb_size: int
+    effective_per_page: int = 0
     cells: list[CellLayout] = field(default_factory=list)
 
 
@@ -138,43 +186,31 @@ def _reserve_caption_px(profile: Profile) -> tuple[int, int]:
 
 def _apply_spacing_clamp(thumb_size: int, available_w: int, available_h: int,
                           cols: int, rows: int, spacing_px: int,
-                          caption_w_px: int, caption_h_px: int,
-                          clamp_vertical_spacing: bool) -> int:
+                          caption_w_px: int, caption_h_px: int) -> int:
     """Clampage a posteriori pour tenir compte de l'espacement ENTRE
     cellules, absent du calcul initial de cell_w/cell_h (qui divise
     seulement l'espace disponible par le nombre de colonnes/lignes, sans
-    retrancher l'espacement entre elles).
-
-    `clamp_vertical_spacing=False` reproduit fidèlement
-    contactsheet.py : seul l'espacement HORIZONTAL est clampé (bug
-    préexistant découvert en écrivant les tests de ce module - voir
-    docstring du module et PROJECT_CONTEXT.md ; conservé tel quel pour le
-    modèle "grid", qui doit rester pixel-identique au comportement actuel).
-    `clamp_vertical_spacing=True` corrige ce défaut pour les NOUVEAUX
-    modèles (large_thumbs/landscape/portrait, et le calcul explicite de
-    "free") qui n'ont aucune contrainte de rétrocompatibilité : les
-    cellules ne peuvent alors jamais déborder du bas de la page."""
+    retrancher l'espacement entre elles) - tant horizontalement (entre
+    colonnes) que verticalement (entre lignes), pour tous les modèles sans
+    exception : voir le docstring du module et CHANGELOG.md pour le
+    correctif correspondant apporté à contactsheet.py."""
     max_thumb_w = (available_w - (cols - 1) * spacing_px) // cols - caption_w_px
     thumb_size = min(thumb_size, max(1, max_thumb_w))
-    if clamp_vertical_spacing:
-        max_thumb_h = (available_h - (rows - 1) * spacing_px) // rows - caption_h_px
-        thumb_size = min(thumb_size, max(1, max_thumb_h))
+    max_thumb_h = (available_h - (rows - 1) * spacing_px) // rows - caption_h_px
+    thumb_size = min(thumb_size, max(1, max_thumb_h))
     return thumb_size
 
 
 def _grid_search(available_w: int, available_h: int, per_page: int,
                   spacing_px: int, max_columns_tested: int,
-                  caption_w_px: int, caption_h_px: int,
-                  clamp_vertical_spacing: bool = False) -> tuple[int, int]:
+                  caption_w_px: int, caption_h_px: int) -> tuple[int, int]:
     """Coeur de l'algorithme "grid" (et de "large_thumbs"/"landscape"/
-    "portrait", qui n'en diffèrent que par `max_columns_tested` et/ou un
-    post-traitement) : cherche, parmi les nombres de colonnes testés,
-    celui qui maximise la taille de vignette obtenue. Reproduit fidèlement
-    l'algorithme historique de contactsheet.py quand
-    clamp_vertical_spacing=False (son comportement par défaut), étendu
-    pour réserver l'espace de légende par cellule (nul quand il n'y a pas
-    de légende, donc strictement équivalent à l'algorithme d'origine dans
-    ce cas). Renvoie (thumb_size, cols)."""
+    "portrait", qui n'en diffèrent que par `per_page`/`max_columns_tested`
+    et/ou un post-traitement) : cherche, parmi les nombres de colonnes
+    testés, celui qui maximise la taille de vignette obtenue. Étendu pour
+    réserver l'espace de légende par cellule (nul quand il n'y a pas de
+    légende, donc strictement équivalent à l'algorithme d'origine dans ce
+    cas). Renvoie (thumb_size, cols)."""
     best_cols = 1
     best_thumb_size = 0
 
@@ -202,7 +238,7 @@ def _grid_search(available_w: int, available_h: int, per_page: int,
 
     thumb_size = _apply_spacing_clamp(
         thumb_size, available_w, available_h, cols, rows, spacing_px,
-        caption_w_px, caption_h_px, clamp_vertical_spacing,
+        caption_w_px, caption_h_px,
     )
 
     return thumb_size, cols
@@ -234,13 +270,9 @@ def _free_layout(profile: Profile, available_w: int, available_h: int,
     photo_cell_h = max(1, cell_h - caption_h_px)
     thumb_size = max(MIN_THUMB_SIZE_PX, min(photo_cell_w, photo_cell_h))
 
-    # Contrairement à "grid" (voir _apply_spacing_clamp), le clampage
-    # vertical est ici actif : des colonnes/lignes explicites sont un
-    # réglage entièrement nouveau, sans contrainte de rétrocompatibilité à
-    # respecter pixel près.
     thumb_size = _apply_spacing_clamp(
         thumb_size, available_w, available_h, cols, rows, spacing_px,
-        caption_w_px, caption_h_px, clamp_vertical_spacing=True,
+        caption_w_px, caption_h_px,
     )
 
     return thumb_size, cols
@@ -250,15 +282,16 @@ def compute_page_layout(profile: Profile, photo_count: int) -> PageLayout:
     """Calcule la géométrie d'une page pour le Profil donné.
 
     `photo_count` est le nombre de photos RÉELLEMENT présentes sur cette
-    page (peut être inférieur à profile.layout.per_page pour la dernière
-    page d'une série) - la géométrie de la grille elle-même se base
-    toujours sur profile.layout.per_page (comme aujourd'hui dans
-    contactsheet.py), pour que toutes les pages d'une même génération
-    aient des cellules de taille identique ; seul le nombre de cellules
-    effectivement remplies varie.
+    page (peut être inférieur à l'effectif par page pour la dernière page
+    d'une série) - la géométrie de la grille elle-même se base toujours
+    sur l'effectif par page du modèle (compute_effective_per_page(),
+    identique à profile.layout.per_page sauf pour "large_thumbs"), pour
+    que toutes les pages d'une même génération aient des cellules de
+    taille identique ; seul le nombre de cellules effectivement remplies
+    varie.
 
     Ne lève jamais d'exception : un Profil par défaut produit exactement
-    la géométrie actuelle de contactsheet.py.
+    la géométrie actuelle (corrigée) de contactsheet.py.
     """
     layout = profile.layout
     canvas_w, canvas_h = canvas_size_px(layout.page_format, layout.orientation)
@@ -270,29 +303,20 @@ def compute_page_layout(profile: Profile, photo_count: int) -> PageLayout:
 
     caption_w_px, caption_h_px = _reserve_caption_px(profile)
 
+    effective_per_page = compute_effective_per_page(profile)
+
     if layout.template == "free":
         thumb_size, cols = _free_layout(profile, available_w, available_h, spacing_px,
                                          caption_w_px, caption_h_px)
+        # "free" n'est pas concerné par la réduction d'effectif de
+        # "large_thumbs" (compute_effective_per_page() renvoie
+        # layout.per_page tel quel pour ce modèle) ; conservé ici pour que
+        # le calcul des lignes/cellules ci-dessous reste basé sur une
+        # seule et même variable pour tous les modèles.
+        effective_per_page = layout.per_page
     elif layout.template == "large_thumbs":
-        # NOTE DE CONCEPTION (à valider avec le mainteneur) : restreindre le
-        # nombre de colonnes testées, à per_page INCHANGÉ, ne peut par
-        # construction jamais produire une vignette PLUS grande que la
-        # recherche non restreinte de "grid" (qui explore déjà ces mêmes
-        # colonnes parmi ses candidats) - seulement une vignette plus
-        # petite ou égale, si per_page force de toute façon beaucoup de
-        # lignes. Ce modèle ne garantit donc aujourd'hui "de grandes
-        # vignettes" que combiné à un per_page modeste choisi par
-        # ailleurs (ex : interface graphique proposant un per_page par
-        # défaut plus bas quand ce modèle est sélectionné) ; il ne réduit
-        # pas lui-même le nombre de photos par page. Une vraie garantie de
-        # grande taille quel que soit per_page impliquerait de laisser ce
-        # modèle décider lui-même du nombre de photos effectivement placées
-        # par page (le reste basculant sur des pages suivantes) - un
-        # changement de pagination plus large, hors du périmètre de cette
-        # étape (voir la présentation de l'analyse).
-        thumb_size, cols = _grid_search(available_w, available_h, layout.per_page, spacing_px,
-                                         LARGE_THUMBS_MAX_COLUMNS_TESTED, caption_w_px, caption_h_px,
-                                         clamp_vertical_spacing=True)
+        thumb_size, cols = _grid_search(available_w, available_h, effective_per_page, spacing_px,
+                                         LARGE_THUMBS_MAX_COLUMNS_TESTED, caption_w_px, caption_h_px)
     elif layout.template in ("landscape", "portrait"):
         # Recherche identique à "grid", mais la préférence entre deux
         # nombres de colonnes donnant une taille de vignette quasi
@@ -303,16 +327,15 @@ def compute_page_layout(profile: Profile, photo_count: int) -> PageLayout:
         # affiner après une première prévisualisation visuelle réelle, la
         # demande ne spécifiant pas de règle exacte au-delà du nom des
         # modèles.
-        thumb_size, cols = _grid_search(available_w, available_h, layout.per_page, spacing_px,
-                                         GRID_MAX_COLUMNS_TESTED, caption_w_px, caption_h_px,
-                                         clamp_vertical_spacing=True)
-        rows_at_cols = math.ceil(layout.per_page / cols)
+        thumb_size, cols = _grid_search(available_w, available_h, effective_per_page, spacing_px,
+                                         GRID_MAX_COLUMNS_TESTED, caption_w_px, caption_h_px)
+        rows_at_cols = math.ceil(effective_per_page / cols)
         prefer_more_cols = layout.template == "landscape"
-        candidates = range(1, min(layout.per_page + 1, GRID_MAX_COLUMNS_TESTED + 1))
+        candidates = range(1, min(effective_per_page + 1, GRID_MAX_COLUMNS_TESTED + 1))
         for alt_cols in candidates:
             if (alt_cols > cols) != prefer_more_cols:
                 continue
-            alt_rows = math.ceil(layout.per_page / alt_cols)
+            alt_rows = math.ceil(effective_per_page / alt_cols)
             cell_w = available_w // alt_cols if alt_cols > 1 else available_w
             cell_h = available_h // alt_rows if alt_rows > 1 else available_h
             alt_thumb = min(max(1, cell_w - caption_w_px), max(1, cell_h - caption_h_px))
@@ -322,17 +345,17 @@ def compute_page_layout(profile: Profile, photo_count: int) -> PageLayout:
                 cols, thumb_size, rows_at_cols = alt_cols, alt_thumb, alt_rows
         thumb_size = max(MIN_THUMB_SIZE_PX, _apply_spacing_clamp(
             thumb_size, available_w, available_h, cols, rows_at_cols, spacing_px,
-            caption_w_px, caption_h_px, clamp_vertical_spacing=True,
+            caption_w_px, caption_h_px,
         ))
     else:  # "grid", et filet de sécurité pour une valeur inconnue
-        thumb_size, cols = _grid_search(available_w, available_h, layout.per_page, spacing_px,
+        thumb_size, cols = _grid_search(available_w, available_h, effective_per_page, spacing_px,
                                          GRID_MAX_COLUMNS_TESTED, caption_w_px, caption_h_px)
 
-    rows = math.ceil(layout.per_page / cols)
+    rows = math.ceil(effective_per_page / cols)
     content_top_px = margin_px + HEADER_RESERVED_PX_GRID
 
     cells: list[CellLayout] = []
-    n_cells = min(photo_count, layout.per_page)
+    n_cells = min(photo_count, effective_per_page)
     for idx in range(n_cells):
         row = idx // cols
         col = idx % cols
@@ -365,5 +388,6 @@ def compute_page_layout(profile: Profile, photo_count: int) -> PageLayout:
         margin_px=margin_px, spacing_px=spacing_px,
         content_top_px=content_top_px,
         cols=cols, rows=rows, thumb_size=thumb_size,
+        effective_per_page=effective_per_page,
         cells=cells,
     )
