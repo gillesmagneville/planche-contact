@@ -12,7 +12,7 @@ propres couleurs en dur - voir PROJECT_CONTEXT.md. Ce package centralise :
 - layout_engine.py  : calcul de géométrie
 - captions.py       : résolution des légendes EXIF (formatage - voir
                       portfolio.utils.get_exif_metadata() pour l'extraction)
-- themes.py         : palettes de couleurs (à venir)
+- themes.py         : palettes de couleurs
 
 Règle générale, valable pour tout le package : l'ABSENCE de profil, ou un
 profil partiel/invalide, ne doit jamais changer le comportement actuel de
@@ -38,6 +38,7 @@ from .layout_engine import (
     mm_to_px,
 )
 from .captions import resolve_caption_lines
+from .themes import Palette, THEME_PALETTES, get_palette, resolve_theme, apply_custom_colors
 
 __all__ = [
     "Profile",
@@ -55,4 +56,9 @@ __all__ = [
     "canvas_size_px",
     "mm_to_px",
     "resolve_caption_lines",
+    "Palette",
+    "THEME_PALETTES",
+    "get_palette",
+    "resolve_theme",
+    "apply_custom_colors",
 ]
