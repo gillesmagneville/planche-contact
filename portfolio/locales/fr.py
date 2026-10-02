@@ -112,6 +112,10 @@ STRINGS = {
     "gallery.nav_prev": "← Précédent",
     "gallery.nav_next": "Suivant →",
     "gallery.footer": "Galerie générée par Planche-Contact",
+
+    # --- Index CSV généré (portfolio/csvindex.py) ---
+    "csv.header_num": "Numéro",
+    "csv.header_filename": "Fichier",
     "gallery.lightbox_page": "Page {current} / {total}",
     "gallery.zoom_out": "Dézoomer",
     "gallery.zoom_out_title": "Dézoomer (-)",
@@ -130,6 +134,13 @@ STRINGS = {
     "gallery.info_size": "Taille :",
     "gallery.info_date": "Date :",
     "gallery.unknown": "Inconnue",
+
+    # --- Unités de taille de fichier (utils.format_file_size(),
+    # affichées dans la visionneuse de la galerie HTML) ---
+    "unit.bytes": "o",
+    "unit.kb": "Ko",
+    "unit.mb": "Mo",
+    "unit.gb": "Go",
     "gallery.goto_page_label": "Aller à la page :",
     "gallery.goto_page_ok": "OK",
     "gallery.download_toast": "Téléchargement direct impossible en ouvrant ce fichier localement (restriction de sécurité du navigateur). L'image s'est ouverte dans un nouvel onglet : clic droit → « Enregistrer l'image sous ». Pour un téléchargement en un clic, consultez cette galerie via un serveur web plutôt qu'en double-cliquant sur le fichier.",
@@ -178,6 +189,11 @@ STRINGS = {
     "engine.log_images_found_sorted": "{count} images trouvées et triées.",
     "engine.log_pdf_created": "PDF créé avec succès : {path}",
     "engine.raw_module_missing": "Impossible de lire '{name}' : le module 'rawpy' n'est pas installé. Installez-le avec : pip install rawpy",
+
+    # --- Texte dessiné sur la planche de contact elle-même (JPEG/PDF -
+    # portfolio/contactsheet.py, _draw_page_number()) ---
+    "sheet.page_label": "Planche {page}/{total}",
+    "sheet.footer": "Planche générée par Planche-Contact",
     "gallery.footer_credit": "Développé par {name}, sous licence GNU GPL v3",
     "prefs.title": "Préférences",
     "gallery.wrap_forward": "Fin de la galerie — retour à la première page.",

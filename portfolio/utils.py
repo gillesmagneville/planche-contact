@@ -466,13 +466,22 @@ def get_exif_metadata(path: Path) -> dict:
 
 
 def format_file_size(num_bytes: int) -> str:
-    """Taille de fichier lisible (ex: "4,2 Mo"), utilisée pour les
-    informations affichées dans la visionneuse de la galerie HTML."""
+    """Taille de fichier lisible (ex: "4,2 Mo" en français, "4.2 MB" en
+    anglais), utilisée pour les informations affichées dans la
+    visionneuse de la galerie HTML. Unité ET séparateur décimal suivent
+    la langue active (`portfolio.i18n`, pilotée par --language/l'onglet
+    "À propos") - ce calcul a lieu APRÈS la génération de la galerie
+    HTML elle-même (voir htmlgallery.py), donc la langue active à cet
+    instant est toujours la bonne."""
+    from .i18n import _, get_language
+
     size = float(num_bytes)
-    for unit in ("o", "Ko", "Mo", "Go"):
-        if size < 1024 or unit == "Go":
-            if unit == "o":
+    decimal_separator = "," if get_language() != "en" else "."
+    for key in ("unit.bytes", "unit.kb", "unit.mb", "unit.gb"):
+        if size < 1024 or key == "unit.gb":
+            unit = _(key)
+            if key == "unit.bytes":
                 return f"{int(size)} {unit}"
-            return f"{size:.1f} {unit}".replace(".", ",")
+            return f"{size:.1f} {unit}".replace(".", decimal_separator)
         size /= 1024
-    return f"{size:.1f} Go".replace(".", ",")
+    return f"{size:.1f} {_('unit.gb')}".replace(".", decimal_separator)

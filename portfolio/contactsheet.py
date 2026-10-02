@@ -5,6 +5,7 @@ from .utils import apply_watermark, get_font, get_exif_metadata
 from .presentation import (
     compute_page_layout, resolve_theme, resolve_caption_lines, canvas_size_px, pt_to_px,
 )
+from .i18n import _
 
 
 class ContactSheetGenerator:
@@ -176,12 +177,12 @@ class ContactSheetGenerator:
         font = get_font(26)
         font_small = get_font(20)
 
-        page_text = f"Planche {page_num}/{total_pages}"
+        page_text = _("sheet.page_label", page=page_num, total=total_pages)
         bbox = draw.textbbox((0, 0), page_text, font=font)
         page_w = bbox[2] - bbox[0]
         draw.text(((canvas_w - page_w) / 2, canvas_h - 90), page_text, fill=palette.text, font=font)
 
-        credit = "Planche générée par Planche-Contact"
+        credit = _("sheet.footer")
         bbox = draw.textbbox((0, 0), credit, font=font_small)
         credit_w = bbox[2] - bbox[0]
         draw.text(((canvas_w - credit_w) / 2, canvas_h - 50), credit, fill=palette.text_secondary, font=font_small)

@@ -110,6 +110,10 @@ STRINGS = {
     "gallery.nav_prev": "← Zurück",
     "gallery.nav_next": "Weiter →",
     "gallery.footer": "Galerie erstellt mit Planche-Contact",
+
+    # --- Erzeugter CSV-Index (portfolio/csvindex.py) ---
+    "csv.header_num": "Nummer",
+    "csv.header_filename": "Dateiname",
     "gallery.lightbox_page": "Seite {current} / {total}",
     "gallery.zoom_out": "Verkleinern",
     "gallery.zoom_out_title": "Verkleinern (-)",
@@ -128,6 +132,13 @@ STRINGS = {
     "gallery.info_size": "Größe:",
     "gallery.info_date": "Datum:",
     "gallery.unknown": "Unbekannt",
+
+    # --- Dateigrößeneinheiten (utils.format_file_size(), in der
+    # HTML-Galerie-Ansicht angezeigt) ---
+    "unit.bytes": "B",
+    "unit.kb": "KB",
+    "unit.mb": "MB",
+    "unit.gb": "GB",
     "gallery.goto_page_label": "Zu Seite gehen:",
     "gallery.goto_page_ok": "OK",
     "gallery.download_toast": "Ein direkter Download ist beim lokalen Öffnen dieser Datei nicht möglich (Sicherheitsbeschränkung des Browsers). Das Bild wurde stattdessen in einem neuen Tab geöffnet: Rechtsklick darauf und „Bild speichern unter“ wählen. Für Downloads mit einem Klick rufen Sie diese Galerie über einen Webserver auf, statt die Datei per Doppelklick zu öffnen.",
@@ -176,6 +187,11 @@ STRINGS = {
     "engine.log_images_found_sorted": "{count} Bilder gefunden und sortiert.",
     "engine.log_pdf_created": "PDF erfolgreich erstellt: {path}",
     "engine.raw_module_missing": "'{name}' kann nicht gelesen werden: das Modul 'rawpy' ist nicht installiert. Installieren Sie es mit: pip install rawpy",
+
+    # --- Auf dem Kontaktbogen selbst eingeblendeter Text (JPEG/PDF -
+    # portfolio/contactsheet.py, _draw_page_number()) ---
+    "sheet.page_label": "Kontaktbogen {page}/{total}",
+    "sheet.footer": "Kontaktbogen erstellt mit Planche-Contact",
     "gallery.footer_credit": "Entwickelt von {name}, unter der Lizenz GNU GPL v3",
     "prefs.title": "Einstellungen",
     "gallery.wrap_forward": "Ende der Galerie — zurück zur ersten Seite.",

@@ -23,6 +23,8 @@ sélectionner "large_thumbs" lui-même : ce test construit donc le Profil
 tel Profil) - mais exerce bien la VRAIE boucle de pagination de main(),
 pas une réimplémentation de son calcul.
 """
+import json
+import re
 import sys
 from dataclasses import replace
 
@@ -304,3 +306,71 @@ def test_preview_output_respects_profile_flag(tmp_path, monkeypatch):
         f"le profil --profile (thème sombre) n'a pas été appliqué à l'aperçu : "
         f"couleur de coin {corner_pixel}"
     )
+
+
+def test_csv_index_header_follows_language_flag(tmp_path, monkeypatch):
+    """Non-régression : l'en-tête de l'index CSV (portfolio/csvindex.py)
+    était codé en dur en français ("Numéro"/"Fichier"), quelle que soit
+    --language - trouvé lors d'un test de charge complet avec
+    --language en. Doit désormais suivre la langue demandée, comme le
+    reste des sorties générées (CHANGELOG.md, §6 PROJECT_CONTEXT.md)."""
+    img_dir = tmp_path / "photos"
+    _make_photos(img_dir, 2)
+
+    out_fr = tmp_path / "out_fr"
+    monkeypatch.setattr(
+        sys, "argv",
+        ["portfolio.py", "-i", str(img_dir), "-o", str(out_fr), "--csv", "--language", "fr"],
+    )
+    cli_module.main()
+    assert (out_fr / "index.csv").read_text(encoding="utf-8").splitlines()[0] == "Numéro,Fichier"
+
+    out_en = tmp_path / "out_en"
+    monkeypatch.setattr(
+        sys, "argv",
+        ["portfolio.py", "-i", str(img_dir), "-o", str(out_en), "--csv", "--language", "en"],
+    )
+    cli_module.main()
+    assert (out_en / "index.csv").read_text(encoding="utf-8").splitlines()[0] == "Number,Filename"
+
+
+def test_html_gallery_file_size_follows_language_in_worker_process(tmp_path, monkeypatch):
+    """Non-régression (bug plus subtil que le précédent) : la galerie HTML
+    régénère les images/vignettes dans des processus worker séparés
+    (ProcessPoolExecutor, mp_context="spawn" - voir htmlgallery.py), qui
+    n'héritent d'AUCUN état du processus principal, y compris la langue
+    active (portfolio.i18n). La taille de fichier affichée dans la
+    visionneuse (utils.format_file_size(), appelée DANS le worker)
+    retombait donc silencieusement sur l'anglais même avec
+    --language fr - trouvé lors du même test de charge que le test
+    ci-dessus. Verrouillé ici en inspectant directement galleryMeta dans
+    le HTML généré, pour les deux langues."""
+    img_dir = tmp_path / "photos"
+    _make_photos(img_dir, 2)
+
+    def _first_size(out_dir):
+        html = (out_dir / "gallery" / "index.html").read_text(encoding="utf-8")
+        match = re.search(r"const galleryMeta = (\[.*?\]);", html)
+        assert match, "galleryMeta introuvable dans la galerie générée"
+        meta = json.loads(match.group(1))
+        return meta[0]["size"]
+
+    out_fr = tmp_path / "out_fr"
+    monkeypatch.setattr(
+        sys, "argv",
+        ["portfolio.py", "-i", str(img_dir), "-o", str(out_fr), "--html", "--language", "fr"],
+    )
+    cli_module.main()
+    size_fr = _first_size(out_fr)
+    assert "Ko" in size_fr and "," in size_fr, (
+        f"taille de fichier non traduite en français (langue du worker non propagée) : {size_fr!r}"
+    )
+
+    out_en = tmp_path / "out_en"
+    monkeypatch.setattr(
+        sys, "argv",
+        ["portfolio.py", "-i", str(img_dir), "-o", str(out_en), "--html", "--language", "en"],
+    )
+    cli_module.main()
+    size_en = _first_size(out_en)
+    assert "KB" in size_en and "." in size_en, f"taille de fichier non traduite en anglais : {size_en!r}"

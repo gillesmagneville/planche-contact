@@ -10,7 +10,7 @@ from PIL import Image, ImageOps
 
 from .rawloader import load_image, is_raw_file, get_original_dimensions
 from .utils import apply_watermark, get_exif_date, format_file_size, get_exif_metadata
-from .i18n import _, get_language
+from .i18n import _, get_language, set_language
 from .presentation import get_palette, apply_custom_colors, resolve_caption_lines
 
 # Taille max. (plus grand côté) des images "pleine taille" de la galerie
@@ -35,9 +35,21 @@ def _css_vars(palette) -> str:
     )
 
 
-def _init_worker_logging(log_path):
+def _init_worker_logging(log_path, language=None):
     """Reconfigure le logging dans les processus enfants (nécessaire avec
-    'spawn', qui ne partage pas la configuration du processus parent)."""
+    'spawn', qui ne partage pas la configuration du processus parent).
+
+    Repropage également la langue active (`portfolio.i18n`) : 'spawn'
+    démarre un interpréteur Python tout neuf par worker (aucun état du
+    processus parent n'est hérité, contrairement à 'fork'), donc
+    `set_language()` - appelé une fois au démarrage du CLI - n'a jamais
+    eu lieu dans ce worker. Sans ce ré-armement explicite, tout appel à
+    `_()` DANS un worker (ex: `format_file_size()` ci-dessous, pour les
+    métadonnées de la visionneuse) retombait silencieusement sur
+    l'anglais (langue de repli de `portfolio.i18n`), quelle que soit la
+    langue demandée via --language - bug constaté concrètement : galerie
+    générée en français, mais tailles de fichier affichées comme
+    "92.4 KB" (anglais) au lieu de "92,4 Ko"."""
     if log_path:
         logging.basicConfig(
             level=logging.INFO,
@@ -45,6 +57,8 @@ def _init_worker_logging(log_path):
             handlers=[logging.FileHandler(log_path, encoding="utf-8")],
             force=True,
         )
+    if language:
+        set_language(language)
 
 
 def _process_full_image_worker(args):
@@ -291,7 +305,7 @@ class HTMLGalleryGenerator:
                 max_workers=max_workers,
                 mp_context=ctx,
                 initializer=_init_worker_logging,
-                initargs=(log_path,),
+                initargs=(log_path, get_language()),
             ) as executor:
                 results = list(executor.map(_process_full_image_worker, tasks))
 
