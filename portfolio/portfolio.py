@@ -20,6 +20,7 @@ from portfolio.htmlgallery import HTMLGalleryGenerator
 from portfolio.csvindex import CSVIndexGenerator
 from portfolio.utils import setup_logging
 from portfolio.i18n import _, set_language, AVAILABLE_LANGUAGES
+from portfolio.presentation import compute_effective_per_page
 
 
 def _pre_resolve_language():
@@ -125,7 +126,18 @@ def main():
         print(f"PROGRESS:100/100 {_('cli.progress_done_empty')}", flush=True)
         return
 
-    n = config.num_per_sheet
+    # Le modèle "grandes vignettes" ("large_thumbs") peut réduire lui-même
+    # le nombre de photos tenant sur UNE page, pour garantir de grandes
+    # vignettes quel que soit le nombre demandé (voir
+    # presentation.layout_engine.compute_effective_per_page) - les autres
+    # modèles renvoient `config.num_per_sheet` inchangé. Paginer sur cette
+    # valeur EFFECTIVE (plutôt que sur `config.num_per_sheet` directement)
+    # garantit que les photos excédentaires d'une page "large_thumbs"
+    # trop chargée se retrouvent sur une page supplémentaire plutôt que
+    # d'être silencieusement ignorées (ContactSheetGenerator ne dessine de
+    # toute façon jamais plus de cellules que cette même valeur - voir
+    # contactsheet.py).
+    n = compute_effective_per_page(config.profile)
     total_pages = (len(images) + n - 1) // n
 
     thumb_gen = ThumbnailGenerator(config)
