@@ -145,7 +145,11 @@ class ContactSheetGenerator:
         # jamais déborder de la grille.
         effective_per_page = page.effective_per_page
 
-        thumbnails = self.thumb_gen.generate_parallel(images, thumb_size)
+        # Mode d'ajustement (Profil, "Remplir" dans l'interface) : "cover"
+        # recadre chaque photo en carré pour remplir toute sa cellule.
+        thumbnails = self.thumb_gen.generate_parallel(
+            images, thumb_size, fit_mode=profile.layout.fit_mode,
+        )
 
         sheet = Image.new("RGB", (canvas_w, canvas_h), palette.background)
         draw = ImageDraw.Draw(sheet)

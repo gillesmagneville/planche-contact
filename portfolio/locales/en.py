@@ -219,6 +219,7 @@ STRINGS = {
     "adv.fit_mode_label": "Photo fit",
     "adv.fit_mode.contain": "Whole photo (contain)",
     "adv.fit_mode.cover": "Fill (cover)",
+    "adv.fit_mode_tooltip": "Whole photo: the entire photo with its proportions (default). Fill: the photo is cropped to a centered square to fill its whole cell, with no empty margin. Applies to the sheets and the PDF; the HTML gallery keeps the photos' proportions. A photo smaller than its cell is never enlarged.",
     "adv.margin_label": "Margin (mm)",
     "adv.spacing_label": "Spacing (mm)",
     "adv.free_columns_label": "Columns (Free template, 0 = auto)",

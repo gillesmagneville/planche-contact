@@ -908,6 +908,8 @@ class PlancheContactGTK(Gtk.Application):
         self.adv_fit_mode_dd = self._make_choice_dropdown(
             FIT_MODES, [f"adv.fit_mode.{m}" for m in FIT_MODES]
         )
+        fit_label.set_tooltip_text(_("adv.fit_mode_tooltip"))
+        self.adv_fit_mode_dd.set_tooltip_text(_("adv.fit_mode_tooltip"))
         grid.attach(self.adv_fit_mode_dd, 5, 0, 1, 1)
 
         grid.attach(Gtk.Label(label=_("adv.margin_label"), xalign=0), 0, 1, 1, 1)

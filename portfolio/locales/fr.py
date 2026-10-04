@@ -219,6 +219,7 @@ STRINGS = {
     "adv.fit_mode_label": "Ajustement de la photo",
     "adv.fit_mode.contain": "Entière (contain)",
     "adv.fit_mode.cover": "Remplir (cover)",
+    "adv.fit_mode_tooltip": "Entière : toute la photo, avec ses proportions (comportement par défaut). Remplir : la photo est recadrée au centre en carré pour remplir toute sa cellule, sans marge vide. S'applique aux planches et au PDF ; la galerie HTML garde les proportions des photos. Une photo plus petite que sa cellule n'est jamais agrandie.",
     "adv.margin_label": "Marge (mm)",
     "adv.spacing_label": "Espacement (mm)",
     "adv.free_columns_label": "Colonnes (modèle Libre, 0 = auto)",

@@ -624,3 +624,83 @@ def test_portrait_photo_is_centered_above_its_centered_caption(tmp_path, monkeyp
     right_margin = int(cell0.photo_x + cell0.photo_w - 1 - cols.max())
     assert left_margin > 0, "une photo en portrait doit être plus étroite que sa cellule"
     assert abs(left_margin - right_margin) <= 1, (left_margin, right_margin)
+
+
+# ---------------------------------------------------------------------------
+# Mode d'ajustement "Remplir" (fit_mode="cover") : la photo est recadrée en
+# carré pour remplir toute sa cellule. Ce réglage était exposé mais jamais
+# lu par le rendu.
+# ---------------------------------------------------------------------------
+
+def _render_with_fit_mode(tmp_path, fit_mode, photo_color, **layout_kwargs):
+    # 2000 x 1500 (paysage 4:3), plus grand que la cellule : une vignette
+    # n'est jamais AGRANDIE (ni en "contain" ni en "cover"), donc des photos
+    # plus petites que la cellule ne la rempliraient pas, par construction.
+    images = _make_images(tmp_path, 6, color=photo_color, size=(2000, 1500))
+    profile = Profile(layout=LayoutSettings(template="grid", per_page=6, fit_mode=fit_mode, **layout_kwargs))
+    config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=6,
+                    page_format="A4", profile=profile)
+    cs_gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
+    page, _ = cs_gen._plan_page(images)
+    return np.array(cs_gen.create_contact_sheet(images, 1, 1)).astype(int), page
+
+
+def _photo_extent(arr, page, photo_color):
+    """(hauteur, largeur) en pixels de la photo de la 1re cellule, mesurées
+    sur une ligne et une colonne qui la traversent en son centre."""
+    cell = page.cells[0]
+    x_center = cell.photo_x + cell.photo_w // 2
+    segments = _photo_segments(arr[:, x_center, :], photo_color)
+    top, bottom = segments[0]
+    row = arr[(top + bottom) // 2, :, :]
+    cols = np.where(np.all(np.abs(row - np.array(photo_color)) < 12, axis=1))[0]
+    cols = cols[(cols >= cell.photo_x) & (cols < cell.photo_x + cell.photo_w)]
+    return bottom - top + 1, int(cols.max() - cols.min() + 1)
+
+
+def test_cover_fit_mode_fills_the_whole_square_cell_while_contain_keeps_the_proportions(tmp_path):
+    photo_color = (10, 200, 10)
+    contain_sheet, page = _render_with_fit_mode(tmp_path, "contain", photo_color)
+    cover_sheet, cover_page = _render_with_fit_mode(tmp_path, "cover", photo_color)
+
+    # Le mode d'ajustement ne change PAS la géométrie de la grille.
+    assert cover_page.thumb_size == page.thumb_size
+
+    contain_h, contain_w = _photo_extent(contain_sheet, page, photo_color)
+    cover_h, cover_w = _photo_extent(cover_sheet, cover_page, photo_color)
+
+    # "contain" : photo 4:3 entière, donc plus large que haute.
+    assert abs(contain_w - page.thumb_size) <= 1
+    assert abs(contain_h - round(page.thumb_size * 0.75)) <= 2
+    # "cover" : toute la cellule carrée est remplie.
+    assert abs(cover_w - page.thumb_size) <= 1
+    assert abs(cover_h - page.thumb_size) <= 1
+
+
+def test_cover_fit_mode_leaves_no_gap_between_photo_and_caption_beyond_the_wanted_one(tmp_path, monkeypatch):
+    """Avec une légende, une photo recadrée remplit sa cellule : seul
+    l'écart voulu (CAPTION_PHOTO_GAP_PX) la sépare de son texte."""
+    from portfolio.presentation import pt_to_px, CAPTION_PHOTO_GAP_PX
+
+    photo_color = (10, 200, 10)
+    monkeypatch.setattr("portfolio.contactsheet.get_exif_metadata", _fake_rich_metadata)
+    images = _make_images(tmp_path, 6, color=photo_color, size=(2000, 1500))
+    profile = Profile(
+        layout=LayoutSettings(template="grid", per_page=6, fit_mode="cover", caption_position="below", caption_area_mm=8),
+        captions=CaptionSettings(fields=["filename"], lines=1, font_size=9),
+    )
+    config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=6,
+                    page_format="A4", profile=profile)
+    cs_gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
+    arr = np.array(cs_gen.create_contact_sheet(images, 1, 1)).astype(int)
+    page, _ = cs_gen._plan_page(images)
+    cell0 = page.cells[0]
+
+    segments = _photo_segments(arr[:, cell0.photo_x + cell0.photo_w // 2, :], photo_color)
+    assert abs((segments[0][1] - segments[0][0] + 1) - page.thumb_size) <= 1
+
+    band = arr[segments[0][1] + 1:segments[1][0], cell0.photo_x:cell0.photo_x + cell0.photo_w, :]
+    text_rows = np.where(np.any(band < 128, axis=(1, 2)))[0]
+    assert text_rows.size > 0
+    font_px = max(6, pt_to_px(9))
+    assert CAPTION_PHOTO_GAP_PX <= int(text_rows.min()) < CAPTION_PHOTO_GAP_PX + font_px

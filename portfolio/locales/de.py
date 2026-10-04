@@ -217,6 +217,7 @@ STRINGS = {
     "adv.fit_mode_label": "Fotoanpassung",
     "adv.fit_mode.contain": "Ganzes Foto (contain)",
     "adv.fit_mode.cover": "Ausfüllen (cover)",
+    "adv.fit_mode_tooltip": "Ganzes Foto: das gesamte Foto mit seinen Proportionen (Standard). Ausfüllen: Das Foto wird mittig quadratisch zugeschnitten, um die ganze Zelle ohne leeren Rand zu füllen. Gilt für Kontaktbögen und PDF; die HTML-Galerie behält die Proportionen der Fotos bei. Ein Foto, das kleiner als seine Zelle ist, wird nie vergrößert.",
     "adv.margin_label": "Rand (mm)",
     "adv.spacing_label": "Abstand (mm)",
     "adv.free_columns_label": "Spalten (Vorlage „Frei“, 0 = automatisch)",

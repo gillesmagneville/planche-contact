@@ -217,6 +217,7 @@ STRINGS = {
     "adv.fit_mode_label": "Ajuste de la foto",
     "adv.fit_mode.contain": "Foto completa (contain)",
     "adv.fit_mode.cover": "Rellenar (cover)",
+    "adv.fit_mode_tooltip": "Foto completa: toda la foto con sus proporciones (por defecto). Rellenar: la foto se recorta en un cuadrado centrado para llenar toda su celda, sin margen vacío. Se aplica a las hojas y al PDF; la galería HTML conserva las proporciones de las fotos. Una foto más pequeña que su celda nunca se amplía.",
     "adv.margin_label": "Margen (mm)",
     "adv.spacing_label": "Espaciado (mm)",
     "adv.free_columns_label": "Columnas (modelo Libre, 0 = automático)",

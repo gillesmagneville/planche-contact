@@ -89,15 +89,22 @@ def get_original_dimensions(path: Path):
         return None
 
 
-def _large_enough(img_size, target_size, tolerance=0.9):
+def _large_enough(img_size, target_size, tolerance=0.9, fill=False):
     """Vrai si img_size couvre au moins ~tolerance fois le plus grand côté
     demandé. Une petite marge est tolérée : un aperçu embarqué très
     légèrement plus petit que la cible reste largement préférable, en
-    vitesse, à un dématriçage complet pour une différence imperceptible."""
-    return max(img_size) >= max(target_size) * tolerance
+    vitesse, à un dématriçage complet pour une différence imperceptible.
+
+    `fill` : la vignette sera RECADRÉE pour remplir toute sa cellule (mode
+    d'ajustement "cover", voir thumbnail.fit_thumbnail_image()) - c'est
+    alors le PETIT côté de l'aperçu qui doit atteindre la cible, pas le
+    grand : un aperçu 4:3 dont seul le grand côté suffirait laisserait un
+    carré recadré plus petit que sa cellule."""
+    side = min(img_size) if fill else max(img_size)
+    return side >= max(target_size) * tolerance
 
 
-def _load_raw(path: Path, use_embedded_thumb: bool = True, target_size=None) -> Image.Image:
+def _load_raw(path: Path, use_embedded_thumb: bool = True, target_size=None, fill: bool = False) -> Image.Image:
     """Charge un fichier RAW et retourne une image PIL en mode RGB."""
     if not RAWPY_AVAILABLE:
         raise RuntimeError(_("engine.raw_module_missing", name=path.name))
@@ -120,7 +127,7 @@ def _load_raw(path: Path, use_embedded_thumb: bool = True, target_size=None) -> 
                     img = Image.fromarray(thumb.data).convert("RGB")
 
                 if img is not None:
-                    if target_size is None or _large_enough(img.size, target_size):
+                    if target_size is None or _large_enough(img.size, target_size, fill=fill):
                         return img
                     # Aperçu trop petit pour l'usage demandé : on continue
                     # plus bas vers un dématriçage complet.
@@ -134,7 +141,7 @@ def _load_raw(path: Path, use_embedded_thumb: bool = True, target_size=None) -> 
         return Image.fromarray(rgb)
 
 
-def load_image(path: Path, use_embedded_thumb: bool = True, target_size=None) -> Image.Image:
+def load_image(path: Path, use_embedded_thumb: bool = True, target_size=None, fill: bool = False) -> Image.Image:
     """
     Point d'entrée unique pour charger n'importe quelle image (RAW ou standard).
     Retourne toujours une image PIL en mode RGB. Lève une exception en cas d'échec
@@ -146,10 +153,16 @@ def load_image(path: Path, use_embedded_thumb: bool = True, target_size=None) ->
     du module) ; elle n'a aucun effet sur le résultat final si l'appelant
     redimensionne de toute façon ensuite (thumbnail(), etc.) - c'est une
     pure optimisation de vitesse.
+
+    fill : mettre à True quand l'appelant va RECADRER l'image pour remplir
+    une zone `target_size` (vignette en mode "cover") plutôt que l'y
+    inscrire : un aperçu RAW embarqué n'est alors jugé assez grand que si
+    son petit côté atteint la cible (voir _large_enough()). Sans effet
+    pour les images non RAW.
     """
     path = Path(path)
     if is_raw_file(path):
-        return _load_raw(path, use_embedded_thumb=use_embedded_thumb, target_size=target_size)
+        return _load_raw(path, use_embedded_thumb=use_embedded_thumb, target_size=target_size, fill=fill)
 
     with Image.open(path) as img:
         if target_size is not None:
