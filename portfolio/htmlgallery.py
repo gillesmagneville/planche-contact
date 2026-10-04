@@ -137,6 +137,19 @@ def _process_full_image_worker(args):
         return (False, None)
 
 
+_HEADER_TEXT_ALIGN = {"top_left": "left", "top_right": "right"}
+
+
+def _header_align_attr(position):
+    """Attribut HTML d'alignement d'une ligne de l'en-tête de la galerie
+    (titre, auteur) selon Profile.layout.title_position / author_position.
+    Chaîne VIDE pour le centrage (valeur par défaut, déjà fourni par la
+    classe CSS .header) : le balisage d'une galerie générée sans
+    personnalisation reste donc strictement identique à celui d'avant."""
+    align = _HEADER_TEXT_ALIGN.get(position)
+    return f' style="text-align: {align}"' if align else ""
+
+
 class HTMLGalleryGenerator:
     def __init__(self, config, thumbnail_generator):
         self.config = config
@@ -338,9 +351,15 @@ class HTMLGalleryGenerator:
                        current_page, total_pages, total_images, thumbs_dir):
         thumbs_dir.mkdir(exist_ok=True)
 
-        header_html = f"<h1>{display_title}</h1>"
-        if self.author:
-            header_html += f"<p>{_('gallery.by_author', author=self.author)}</p>"
+        layout = self.profile.layout
+        header_html = ""
+        if layout.title_position != "none":
+            header_html += f"<h1{_header_align_attr(layout.title_position)}>{display_title}</h1>"
+        if self.author and layout.author_position != "none":
+            header_html += (
+                f"<p{_header_align_attr(layout.author_position)}>"
+                f"{_('gallery.by_author', author=self.author)}</p>"
+            )
         header_html += f"<p>{_('gallery.header_count', count=total_images, current=current_page, total=total_pages)}</p>"
 
         nav_html = ""

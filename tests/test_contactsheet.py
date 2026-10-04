@@ -704,3 +704,209 @@ def test_cover_fit_mode_leaves_no_gap_between_photo_and_caption_beyond_the_wante
     assert text_rows.size > 0
     font_px = max(6, pt_to_px(9))
     assert CAPTION_PHOTO_GAP_PX <= int(text_rows.min()) < CAPTION_PHOTO_GAP_PX + font_px
+
+
+# ---------------------------------------------------------------------------
+# Position du titre / de l'auteur et numérotation des planches
+# (LayoutSettings.title_position, author_position, page_numbering) : ces
+# trois réglages étaient exposés par l'interface et le profil JSON, mais
+# jamais lus par le rendu.
+# ---------------------------------------------------------------------------
+
+from types import SimpleNamespace
+
+from PIL import ImageDraw
+
+_HEADER_PALETTE = SimpleNamespace(text=(0, 0, 0), text_secondary=(0, 0, 0))
+
+
+def _header_generator(tmp_path, *, title=None, author=None, watermark=None, **layout_kwargs):
+    profile = Profile(layout=LayoutSettings(**layout_kwargs))
+    config = Config(input_dir=tmp_path / "Mon dossier", output_dir=tmp_path / "out", num_per_sheet=6,
+                    title=title, author=author, watermark_text=watermark, profile=profile)
+    return ContactSheetGenerator(config, ThumbnailGenerator(config))
+
+
+def _draw_header_only(gen, canvas_w=2480, canvas_h=800, margin=142):
+    """Dessine UNIQUEMENT l'en-tête sur un canevas blanc, renvoie
+    (tableau des niveaux de gris, ordonnée du bas de l'en-tête)."""
+    canvas = Image.new("RGB", (canvas_w, canvas_h), "white")
+    bottom = gen._draw_header(ImageDraw.Draw(canvas), canvas_w, margin, _HEADER_PALETTE)
+    return np.array(canvas.convert("L")).astype(int), bottom
+
+
+def _ink_columns(gray, y0=0, y1=None):
+    """(première, dernière) colonne contenant de l'encre entre y0 et y1,
+    ou None si la zone est vide."""
+    cols = np.where((gray[y0:y1, :] < 128).any(axis=0))[0]
+    return (int(cols.min()), int(cols.max())) if len(cols) else None
+
+
+GLYPH_BEARING_TOLERANCE_PX = 14
+
+
+@pytest.mark.parametrize("which", ["title", "author"])
+def test_header_text_is_aligned_on_the_page_margins(tmp_path, which):
+    margin, canvas_w = 142, 2480
+    kwargs = {"title": "Voyage", "author": None} if which == "title" else {"title": None, "author": "Jeanne"}
+    for position in ("top_left", "top_center", "top_right"):
+        gen = _header_generator(tmp_path, **kwargs, **{f"{which}_position": position})
+        gray, _ = _draw_header_only(gen, canvas_w=canvas_w, margin=margin)
+        left, right = _ink_columns(gray)
+        if position == "top_left":
+            assert abs(left - margin) <= GLYPH_BEARING_TOLERANCE_PX
+        elif position == "top_right":
+            assert abs(right - (canvas_w - margin)) <= GLYPH_BEARING_TOLERANCE_PX
+        else:
+            assert abs(left - (canvas_w - 1 - right)) <= GLYPH_BEARING_TOLERANCE_PX
+
+
+def test_default_header_is_strictly_the_historical_centered_rendering(tmp_path):
+    """Positions par défaut (centrées) : mêmes pixels qu'avec une position
+    "top_center" explicite, et titre/auteur toujours centrés l'un sous
+    l'autre, bas d'en-tête inchangé (170 px)."""
+    default_gen = _header_generator(tmp_path, title="Voyage", author="Jeanne")
+    explicit_gen = _header_generator(tmp_path, title="Voyage", author="Jeanne",
+                                     title_position="top_center", author_position="top_center")
+    default_gray, default_bottom = _draw_header_only(default_gen)
+    explicit_gray, explicit_bottom = _draw_header_only(explicit_gen)
+
+    assert default_bottom == explicit_bottom == 170
+    assert np.array_equal(default_gray, explicit_gray)
+
+
+def test_header_bottom_keeps_its_historical_values(tmp_path):
+    assert _draw_header_only(_header_generator(tmp_path, title="Voyage"))[1] == 128
+    assert _draw_header_only(_header_generator(tmp_path, author="Jeanne"))[1] == 112
+    assert _draw_header_only(_header_generator(tmp_path, title="Voyage", author="Jeanne"))[1] == 170
+    # Rien à écrire (filigrane seul) : l'en-tête ne réserve que sa marge haute.
+    assert _draw_header_only(_header_generator(tmp_path, watermark="© moi"))[1] == 70
+
+
+def test_title_and_author_can_sit_on_opposite_sides_while_stacked(tmp_path):
+    margin, canvas_w = 142, 2480
+    gen = _header_generator(tmp_path, title="Voyage", author="Jeanne",
+                            title_position="top_left", author_position="top_right")
+    gray, bottom = _draw_header_only(gen, canvas_w=canvas_w, margin=margin)
+
+    assert bottom == 170
+    half = canvas_w // 2
+    left_ink = _ink_columns(gray[:, :half])
+    right_ink = _ink_columns(gray[:, half:])
+    assert abs(left_ink[0] - margin) <= GLYPH_BEARING_TOLERANCE_PX
+    assert abs((half + right_ink[1]) - (canvas_w - margin)) <= GLYPH_BEARING_TOLERANCE_PX
+    # Le titre (à gauche) est au-dessus de l'auteur (à droite) : ils ne
+    # partagent pas les mêmes lignes de pixels, hors débord de jambage.
+    title_rows = np.where((gray[:, :half] < 128).any(axis=1))[0]
+    author_rows = np.where((gray[:, half:] < 128).any(axis=1))[0]
+    assert title_rows.min() < author_rows.min()
+
+
+def test_hidden_title_and_author_draw_nothing_and_reserve_no_height(tmp_path):
+    gen = _header_generator(tmp_path, title="Voyage", author="Jeanne",
+                            title_position="none", author_position="none")
+    gray, bottom = _draw_header_only(gen)
+
+    assert _ink_columns(gray) is None
+    assert bottom == 70
+
+
+def test_hiding_only_the_title_moves_the_author_up_to_the_title_slot(tmp_path):
+    gen = _header_generator(tmp_path, title="Voyage", author="Jeanne", title_position="none")
+    gray, bottom = _draw_header_only(gen)
+
+    assert _ink_columns(gray) is not None
+    assert bottom == 112
+
+
+def test_folder_name_fallback_title_is_never_shown_once_the_title_is_hidden(tmp_path):
+    shown = _header_generator(tmp_path)
+    hidden = _header_generator(tmp_path, title_position="none")
+
+    assert _ink_columns(_draw_header_only(shown)[0]) is not None
+    gray, bottom = _draw_header_only(hidden)
+    assert _ink_columns(gray) is None
+    assert bottom == 70
+
+
+@pytest.mark.parametrize("position", ["top_left", "top_center", "top_right"])
+def test_a_very_long_title_always_stays_inside_the_page_margins(tmp_path, position):
+    margin, canvas_w = 142, 2480
+    long_title = "Un titre extraordinairement long pour une seule ligne de planche contact " * 3
+    gen = _header_generator(tmp_path, title=long_title, author=long_title, title_position=position,
+                            author_position=position)
+    gray, _ = _draw_header_only(gen, canvas_w=canvas_w, margin=margin)
+    left, right = _ink_columns(gray)
+
+    assert left >= margin - GLYPH_BEARING_TOLERANCE_PX
+    assert right <= canvas_w - margin + GLYPH_BEARING_TOLERANCE_PX
+
+
+def test_a_short_title_keeps_its_historical_font_size(tmp_path):
+    """Le garde-fou « tenir dans la page » ne doit pas rétrécir un titre
+    qui tient déjà : même encombrement qu'avec la police 54 px d'origine."""
+    from portfolio.utils import get_font
+
+    gen = _header_generator(tmp_path, title="Voyage")
+    gray, _ = _draw_header_only(gen)
+    left, right = _ink_columns(gray)
+
+    probe = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+    bbox = probe.textbbox((0, 0), "Voyage", font=get_font(54, bold=True))
+    assert abs((right - left) - (bbox[2] - bbox[0])) <= GLYPH_BEARING_TOLERANCE_PX
+
+
+def _footer_ink(gen, page_numbering_arg):
+    canvas_w, canvas_h = 2480, 3508
+    canvas = Image.new("RGB", (canvas_w, canvas_h), "white")
+    gen._draw_page_number(ImageDraw.Draw(canvas), canvas_w, canvas_h, 2, 5, _HEADER_PALETTE,
+                          show_page_number=page_numbering_arg)
+    gray = np.array(canvas.convert("L")).astype(int)
+    number_band = gray[canvas_h - 100:canvas_h - 55, :]
+    credit_band = gray[canvas_h - 55:, :]
+    return (number_band < 128).any(), (credit_band < 128).any()
+
+
+def test_page_number_is_drawn_by_default_with_the_credit_line(tmp_path):
+    gen = _header_generator(tmp_path)
+    assert _footer_ink(gen, True) == (True, True)
+
+
+def test_page_number_can_be_hidden_while_the_credit_line_stays(tmp_path):
+    gen = _header_generator(tmp_path)
+    assert _footer_ink(gen, False) == (False, True)
+
+
+def test_page_numbering_setting_reaches_the_rendered_sheet(tmp_path):
+    images = _make_images(tmp_path, 6)
+
+    def render(page_numbering):
+        profile = Profile(layout=LayoutSettings(per_page=6, page_numbering=page_numbering))
+        config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=6, profile=profile)
+        gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
+        sheet = gen.create_contact_sheet(images, 1, 3)
+        gray = np.array(sheet.convert("L")).astype(int)
+        h = gray.shape[0]
+        return (gray[h - 100:h - 55, :] < 128).any(), (gray[h - 55:, :] < 128).any()
+
+    assert render(True) == (True, True)
+    assert render(False) == (False, True)
+
+
+def test_header_position_setting_reaches_the_rendered_sheet(tmp_path):
+    images = _make_images(tmp_path, 6)
+
+    def header_extent(position):
+        profile = Profile(layout=LayoutSettings(per_page=6, title_position=position))
+        config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=6,
+                        title="Voyage", profile=profile)
+        gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
+        gray = np.array(gen.create_contact_sheet(images, 1, 1).convert("L")).astype(int)
+        return _ink_columns(gray, 70, 120), gray.shape[1]
+
+    (left, _), width = header_extent("top_left")
+    (_, right), _ = header_extent("top_right")
+    assert left < width // 4
+    assert right > 3 * width // 4
+    assert header_extent("none")[0] is None
+

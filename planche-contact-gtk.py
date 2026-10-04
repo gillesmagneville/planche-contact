@@ -71,8 +71,8 @@ from portfolio.i18n import _, set_language, get_language, AVAILABLE_LANGUAGES, d
 from portfolio.presentation import (
     Profile, LayoutSettings, CaptionSettings, ThemeSettings, ThemeCustomColors,
     CAPTION_FIELDS, LAYOUT_TEMPLATES, FIT_MODES, ORIENTATIONS, CAPTION_POSITIONS,
-    CAPTION_ALIGNMENTS, THEME_MODES, default_profile, load_profile, save_profile,
-    compute_effective_per_page,
+    CAPTION_ALIGNMENTS, THEME_MODES, HEADER_POSITIONS, default_profile, load_profile,
+    save_profile, compute_effective_per_page,
 )
 
 
@@ -934,6 +934,25 @@ class PlancheContactGTK(Gtk.Application):
         self.adv_free_rows_spin = Gtk.SpinButton.new_with_range(0, 12, 1)
         grid.attach(self.adv_free_rows_spin, 7, 1, 1, 1)
 
+        grid.attach(Gtk.Label(label=_("adv.title_position_label"), xalign=0), 0, 2, 1, 1)
+        self.adv_title_position_dd = self._make_choice_dropdown(
+            HEADER_POSITIONS, [f"adv.header_position.{p}" for p in HEADER_POSITIONS]
+        )
+        grid.attach(self.adv_title_position_dd, 1, 2, 1, 1)
+
+        author_pos_label = Gtk.Label(label=_("adv.author_position_label"), xalign=0)
+        author_pos_label.set_margin_start(20)
+        grid.attach(author_pos_label, 2, 2, 1, 1)
+        self.adv_author_position_dd = self._make_choice_dropdown(
+            HEADER_POSITIONS, [f"adv.header_position.{p}" for p in HEADER_POSITIONS]
+        )
+        grid.attach(self.adv_author_position_dd, 3, 2, 1, 1)
+
+        self.adv_page_numbering_check = Gtk.CheckButton(label=_("adv.page_numbering_label"))
+        self.adv_page_numbering_check.set_margin_start(20)
+        self.adv_page_numbering_check.set_tooltip_text(_("adv.page_numbering_tooltip"))
+        grid.attach(self.adv_page_numbering_check, 4, 2, 2, 1)
+
         # --- Légendes par photo (cahier des charges §1) ---------------------
         box.append(subtitle("adv.captions_subtitle"))
         grid = Gtk.Grid(column_spacing=10, row_spacing=6)
@@ -1072,6 +1091,9 @@ class PlancheContactGTK(Gtk.Application):
             fit_mode=self._dropdown_value(self.adv_fit_mode_dd),
             caption_position=self._dropdown_value(self.adv_caption_position_dd),
             caption_area_mm=self.adv_caption_area_spin.get_value(),
+            title_position=self._dropdown_value(self.adv_title_position_dd),
+            author_position=self._dropdown_value(self.adv_author_position_dd),
+            page_numbering=self.adv_page_numbering_check.get_active(),
         )
 
         show_gps = self.adv_caption_field_checks["gps"].get_active()
@@ -1111,6 +1133,9 @@ class PlancheContactGTK(Gtk.Application):
         self.adv_spacing_spin.set_value(profile.layout.spacing_mm)
         self.adv_free_cols_spin.set_value(profile.layout.columns or 0)
         self.adv_free_rows_spin.set_value(profile.layout.rows or 0)
+        self._set_dropdown_value(self.adv_title_position_dd, profile.layout.title_position)
+        self._set_dropdown_value(self.adv_author_position_dd, profile.layout.author_position)
+        self.adv_page_numbering_check.set_active(profile.layout.page_numbering)
 
         self._set_dropdown_value(self.adv_caption_position_dd, profile.layout.caption_position)
         self.adv_caption_area_spin.set_value(profile.layout.caption_area_mm)

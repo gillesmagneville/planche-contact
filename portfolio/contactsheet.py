@@ -99,6 +99,36 @@ def _thumb_offset(caption_position, alignment, thumb_wh, cell_size):
     return dx, dy
 
 
+def _fit_header_text(draw, text, size, bold, max_width, min_size):
+    """Police et texte de l'en-tête (titre/auteur) tenant dans `max_width` :
+    la plus grande taille <= `size` (par pas de 2 px, jamais sous
+    `min_size`) pour laquelle `text` tient ; si même `min_size` ne suffit
+    pas, le texte est tronqué avec "…" (_fit_text_to_width) en dernier
+    recours. Un texte qui tient déjà garde exactement sa police d'origine.
+
+    Sans cette garde, un titre long débordait de la page - sans conséquence
+    visible tant qu'il était centré (rogné symétriquement), mais un titre
+    aligné à droite aurait commencé HORS de la page."""
+    font = get_font(size, bold=bold)
+    for candidate in range(size, min_size - 1, -2):
+        font = get_font(candidate, bold=bold)
+        bbox = draw.textbbox((0, 0), text, font=font)
+        if bbox[2] - bbox[0] <= max_width:
+            return font, text
+    return font, _fit_text_to_width(draw, text, font, max_width)
+
+
+def _header_x(position, canvas_w, margin_px, text_w):
+    """Abscisse du texte d'en-tête selon HEADER_POSITIONS : aligné sur la
+    marge de page à gauche/à droite, centré sinon (formule d'origine,
+    inchangée : le centrage n'a jamais tenu compte des marges)."""
+    if position == "top_left":
+        return margin_px
+    if position == "top_right":
+        return canvas_w - margin_px - text_w
+    return (canvas_w - text_w) / 2
+
+
 class ContactSheetGenerator:
     def __init__(self, config, thumbnail_generator):
         self.config = config
@@ -154,7 +184,7 @@ class ContactSheetGenerator:
         sheet = Image.new("RGB", (canvas_w, canvas_h), palette.background)
         draw = ImageDraw.Draw(sheet)
 
-        header_bottom_y = self._draw_header(draw, canvas_w, palette)
+        header_bottom_y = self._draw_header(draw, canvas_w, margin, palette)
         # Espace entre le bas de l'en-tête et la grille de vignettes : plus
         # généreux que la version précédente, aligné sur la même valeur que
         # les marges latérales/basse pour une composition équilibrée.
@@ -215,7 +245,10 @@ class ContactSheetGenerator:
                     cell.caption_w, cell.caption_h, profile.captions, palette,
                 )
 
-        self._draw_page_number(draw, canvas_w, canvas_h, page_num, total_pages, palette)
+        self._draw_page_number(
+            draw, canvas_w, canvas_h, page_num, total_pages, palette,
+            show_page_number=profile.layout.page_numbering,
+        )
         return sheet
 
     def _plan_page(self, images):
@@ -279,9 +312,15 @@ class ContactSheetGenerator:
                 return page, texts
             n_lines = min(needed, max_lines)
 
-    def _draw_header(self, draw, canvas_w, palette):
-        font_title = get_font(54, bold=True)
-        font_author = get_font(36, bold=True)
+    def _draw_header(self, draw, canvas_w, margin_px, palette):
+        """Titre puis auteur, l'un SOUS l'autre, chacun aligné selon
+        LayoutSettings.title_position/author_position (gauche/centre/droite
+        sur les marges de page, ou "none" pour le masquer). Renvoie
+        l'ordonnée du bas de l'en-tête (la grille de vignettes démarre
+        dessous). Positions par défaut (centrées) : rendu strictement
+        identique à avant l'introduction de ces réglages."""
+        layout = self.profile.layout
+        max_width = canvas_w - 2 * margin_px
 
         # Marge haute réduite avant l'en-tête (6 mm, contre ~9,5 mm
         # auparavant) : le titre démarre nettement plus près du haut de la
@@ -291,22 +330,27 @@ class ContactSheetGenerator:
         # Si aucun champ (titre, auteur, filigrane) n'a été renseigné, la
         # planche serait totalement anonyme : on affiche alors par défaut
         # le nom du dossier source (sans son chemin complet) en guise de
-        # titre.
+        # titre. Jamais quand l'utilisateur a explicitement masqué le titre
+        # (title_position == "none").
         watermark_text = getattr(self.config, 'watermark_text', None)
         display_title = self.project_title
         if not display_title and not self.author and not watermark_text and self.input_dir:
             display_title = Path(self.input_dir).name
 
-        if display_title:
-            bbox = draw.textbbox((0, 0), display_title, font=font_title)
+        if display_title and layout.title_position != "none":
+            font_title, text = _fit_header_text(draw, display_title, 54, True, max_width, 28)
+            bbox = draw.textbbox((0, 0), text, font=font_title)
             text_w = bbox[2] - bbox[0]
-            draw.text(((canvas_w - text_w) / 2, y), display_title, fill=palette.text, font=font_title)
+            x = _header_x(layout.title_position, canvas_w, margin_px, text_w)
+            draw.text((x, y), text, fill=palette.text, font=font_title)
             y += 58
 
-        if self.author:
-            bbox = draw.textbbox((0, 0), self.author, font=font_author)
+        if self.author and layout.author_position != "none":
+            font_author, text = _fit_header_text(draw, self.author, 36, True, max_width, 20)
+            bbox = draw.textbbox((0, 0), text, font=font_author)
             text_w = bbox[2] - bbox[0]
-            draw.text(((canvas_w - text_w) / 2, y), self.author, fill=palette.text, font=font_author)
+            x = _header_x(layout.author_position, canvas_w, margin_px, text_w)
+            draw.text((x, y), text, fill=palette.text, font=font_author)
             y += 42
 
         return y
@@ -358,14 +402,19 @@ class ContactSheetGenerator:
                 text_x = x + (width - text_w) / 2
             draw.text((text_x, y + i * line_height), line, fill=palette.text, font=font)
 
-    def _draw_page_number(self, draw, canvas_w, canvas_h, page_num, total_pages, palette):
+    def _draw_page_number(self, draw, canvas_w, canvas_h, page_num, total_pages, palette,
+                          show_page_number=True):
+        """Numéro de planche ("Planche 1/3") puis mention de crédit. Le
+        numéro seul est optionnel (LayoutSettings.page_numbering) ; la
+        mention de crédit en bas de page reste toujours affichée."""
         font = get_font(26)
         font_small = get_font(20)
 
-        page_text = _("sheet.page_label", page=page_num, total=total_pages)
-        bbox = draw.textbbox((0, 0), page_text, font=font)
-        page_w = bbox[2] - bbox[0]
-        draw.text(((canvas_w - page_w) / 2, canvas_h - 90), page_text, fill=palette.text, font=font)
+        if show_page_number:
+            page_text = _("sheet.page_label", page=page_num, total=total_pages)
+            bbox = draw.textbbox((0, 0), page_text, font=font)
+            page_w = bbox[2] - bbox[0]
+            draw.text(((canvas_w - page_w) / 2, canvas_h - 90), page_text, fill=palette.text, font=font)
 
         credit = _("sheet.footer")
         bbox = draw.textbbox((0, 0), credit, font=font_small)

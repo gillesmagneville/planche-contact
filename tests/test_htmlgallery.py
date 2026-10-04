@@ -47,12 +47,14 @@ def _make_images(tmp_path, n, *, with_exif=False, color=(90, 140, 200), size=(80
     return img_dir, [{"path": p} for p in paths]
 
 
-def _generate(tmp_path, images, profile, *, per_page=12):
+def _generate(tmp_path, images, profile, *, per_page=12, title=None, author=None,
+              html_per_page=48):
     img_dir = images[0]["path"].parent
     out_dir = tmp_path / "out"
     config = Config(
         input_dir=img_dir, output_dir=out_dir, num_per_sheet=per_page,
-        page_format="A4", profile=profile,
+        page_format="A4", profile=profile, title=title, author=author,
+        html_images_per_page=html_per_page,
     )
     gallery_gen = HTMLGalleryGenerator(config, ThumbnailGenerator(config))
     gallery_gen.create_gallery(images, out_dir)
@@ -192,3 +194,64 @@ def test_lightbox_styling_is_independent_of_the_page_theme(tmp_path):
     html = _generate(tmp_path, images, profile)
 
     assert "background: rgba(0,0,0,0.92);" in html  # fond du calque .lightbox, jamais var(--bg)
+
+
+# ---------------------------------------------------------------------------
+# Position du titre et de l'auteur (LayoutSettings.title_position/
+# author_position) : ces réglages étaient exposés mais jamais lus.
+# ---------------------------------------------------------------------------
+
+def test_default_header_markup_is_unchanged(tmp_path):
+    """Positions par défaut (centrées) : l'en-tête garde EXACTEMENT son
+    balisage historique, sans aucun attribut d'alignement ajouté."""
+    _, images = _make_images(tmp_path, 3)
+    html = _generate(tmp_path, images, Profile(), title="Mon Titre", author="Jeanne")
+
+    assert "<h1>Mon Titre</h1>" in html
+    assert "<p>" in html and "Jeanne" in html
+    assert 'style="text-align' not in html.split("</div>", 1)[0].split('<div class="header">')[-1]
+
+
+@pytest.mark.parametrize("position,css", [("top_left", "left"), ("top_right", "right")])
+def test_title_and_author_follow_their_own_position(tmp_path, position, css):
+    _, images = _make_images(tmp_path, 3)
+    profile = Profile(layout=LayoutSettings(title_position=position, author_position="top_center"))
+    html = _generate(tmp_path, images, profile, title="Mon Titre", author="Jeanne")
+
+    assert f'<h1 style="text-align: {css}">Mon Titre</h1>' in html
+    # L'auteur garde sa propre position (centrée : pas d'attribut).
+    assert '<p style=' not in html
+    assert "Jeanne" in html
+
+
+def test_author_position_is_independent_from_the_title_position(tmp_path):
+    _, images = _make_images(tmp_path, 3)
+    profile = Profile(layout=LayoutSettings(title_position="top_center", author_position="top_right"))
+    html = _generate(tmp_path, images, profile, title="Mon Titre", author="Jeanne")
+
+    assert "<h1>Mon Titre</h1>" in html
+    assert '<p style="text-align: right">' in html
+
+
+def test_hidden_title_and_author_are_removed_from_the_header(tmp_path):
+    _, images = _make_images(tmp_path, 3)
+    profile = Profile(layout=LayoutSettings(title_position="none", author_position="none"))
+    html = _generate(tmp_path, images, profile, title="Mon Titre", author="Jeanne")
+
+    body = html.split("<body", 1)[1]
+    assert "<h1" not in body
+    assert "Jeanne" not in body
+    # Le compteur d'images reste affiché, et le <title> de l'onglet aussi.
+    assert "<title>Mon Titre</title>" in html
+    assert 'class="header"' in body
+
+
+def test_header_positions_apply_to_every_page(tmp_path):
+    _, images = _make_images(tmp_path, 5)
+    profile = Profile(layout=LayoutSettings(title_position="top_left"))
+    _generate(tmp_path, images, profile, html_per_page=2, title="Mon Titre")
+
+    pages = sorted((tmp_path / "out").glob("*.html"))
+    assert len(pages) >= 3
+    for page in pages:
+        assert '<h1 style="text-align: left">Mon Titre</h1>' in page.read_text(encoding="utf-8")
