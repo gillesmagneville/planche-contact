@@ -182,14 +182,40 @@ class PageLayout:
     cells: list[CellLayout] = field(default_factory=list)
 
 
+#: Espacement vertical entre deux lignes de légende, en plus de la hauteur
+#: de police elle-même. Source UNIQUE de cette valeur (ré-exportée par
+#: presentation/__init__.py et importée telle quelle par
+#: contactsheet.py._draw_caption(), `line_height = font_px +
+#: CAPTION_LINE_SPACING_PX`) : la hauteur réservée ici doit toujours
+#: correspondre EXACTEMENT à ce que cette méthode dessine réellement (voir
+#: _reserve_caption_px() ci-dessous) - jamais deux constantes dupliquées
+#: qui pourraient diverger.
+CAPTION_LINE_SPACING_PX = 4
+
+
 def _reserve_caption_px(profile: Profile) -> tuple[int, int]:
     """Espace (largeur, hauteur) en pixels à réserver par cellule pour la
     légende, selon layout.caption_position. Une seule des deux valeurs est
     non nulle à la fois (une légende est soit sous/sur la photo, soit à
-    côté - jamais les deux)."""
+    côté - jamais les deux).
+
+    Pour "below"/"above" : la hauteur réservée est le MAXIMUM entre
+    layout.caption_area_mm (valeur choisie par l'utilisateur) et la
+    hauteur réellement nécessaire pour dessiner captions.lines lignes à
+    captions.font_size - jamais la première seule. Sans ce plancher, un
+    utilisateur augmentant le nombre de lignes ou la taille de police sans
+    penser à agrandir manuellement la zone de légende (caption_area_mm
+    reste à sa valeur par défaut de 8 mm) obtenait des dernières lignes de
+    légende débordant dans la photo de la rangée suivante - bug signalé
+    (CHANGELOG.md). "right" n'a pas besoin de ce plancher : sa hauteur
+    suit toujours thumb_size (voir compute_page_layout(), cell.caption_h
+    = thumb_size), jamais caption_area_mm."""
     layout = profile.layout
     if layout.caption_position in ("below", "above"):
-        return 0, mm_to_px(layout.caption_area_mm)
+        configured_h = mm_to_px(layout.caption_area_mm)
+        font_px = max(6, pt_to_px(profile.captions.font_size))
+        needed_h = max(1, profile.captions.lines) * (font_px + CAPTION_LINE_SPACING_PX)
+        return 0, max(configured_h, needed_h)
     if layout.caption_position == "right":
         return mm_to_px(layout.caption_area_mm), 0
     return 0, 0

@@ -8,6 +8,7 @@ pouvait faire déborder les vignettes de la dernière ligne au bas physique
 de la planche pour certaines combinaisons nombre d'images/format de page.
 """
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -259,3 +260,106 @@ def test_large_thumbs_never_draws_more_cells_than_its_effective_per_page(tmp_pat
 
     sheet = cs_gen.create_contact_sheet(images, 1, 1)
     assert sheet is not None  # ne doit pas lever d'exception (dépassement d'index, etc.)
+
+
+def test_fit_text_to_width_truncates_with_ellipsis_when_too_wide():
+    """Non-régression (signalé par l'utilisateur : "les légendes se
+    chevauchent et sont illisibles") : une ligne de légende dont le texte
+    rendu dépasse la largeur disponible doit être tronquée avec une
+    ellipsis ("…"), jamais dessinée telle quelle - sans quoi elle déborde
+    dans la cellule voisine (voir le test de bout en bout ci-dessous)."""
+    from PIL import ImageDraw
+    from portfolio.contactsheet import _fit_text_to_width
+    from portfolio.utils import get_font
+
+    img = Image.new("RGB", (10, 10))
+    draw = ImageDraw.Draw(img)
+    font = get_font(30)
+    long_text = "img_00.jpg · Canon EOS R5 · RF 24-70mm F2.8 L IS USM · 6000 × 4000"
+
+    fitted = _fit_text_to_width(draw, long_text, font, max_width=300)
+    bbox = draw.textbbox((0, 0), fitted, font=font)
+    assert bbox[2] - bbox[0] <= 300
+    assert fitted != long_text
+    assert fitted.endswith("…")
+
+    # Un texte qui tient déjà dans max_width n'est jamais modifié.
+    short_text = "img_00.jpg"
+    assert _fit_text_to_width(draw, short_text, font, max_width=300) == short_text
+
+
+def test_long_caption_with_several_fields_does_not_bleed_into_the_next_column(tmp_path, monkeypatch):
+    """RÉGRESSION rapportée par l'utilisateur : avec plusieurs champs de
+    légende sélectionnés et le réglage par défaut (lines=1), les champs
+    sont joints sur une seule ligne (voir
+    presentation.captions.resolve_caption_lines()) qui pouvait être bien
+    plus large qu'une vignette, débordant alors massivement dans la
+    colonne voisine ("les légendes se chevauchent et sont illisibles").
+
+    La zone de légende réelle sur l'image rendue est décalée verticalement
+    (`y_shift`, voir create_contact_sheet()) par rapport aux coordonnées
+    brutes de compute_page_layout() - ce test repère donc le bandeau
+    réel par la même technique que
+    test_caption_reserved_area_never_overlaps_the_next_photo ci-dessus
+    (détection des segments de vignette par couleur), plutôt que de
+    recalculer ce décalage à la main."""
+    photo_color = (10, 200, 10)
+    images = _make_images(tmp_path, 6, color=photo_color)
+
+    def fake_metadata(path):
+        return {
+            "filename": Path(path).name,
+            "camera": "Canon EOS R5",
+            "lens": "RF 24-70mm F2.8 L IS USM",
+            "dimensions": (6000, 4000),
+        }
+
+    monkeypatch.setattr("portfolio.contactsheet.get_exif_metadata", fake_metadata)
+
+    profile = Profile(
+        layout=LayoutSettings(template="grid", per_page=6, caption_position="below", caption_area_mm=10),
+        captions=CaptionSettings(fields=["filename", "camera", "lens", "dimensions"], lines=1, font_size=9),
+    )
+    config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=6, page_format="A4", profile=profile)
+    cs_gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
+    sheet = cs_gen.create_contact_sheet(images, 1, 1)
+
+    page = compute_page_layout(config.profile, photo_count=6)
+    assert page.cols >= 2 and page.rows >= 2, "ce test suppose au moins 2 colonnes et 2 lignes"
+    cell0, cell1 = page.cells[0], page.cells[1]
+    x_center = cell0.photo_x + cell0.photo_w // 2
+
+    arr = np.array(sheet)
+    column = arr[:, x_center, :].astype(int)
+    is_photo = np.all(np.abs(column - np.array(photo_color)) < 12, axis=1)
+
+    segments, in_segment, start = [], False, 0
+    for y, flag in enumerate(is_photo):
+        if flag and not in_segment:
+            start, in_segment = y, True
+        elif not flag and in_segment:
+            segments.append((start, y - 1))
+            in_segment = False
+    if in_segment:
+        segments.append((start, len(is_photo) - 1))
+
+    assert len(segments) >= 2, "au moins deux segments de vignette attendus sur cette colonne"
+    caption_band_top, caption_band_bottom = segments[0][1] + 1, segments[1][0]
+
+    band = arr[caption_band_top:caption_band_bottom, :, :].astype(int)
+    is_text = np.any(band < 128, axis=2)  # pixel sombre (texte) sur fond blanc par défaut
+
+    # La gouttière entre les deux colonnes (cell1 a sa PROPRE légende, donc
+    # on ne peut pas vérifier au-delà de cell1.photo_x - ce serait alors sa
+    # légende à elle, pas un débordement de cell0) : aucun pixel de texte
+    # ne doit y apparaître. Avant le correctif, le texte de cell0 non
+    # tronqué traversait largement cette gouttière (et bien au-delà).
+    gutter = is_text[:, cell0.photo_x + cell0.photo_w:cell1.photo_x]
+    assert not gutter.any(), (
+        "la légende déborde dans la gouttière vers la colonne suivante - "
+        "texte non tronqué à la largeur de la cellule"
+    )
+    # Et la légende doit bien avoir produit du texte visible DANS sa
+    # propre cellule (preuve que le test exerce réellement le dessin,
+    # pas un cas où rien n'aurait été dessiné du tout).
+    assert is_text[:, cell0.photo_x:cell0.photo_x + cell0.photo_w].any()

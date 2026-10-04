@@ -17,11 +17,12 @@ import math
 import pytest
 
 from portfolio.presentation import (
-    Profile, LayoutSettings, compute_page_layout, compute_effective_per_page,
+    Profile, LayoutSettings, CaptionSettings, compute_page_layout, compute_effective_per_page,
 )
 from portfolio.presentation.layout_engine import (
-    PAPER_SIZES_MM, mm_to_px, canvas_size_px, MIN_THUMB_SIZE_PX,
+    PAPER_SIZES_MM, mm_to_px, pt_to_px, canvas_size_px, MIN_THUMB_SIZE_PX,
     LARGE_THUMBS_MAX_COLUMNS_TESTED, LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE,
+    CAPTION_LINE_SPACING_PX,
 )
 
 
@@ -174,6 +175,36 @@ def test_caption_position_right_reserves_horizontal_space():
     cell = page_with_caption.cells[0]
     assert cell.caption_x == cell.photo_x + cell.photo_w
     assert cell.caption_w == mm_to_px(15)
+
+
+def test_caption_area_grows_to_fit_configured_lines_and_font_size():
+    """Non-régression : avec caption_area_mm laissé à une valeur par
+    défaut/trop petite, mais plusieurs lignes de légende et/ou une grande
+    police configurées, la hauteur RÉSERVÉE devait auparavant rester
+    bornée à caption_area_mm - les dernières lignes dessinées par
+    contactsheet.py._draw_caption() débordaient alors dans la photo de la
+    rangée suivante (bug signalé, voir CHANGELOG.md). La hauteur réservée
+    doit maintenant être le plus grand des deux : jamais plus petite que
+    ce que contactsheet.py va réellement dessiner."""
+    profile = Profile(layout=LayoutSettings(
+        template="grid", per_page=12, caption_position="below", caption_area_mm=8,
+    ), captions=CaptionSettings(fields=["filename"], lines=3, font_size=14))
+
+    page = compute_page_layout(profile, photo_count=12)
+    cell = page.cells[0]
+
+    needed_h = 3 * (pt_to_px(14) + CAPTION_LINE_SPACING_PX)
+    assert needed_h > mm_to_px(8), "le scénario doit bien dépasser caption_area_mm pour être significatif"
+    assert cell.caption_h == needed_h
+
+    # Et la propriété inverse : quand caption_area_mm est déjà suffisant,
+    # il continue de piloter la hauteur réservée (comportement actuel
+    # inchangé pour la configuration par défaut - lines=1, font_size=9).
+    default_profile = Profile(layout=LayoutSettings(
+        template="grid", per_page=12, caption_position="below", caption_area_mm=20,
+    ))
+    default_page = compute_page_layout(default_profile, photo_count=12)
+    assert default_page.cells[0].caption_h == mm_to_px(20)
 
 
 def test_caption_never_increases_thumb_size():

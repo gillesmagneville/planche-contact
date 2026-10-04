@@ -4,8 +4,45 @@ from pathlib import Path
 from .utils import apply_watermark, get_font, get_exif_metadata
 from .presentation import (
     compute_page_layout, resolve_theme, resolve_caption_lines, canvas_size_px, pt_to_px,
+    CAPTION_LINE_SPACING_PX,
 )
 from .i18n import _
+
+
+def _fit_text_to_width(draw, text, font, max_width):
+    """Tronque `text` avec une ellipsis ("…") si sa largeur rendue dépasse
+    `max_width`, sinon le renvoie inchangé. Utilisé par
+    ContactSheetGenerator._draw_caption() pour qu'une ligne de légende
+    (un ou plusieurs champs déjà joints par
+    presentation.captions.resolve_caption_lines()) ne déborde jamais de
+    la cellule qui lui est réservée, quel que soit le nombre de champs
+    configurés - voir CHANGELOG.md.
+
+    Recherche linéaire (retranche un caractère à la fois) : suffisant ici,
+    une légende ne dépassant jamais quelques dizaines de caractères et
+    cette fonction n'étant appelée qu'une fois par ligne/par photo."""
+    if max_width <= 0:
+        return ""
+    bbox = draw.textbbox((0, 0), text, font=font)
+    if bbox[2] - bbox[0] <= max_width:
+        return text
+
+    ellipsis = "…"
+    bbox = draw.textbbox((0, 0), ellipsis, font=font)
+    if bbox[2] - bbox[0] > max_width:
+        # Même l'ellipsis seule ne tient pas (cellule extrêmement
+        # étroite) : rien d'affichable ne rentre, mieux vaut ne rien
+        # dessiner qu'un fragment trompeur.
+        return ""
+
+    truncated = text
+    while truncated:
+        truncated = truncated[:-1]
+        candidate = truncated.rstrip() + ellipsis
+        bbox = draw.textbbox((0, 0), candidate, font=font)
+        if bbox[2] - bbox[0] <= max_width:
+            return candidate
+    return ellipsis
 
 
 class ContactSheetGenerator:
@@ -157,12 +194,26 @@ class ContactSheetGenerator:
         méthode ne fait QUE les positionner/dessiner, aucune règle de
         formatage n'est dupliquée ici. `x`/`y` : coin haut-gauche de la
         zone de légende réservée pour cette photo ; `width` : largeur
-        utile de cette zone, pour le centrage/alignement horizontal."""
+        utile de cette zone, pour le centrage/alignement horizontal.
+
+        Chaque ligne est tronquée (ellipsis "…") si elle dépasse `width` -
+        correctif d'un bug signalé : plusieurs champs de légende joints
+        sur une même ligne (ex: nom de fichier + date + appareil + ISO...)
+        pouvaient produire un texte bien plus large que la vignette, sans
+        aucune limite, débordant alors largement dans les cellules
+        voisines (gauche/droite) et rendant les légendes illisibles. Voir
+        CHANGELOG.md."""
         font_px = max(6, pt_to_px(caption_settings.font_size))
         font = get_font(font_px)
-        line_height = font_px + 4
+        # CAPTION_LINE_SPACING_PX : même constante que
+        # layout_engine._reserve_caption_px(), qui calcule la hauteur à
+        # réserver à partir de cette formule - jamais une valeur dupliquée
+        # en dur ici, pour qu'une ligne dessinée ne puisse pas un jour
+        # redevenir plus haute que l'espace réellement réservé.
+        line_height = font_px + CAPTION_LINE_SPACING_PX
 
         for i, line in enumerate(lines):
+            line = _fit_text_to_width(draw, line, font, width)
             bbox = draw.textbbox((0, 0), line, font=font)
             text_w = bbox[2] - bbox[0]
             if caption_settings.alignment == "left":
