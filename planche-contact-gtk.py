@@ -665,6 +665,23 @@ class PlancheContactGTK(Gtk.Application):
         self.watermark_opacity_scale.set_size_request(220, -1)
         grid.attach(self.watermark_opacity_scale, 1, 2, 3, 1)
 
+        # Thème graphique (Clair/Sombre/Neutre/Système) : un réglage COURANT,
+        # donc visible dans la fenêtre principale plutôt que caché dans la
+        # section avancée repliée (signalé par un utilisateur : "je ne vois
+        # pas de choix de thème"). Seules les couleurs PERSONNALISÉES
+        # restent dans la section avancée. Ce menu est l'unique widget du
+        # mode de thème : _profile_from_widgets()/_apply_profile_to_widgets()
+        # le lisent/l'écrivent comme les autres réglages du Profil.
+        theme_label = Gtk.Label(label=_("gen.theme_label"))
+        theme_label.set_margin_start(20)
+        grid.attach(theme_label, 4, 2, 1, 1)
+        self.theme_mode_dd = self._make_choice_dropdown(
+            THEME_MODES, [f"gen.theme_mode.{m}" for m in THEME_MODES]
+        )
+        self.theme_mode_dd.set_tooltip_text(_("gen.theme_tooltip"))
+        theme_label.set_tooltip_text(_("gen.theme_tooltip"))
+        grid.attach(self.theme_mode_dd, 5, 2, 1, 1)
+
         self.pdf_check = Gtk.CheckButton(label=_("gen.generate_pdf"))
         self.html_check = Gtk.CheckButton(label=_("gen.generate_html"))
         self.csv_check = Gtk.CheckButton(label=_("gen.generate_csv"))
@@ -937,6 +954,11 @@ class PlancheContactGTK(Gtk.Application):
         lines_label.set_margin_start(20)
         grid.attach(lines_label, 4, 0, 1, 1)
         self.adv_caption_lines_spin = Gtk.SpinButton.new_with_range(1, 4, 1)
+        # Le texte passe de toute façon à la ligne s'il est trop large pour
+        # la vignette (voir presentation.captions.layout_caption_lines()) :
+        # ce réglage n'est donc qu'un point de départ, pas une limite.
+        lines_label.set_tooltip_text(_("adv.caption_lines_tooltip"))
+        self.adv_caption_lines_spin.set_tooltip_text(_("adv.caption_lines_tooltip"))
         grid.attach(self.adv_caption_lines_spin, 5, 0, 1, 1)
 
         grid.attach(Gtk.Label(label=_("adv.caption_font_size_label"), xalign=0), 0, 1, 1, 1)
@@ -972,16 +994,12 @@ class PlancheContactGTK(Gtk.Application):
             self.adv_caption_field_checks[field_name] = check
             fields_flow.append(check)
 
-        # --- Thème graphique (cahier des charges §4) ------------------------
+        # --- Couleurs personnalisées du thème (cahier des charges §4) -------
+        # Le MODE de thème (Clair/Sombre/Neutre/Système) se choisit dans la
+        # fenêtre principale (self.theme_mode_dd, voir
+        # _build_generation_tab()) : seules les couleurs qui le surchargent
+        # restent ici, section avancée.
         box.append(subtitle("adv.theme_subtitle"))
-        grid = Gtk.Grid(column_spacing=10, row_spacing=6)
-        box.append(grid)
-
-        grid.attach(Gtk.Label(label=_("adv.theme_mode_label"), xalign=0), 0, 0, 1, 1)
-        self.adv_theme_mode_dd = self._make_choice_dropdown(
-            THEME_MODES, [f"adv.theme_mode.{m}" for m in THEME_MODES]
-        )
-        grid.attach(self.adv_theme_mode_dd, 1, 0, 1, 1)
 
         colors_label = Gtk.Label(label=_("adv.custom_colors_label"), xalign=0)
         colors_label.set_margin_top(4)
@@ -1037,8 +1055,10 @@ class PlancheContactGTK(Gtk.Application):
 
     def _profile_from_widgets(self) -> Profile:
         """Construit le Profil correspondant à l'état courant des widgets
-        avancés - layout.per_page/page_format restent volontairement à
-        leur valeur par défaut (voir l'en-tête de cette section) :
+        avancés ET du menu de thème de la fenêtre principale
+        (self.theme_mode_dd) - layout.per_page/page_format restent
+        volontairement à leur valeur par défaut (voir l'en-tête de cette
+        section) :
         Config.__post_init__() les aligne sur num_combo/format_combo."""
         layout = LayoutSettings(
             template=self._dropdown_value(self.adv_template_dd),
@@ -1074,7 +1094,7 @@ class PlancheContactGTK(Gtk.Application):
             accent=self._hex_or_none(self.adv_color_accent_entry),
             border=self._hex_or_none(self.adv_color_border_entry),
         )
-        theme = ThemeSettings(mode=self._dropdown_value(self.adv_theme_mode_dd), custom=custom)
+        theme = ThemeSettings(mode=self._dropdown_value(self.theme_mode_dd), custom=custom)
 
         return Profile(layout=layout, captions=captions, theme=theme)
 
@@ -1101,7 +1121,7 @@ class PlancheContactGTK(Gtk.Application):
             )
             check.set_active(is_active)
 
-        self._set_dropdown_value(self.adv_theme_mode_dd, profile.theme.mode)
+        self._set_dropdown_value(self.theme_mode_dd, profile.theme.mode)
         self.adv_color_bg_entry.set_text(profile.theme.custom.background or "")
         self.adv_color_text_entry.set_text(profile.theme.custom.text or "")
         self.adv_color_accent_entry.set_text(profile.theme.custom.accent or "")

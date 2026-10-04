@@ -107,6 +107,7 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
     </ul>
 </td></tr>
 <tr><td><strong>Opacité du filigrane</strong></td><td>Curseur de 0 à 100% (défaut : 40%). S'applique de façon identique aux planches, au PDF et à la galerie HTML.</td></tr>
+<tr><td><strong>Thème</strong></td><td>Clair (défaut), Sombre, Neutre ou Système : thème graphique appliqué de façon identique aux planches, au PDF et à la galerie HTML (détails et couleurs personnalisées : voir §3.3).</td></tr>
 <tr><td><strong>Options d'export</strong></td><td>Cases à cocher : Générer PDF, Générer Galerie HTML, Générer Index CSV.</td></tr>
 <tr><td><strong>Images par page</strong></td><td>Nombre de vignettes par page de la galerie HTML (12 à 64, par pas de 4, défaut : 48). Sur la même ligne que la case « Générer Galerie HTML ».</td></tr>
 </table>
@@ -114,7 +115,7 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
 <p>Si aucun des trois champs Titre / Auteur / Filigrane n'est renseigné, l'en-tête des planches affiche par défaut le nom du dossier d'entrée (sans son chemin complet), pour éviter une planche totalement anonyme.</p>
 
 <h3>3.3 Mise en page, légendes et thème (réglages avancés)</h3>
-<p>Un second bloc, replié par défaut (cliquer sur son titre pour l'ouvrir), permet de personnaliser en détail la mise en page, les légendes et le thème graphique des planches — sans rien changer au comportement par défaut tant qu'il reste fermé.</p>
+<p>Un second bloc, replié par défaut (cliquer sur son titre pour l'ouvrir), permet de personnaliser en détail la mise en page, les légendes et les couleurs du thème graphique des planches (le thème lui-même se choisit dans la fenêtre principale, voir §3.2) — sans rien changer au comportement par défaut tant qu'il reste fermé.</p>
 
 <p><strong>Mise en page</strong></p>
 <table>
@@ -131,6 +132,7 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
 <ul>
 <li>Nom de fichier, date de prise de vue, appareil (marque/modèle), objectif, focale, focale équivalente 35&nbsp;mm, ouverture, vitesse d'obturation, sensibilité ISO, dimensions de l'image, position GPS.</li>
 <li>Position, zone réservée (mm), nombre de lignes, taille de police et alignement sont tous réglables.</li>
+<li>Un texte trop large pour la vignette passe automatiquement à la ligne, aux frontières des champs : aucune information n'est tronquée. Des lignes sont ajoutées au besoin, et les vignettes rapetissent légèrement pour leur laisser la place.</li>
 <li>Une métadonnée absente d'une photo donnée (par exemple pas de position GPS) est simplement omise de sa légende, sans jamais provoquer d'erreur.</li>
 </ul>
 <div class="note">
@@ -138,7 +140,7 @@ La position GPS, si cochée, est affichée en clair sur la planche produite — 
 </div>
 
 <p><strong>Thème graphique</strong></p>
-<p>Quatre modes, appliqués de façon identique aux planches JPEG, au PDF et à la galerie HTML : <strong>Clair</strong> (par défaut), <strong>Sombre</strong>, <strong>Neutre</strong>, et <strong>Système</strong> (suit les préférences du système d'exploitation pour les planches/PDF ; pour la galerie HTML, suit le navigateur de chaque visiteur, avec un petit bouton discret lui permettant de basculer lui-même entre clair et sombre — voir §6). Les couleurs de fond, de texte, d'accent et de bordure peuvent en plus être personnalisées individuellement (format hexadécimal <code>#rrggbb</code>).</p>
+<p>Quatre modes, choisis dans la liste « Thème » de la fenêtre principale (voir §3.2) et appliqués de façon identique aux planches JPEG, au PDF et à la galerie HTML : <strong>Clair</strong> (par défaut), <strong>Sombre</strong>, <strong>Neutre</strong>, et <strong>Système</strong> (pour la galerie HTML, suit le navigateur de chaque visiteur, avec un petit bouton discret lui permettant de basculer lui-même entre clair et sombre — voir §6 ; une planche JPEG ou un PDF étant une image fixe qui ne peut pas suivre le thème du système, ils restent clairs dans ce mode). Ce bloc avancé ne contient que les couleurs de fond, de texte, d'accent et de bordure, qui peuvent être personnalisées individuellement (format hexadécimal <code>#rrggbb</code>) pour remplacer celles du thème choisi.</p>
 
 <p><strong>Enregistrer / Charger un profil</strong></p>
 <p>L'ensemble de ces réglages (mise en page, légendes et thème) peut être enregistré dans un fichier JSON réutilisable (bouton « Enregistrer le profil... »), puis rechargé plus tard (bouton « Charger un profil... ») — pratique pour appliquer les mêmes réglages à plusieurs projets, ou pour les partager. Ce même fichier peut être transmis à la ligne de commande via <code>--profile</code> (voir §4.1).</p>

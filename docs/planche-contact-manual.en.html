@@ -107,6 +107,7 @@ RAW support relies on the <code>rawpy</code> library, installed automatically in
     </ul>
 </td></tr>
 <tr><td><strong>Watermark opacity</strong></td><td>Slider from 0 to 100% (default: 40%). Applies identically to sheets, PDF and HTML gallery.</td></tr>
+<tr><td><strong>Theme</strong></td><td>Light (default), Dark, Neutral or System: graphical theme applied identically to the sheets, the PDF and the HTML gallery (details and custom colors: see §3.3).</td></tr>
 <tr><td><strong>Export options</strong></td><td>Checkboxes: Generate PDF, Generate HTML Gallery, Generate CSV Index.</td></tr>
 <tr><td><strong>Images per page</strong></td><td>Number of thumbnails per HTML gallery page (12 to 64, in steps of 4, default: 48). On the same line as the "Generate HTML Gallery" checkbox.</td></tr>
 </table>
@@ -114,7 +115,7 @@ RAW support relies on the <code>rawpy</code> library, installed automatically in
 <p>If none of the Title / Author / Watermark fields is filled in, the sheet header defaults to showing the input folder's name (without its full path), to avoid a completely anonymous sheet.</p>
 
 <h3>3.3 Layout, captions and theme (advanced settings)</h3>
-<p>A second block, collapsed by default (click its title to expand it), lets you fine-tune the layout, captions and graphical theme of the contact sheets — without changing the default behavior at all while it stays closed.</p>
+<p>A second block, collapsed by default (click its title to expand it), lets you fine-tune the layout, captions and graphical theme colors of the contact sheets (the theme itself is chosen in the main window, see §3.2) — without changing the default behavior at all while it stays closed.</p>
 
 <p><strong>Layout</strong></p>
 <table>
@@ -131,6 +132,7 @@ RAW support relies on the <code>rawpy</code> library, installed automatically in
 <ul>
 <li>Filename, date taken, camera (make/model), lens, focal length, 35&nbsp;mm-equivalent focal length, aperture, shutter speed, ISO sensitivity, image dimensions, GPS position.</li>
 <li>Position, reserved area (mm), number of lines, font size and alignment are all configurable.</li>
+<li>Text that is too wide for the thumbnail wraps automatically, between fields: no information is cut off. Extra lines are added as needed, and the thumbnails shrink slightly to make room for them.</li>
 <li>A metadata field missing from a given photo (for example no GPS data) is simply left out of its caption, never causing an error.</li>
 </ul>
 <div class="note">
@@ -138,7 +140,7 @@ GPS position, if enabled, is shown in plain text on the generated sheet — only
 </div>
 
 <p><strong>Graphical theme</strong></p>
-<p>Four modes, applied identically to the JPEG contact sheets, the PDF and the HTML gallery: <strong>Light</strong> (default), <strong>Dark</strong>, <strong>Neutral</strong>, and <strong>System</strong> (follows the operating system's preference for sheets/PDF; for the HTML gallery, it follows each visitor's own browser, with a small discreet button letting them switch between light and dark themselves — see §6). Background, text, accent and border colors can also be customized individually (hex format <code>#rrggbb</code>).</p>
+<p>Four modes, chosen from the "Theme" list in the main window (see §3.2) and applied identically to the JPEG contact sheets, the PDF and the HTML gallery: <strong>Light</strong> (default), <strong>Dark</strong>, <strong>Neutral</strong>, and <strong>System</strong> (for the HTML gallery, it follows each visitor's own browser, with a small discreet button letting them switch between light and dark themselves — see §6; a JPEG sheet or a PDF being a fixed image that cannot follow the system theme, they stay light in this mode). This advanced block only contains the background, text, accent and border colors, which can be customized individually (hex format <code>#rrggbb</code>) to override those of the chosen theme.</p>
 
 <p><strong>Save / Load a profile</strong></p>
 <p>All of these settings (layout, captions and theme) can be saved to a reusable JSON file ("Save profile..." button), then loaded again later ("Load profile..." button) — handy for applying the same settings to several projects, or for sharing them. This same file can be passed to the command line via <code>--profile</code> (see §4.1).</p>

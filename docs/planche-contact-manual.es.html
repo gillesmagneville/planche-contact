@@ -107,6 +107,7 @@ El soporte de archivos RAW se basa en la biblioteca <code>rawpy</code>, instalad
     </ul>
 </td></tr>
 <tr><td><strong>Opacidad de la marca de agua</strong></td><td>Control deslizante de 0 a 100 % (por defecto: 40 %). Se aplica de forma idéntica a las hojas, el PDF y la galería HTML.</td></tr>
+<tr><td><strong>Tema</strong></td><td>Claro (por defecto), Oscuro, Neutro o Sistema: tema gráfico aplicado de forma idéntica a las hojas, al PDF y a la galería HTML (detalles y colores personalizados: véase §3.3).</td></tr>
 <tr><td><strong>Opciones de exportación</strong></td><td>Casillas: Generar PDF, Generar galería HTML, Generar índice CSV.</td></tr>
 <tr><td><strong>Imágenes por página</strong></td><td>Número de miniaturas por página de la galería HTML (de 12 a 64, en pasos de 4, por defecto: 48). En la misma línea que la casilla «Generar galería HTML».</td></tr>
 </table>
@@ -114,7 +115,7 @@ El soporte de archivos RAW se basa en la biblioteca <code>rawpy</code>, instalad
 <p>Si ninguno de los campos Título / Autor / Marca de agua está rellenado, el encabezado de las hojas muestra por defecto el nombre de la carpeta de entrada (sin su ruta completa), para evitar una hoja completamente anónima.</p>
 
 <h3>3.3 Diseño, leyendas y tema (ajustes avanzados)</h3>
-<p>Un segundo bloque, plegado por defecto (haga clic en su título para desplegarlo), permite personalizar con detalle el diseño, las leyendas y el tema gráfico de las hojas de contacto — sin cambiar en nada el comportamiento por defecto mientras permanezca cerrado.</p>
+<p>Un segundo bloque, plegado por defecto (haga clic en su título para desplegarlo), permite personalizar con detalle el diseño, las leyendas y los colores del tema gráfico de las hojas de contacto (el tema en sí se elige en la ventana principal, véase §3.2) — sin cambiar en nada el comportamiento por defecto mientras permanezca cerrado.</p>
 
 <p><strong>Diseño</strong></p>
 <table>
@@ -131,6 +132,7 @@ El soporte de archivos RAW se basa en la biblioteca <code>rawpy</code>, instalad
 <ul>
 <li>Nombre de archivo, fecha de la toma, cámara (marca/modelo), objetivo, distancia focal, distancia focal equivalente a 35&nbsp;mm, apertura, velocidad de obturación, sensibilidad ISO, dimensiones de la imagen, posición GPS.</li>
 <li>La posición, el área reservada (mm), el número de líneas, el tamaño de fuente y la alineación son todos ajustables.</li>
+<li>Un texto demasiado ancho para la miniatura pasa automáticamente a la línea siguiente, entre campos: no se corta ninguna información. Se añaden líneas si hace falta, y las miniaturas se reducen ligeramente para dejarles sitio.</li>
 <li>Un metadato ausente en una foto concreta (por ejemplo, sin datos GPS) simplemente se omite de su leyenda, sin provocar nunca un error.</li>
 </ul>
 <div class="note">
@@ -138,7 +140,7 @@ La posición GPS, si está activada, se muestra en texto claro en la hoja genera
 </div>
 
 <p><strong>Tema gráfico</strong></p>
-<p>Cuatro modos, aplicados de forma idéntica a las hojas JPEG, al PDF y a la galería HTML: <strong>Claro</strong> (por defecto), <strong>Oscuro</strong>, <strong>Neutro</strong> y <strong>Sistema</strong> (sigue la preferencia del sistema operativo para las hojas/PDF; para la galería HTML, sigue el navegador de cada visitante, con un pequeño botón discreto que le permite cambiar él mismo entre claro y oscuro — véase §6). Los colores de fondo, texto, acento y borde también pueden personalizarse individualmente (formato hexadecimal <code>#rrggbb</code>).</p>
+<p>Cuatro modos, elegidos en la lista «Tema» de la ventana principal (véase §3.2) y aplicados de forma idéntica a las hojas JPEG, al PDF y a la galería HTML: <strong>Claro</strong> (por defecto), <strong>Oscuro</strong>, <strong>Neutro</strong> y <strong>Sistema</strong> (para la galería HTML, sigue el navegador de cada visitante, con un pequeño botón discreto que le permite cambiar él mismo entre claro y oscuro — véase §6; como una hoja JPEG o un PDF es una imagen fija que no puede seguir el tema del sistema, permanecen claros en este modo). Este bloque avanzado solo contiene los colores de fondo, texto, acento y borde, que pueden personalizarse individualmente (formato hexadecimal <code>#rrggbb</code>) para sustituir los del tema elegido.</p>
 
 <p><strong>Guardar / Cargar un perfil</strong></p>
 <p>Todos estos ajustes (diseño, leyendas y tema) pueden guardarse en un archivo JSON reutilizable (botón «Guardar perfil…»), y volver a cargarse más tarde (botón «Cargar perfil…») — útil para aplicar los mismos ajustes a varios proyectos, o para compartirlos. Este mismo archivo puede pasarse a la línea de comandos mediante <code>--profile</code> (véase §4.1).</p>

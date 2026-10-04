@@ -107,6 +107,7 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
     </ul>
 </td></tr>
 <tr><td><strong>Deckkraft des Wasserzeichens</strong></td><td>Regler von 0 bis 100 % (Standard: 40 %). Gilt identisch für Kontaktbögen, PDF und HTML-Galerie.</td></tr>
+<tr><td><strong>Thema</strong></td><td>Hell (Standard), Dunkel, Neutral oder System: grafisches Thema, das identisch auf Kontaktbögen, PDF und HTML-Galerie angewendet wird (Details und benutzerdefinierte Farben: siehe §3.3).</td></tr>
 <tr><td><strong>Exportoptionen</strong></td><td>Kontrollkästchen: PDF erstellen, HTML-Galerie erstellen, CSV-Verzeichnis erstellen.</td></tr>
 <tr><td><strong>Bilder pro Seite</strong></td><td>Anzahl der Miniaturbilder pro HTML-Galerieseite (12 bis 64, in Schritten von 4, Standard: 48). Auf derselben Zeile wie das Kontrollkästchen „HTML-Galerie erstellen".</td></tr>
 </table>
@@ -114,7 +115,7 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
 <p>Wenn keines der Felder Titel / Autor / Wasserzeichen ausgefüllt ist, zeigt die Kopfzeile der Kontaktbögen standardmäßig den Namen des Quellordners (ohne vollständigen Pfad) an, um einen völlig anonymen Kontaktbogen zu vermeiden.</p>
 
 <h3>3.3 Layout, Bildunterschriften und Thema (erweiterte Einstellungen)</h3>
-<p>Ein zweiter Bereich, standardmäßig eingeklappt (Titel anklicken zum Öffnen), ermöglicht die detaillierte Anpassung von Layout, Bildunterschriften und grafischem Thema der Kontaktbögen — ohne das Standardverhalten zu ändern, solange er geschlossen bleibt.</p>
+<p>Ein zweiter Bereich, standardmäßig eingeklappt (Titel anklicken zum Öffnen), ermöglicht die detaillierte Anpassung von Layout, Bildunterschriften und den Farben des grafischen Themas der Kontaktbögen (das Thema selbst wird im Hauptfenster gewählt, siehe §3.2) — ohne das Standardverhalten zu ändern, solange er geschlossen bleibt.</p>
 
 <p><strong>Layout</strong></p>
 <table>
@@ -131,6 +132,7 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
 <ul>
 <li>Dateiname, Aufnahmedatum, Kamera (Marke/Modell), Objektiv, Brennweite, KB-äquivalente Brennweite (35&nbsp;mm), Blende, Verschlusszeit, ISO-Empfindlichkeit, Bildabmessungen, GPS-Position.</li>
 <li>Position, reservierter Bereich (mm), Zeilenanzahl, Schriftgröße und Ausrichtung sind alle einstellbar.</li>
+<li>Ein für das Vorschaubild zu breiter Text wird automatisch an den Feldgrenzen umbrochen: Es wird keine Information abgeschnitten. Bei Bedarf kommen Zeilen hinzu, und die Vorschaubilder werden etwas kleiner, um ihnen Platz zu machen.</li>
 <li>Ein bei einem bestimmten Foto fehlendes Metadatenfeld (z. B. keine GPS-Daten) wird einfach aus seiner Bildunterschrift weggelassen, ohne jemals einen Fehler zu verursachen.</li>
 </ul>
 <div class="note">
@@ -138,7 +140,7 @@ Die GPS-Position wird, falls aktiviert, im Klartext auf dem erstellten Kontaktbo
 </div>
 
 <p><strong>Grafisches Thema</strong></p>
-<p>Vier Modi, die identisch auf die JPEG-Kontaktbögen, das PDF und die HTML-Galerie angewendet werden: <strong>Hell</strong> (Standard), <strong>Dunkel</strong>, <strong>Neutral</strong> und <strong>System</strong> (folgt der Einstellung des Betriebssystems für Kontaktbögen/PDF; für die HTML-Galerie folgt es dem Browser jedes Besuchers, mit einer kleinen dezenten Schaltfläche, mit der er selbst zwischen Hell und Dunkel wechseln kann — siehe §6). Hintergrund-, Text-, Akzent- und Rahmenfarbe können zusätzlich einzeln angepasst werden (Hexadezimalformat <code>#rrggbb</code>).</p>
+<p>Vier Modi, die in der Liste „Thema“ des Hauptfensters gewählt werden (siehe §3.2) und identisch auf die JPEG-Kontaktbögen, das PDF und die HTML-Galerie angewendet werden: <strong>Hell</strong> (Standard), <strong>Dunkel</strong>, <strong>Neutral</strong> und <strong>System</strong> (für die HTML-Galerie folgt es dem Browser jedes Besuchers, mit einer kleinen dezenten Schaltfläche, mit der er selbst zwischen Hell und Dunkel wechseln kann — siehe §6; da ein JPEG-Kontaktbogen oder ein PDF ein feststehendes Bild ist, das dem Systemthema nicht folgen kann, bleiben sie in diesem Modus hell). Dieser erweiterte Bereich enthält nur noch die Hintergrund-, Text-, Akzent- und Rahmenfarbe, die einzeln angepasst werden können (Hexadezimalformat <code>#rrggbb</code>), um die Farben des gewählten Themas zu ersetzen.</p>
 
 <p><strong>Profil speichern / laden</strong></p>
 <p>Alle diese Einstellungen (Layout, Bildunterschriften und Thema) können in einer wiederverwendbaren JSON-Datei gespeichert werden (Schaltfläche „Profil speichern…"), und später wieder geladen werden (Schaltfläche „Profil laden…") — praktisch, um dieselben Einstellungen auf mehrere Projekte anzuwenden oder sie weiterzugeben. Dieselbe Datei kann über <code>--profile</code> an die Befehlszeile übergeben werden (siehe §4.1).</p>
