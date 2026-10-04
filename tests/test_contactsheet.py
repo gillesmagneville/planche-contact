@@ -263,11 +263,14 @@ def test_large_thumbs_never_draws_more_cells_than_its_effective_per_page(tmp_pat
 
 
 def test_fit_text_to_width_truncates_with_ellipsis_when_too_wide():
-    """Non-régression (signalé par l'utilisateur : "les légendes se
-    chevauchent et sont illisibles") : une ligne de légende dont le texte
-    rendu dépasse la largeur disponible doit être tronquée avec une
-    ellipsis ("…"), jamais dessinée telle quelle - sans quoi elle déborde
-    dans la cellule voisine (voir le test de bout en bout ci-dessous)."""
+    """Filet de sécurité (signalé par l'utilisateur : "les légendes se
+    chevauchent et sont illisibles") : une ligne dont le texte rendu dépasse
+    la largeur disponible doit être tronquée avec une ellipsis ("…"),
+    jamais dessinée telle quelle - sans quoi elle déborde dans la cellule
+    voisine. Depuis le retour à la ligne des légendes
+    (presentation.captions.layout_caption_lines()), ce filet ne s'applique
+    plus qu'à un MOT isolé plus large que la cellule, jamais à une légende
+    ordinaire de plusieurs champs (voir les tests suivants)."""
     from PIL import ImageDraw
     from portfolio.contactsheet import _fit_text_to_width
     from portfolio.utils import get_font
@@ -363,3 +366,158 @@ def test_long_caption_with_several_fields_does_not_bleed_into_the_next_column(tm
     # propre cellule (preuve que le test exerce réellement le dessin,
     # pas un cas où rien n'aurait été dessiné du tout).
     assert is_text[:, cell0.photo_x:cell0.photo_x + cell0.photo_w].any()
+
+
+def _fake_rich_metadata(path):
+    return {
+        "filename": Path(path).name,
+        "camera": "Canon EOS R5",
+        "lens": "RF 24-70mm F2.8 L IS USM",
+        "focal_length": 50.0,
+        "aperture": 2.8,
+        "shutter_speed": 1 / 250,
+        "iso": 400,
+        "dimensions": (6000, 4000),
+    }
+
+
+def _caption_generator(tmp_path, monkeypatch, n_photos=6, color=(90, 140, 200), **caption_kwargs):
+    monkeypatch.setattr("portfolio.contactsheet.get_exif_metadata", _fake_rich_metadata)
+    images = _make_images(tmp_path, n_photos, color=color)
+    profile = Profile(
+        layout=LayoutSettings(template="grid", per_page=n_photos, caption_position="below", caption_area_mm=8),
+        captions=CaptionSettings(
+            fields=["filename", "camera", "lens", "focal_length", "aperture", "shutter_speed", "iso", "dimensions"],
+            lines=1, font_size=9, **caption_kwargs,
+        ),
+    )
+    config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=n_photos,
+                    page_format="A4", profile=profile)
+    return images, config, ContactSheetGenerator(config, ThumbnailGenerator(config))
+
+
+def test_plan_page_wraps_captions_so_that_no_information_is_truncated(tmp_path, monkeypatch):
+    """RÉGRESSION rapportée par l'utilisateur : "les informations sont
+    tronquées sous les photos (elles se terminent par « ... »)". Avec
+    plusieurs champs et lines=1, la légende tenait sur une seule ligne,
+    tronquée par une ellipsis pour ne pas déborder. Elle doit maintenant
+    passer à la ligne : TOUS les champs visibles, aucune ligne plus large
+    que la vignette, et une hauteur réservée suffisante pour toutes les
+    lignes (sinon la dernière déborderait dans la rangée suivante)."""
+    from PIL import ImageDraw
+    from portfolio.presentation import pt_to_px, CAPTION_LINE_SPACING_PX
+    from portfolio.utils import get_font
+
+    images, config, cs_gen = _caption_generator(tmp_path, monkeypatch)
+
+    page, texts = cs_gen._plan_page(images)
+
+    assert set(texts) == set(range(6))
+    font_px = max(6, pt_to_px(9))
+    font = get_font(font_px)
+    draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    for idx, lines in texts.items():
+        assert len(lines) > 1, "la légende doit passer à la ligne, pas rester sur une seule ligne"
+        assert not any("…" in line for line in lines), "aucune information ne doit être tronquée"
+        joined = " ".join(lines)
+        for expected in (f"img_{idx:02d}", "Canon EOS R5", "RF 24-70mm F2.8 L IS USM", "f/2.8", "ISO 400", "6000 × 4000"):
+            assert expected in joined, (idx, expected)
+        for line in lines:
+            bbox = draw.textbbox((0, 0), line, font=font)
+            assert bbox[2] - bbox[0] <= page.thumb_size, (idx, line)
+
+    needed_h = max(len(lines) for lines in texts.values()) * (font_px + CAPTION_LINE_SPACING_PX)
+    assert page.cells[0].caption_h >= needed_h
+
+
+def test_wrapped_captions_leave_no_text_in_the_gutter_between_columns(tmp_path, monkeypatch):
+    """Rendu réel de bout en bout (create_contact_sheet) avec légendes
+    passées à la ligne : aucun pixel de texte dans la gouttière entre deux
+    colonnes, et du texte bien présent sous chaque vignette de la première
+    rangée - sur toute la hauteur de la zone réservée, pas seulement la
+    première ligne."""
+    photo_color = (10, 200, 10)
+    images, config, cs_gen = _caption_generator(tmp_path, monkeypatch, color=photo_color)
+
+    sheet = cs_gen.create_contact_sheet(images, 1, 1)
+    page, texts = cs_gen._plan_page(images)
+    assert page.cols >= 2 and page.rows >= 2
+
+    cell0, cell1 = page.cells[0], page.cells[1]
+    arr = np.array(sheet).astype(int)
+    column = arr[:, cell0.photo_x + cell0.photo_w // 2, :]
+    is_photo = np.all(np.abs(column - np.array(photo_color)) < 12, axis=1)
+    segments, in_segment, start = [], False, 0
+    for y, flag in enumerate(is_photo):
+        if flag and not in_segment:
+            start, in_segment = y, True
+        elif not flag and in_segment:
+            segments.append((start, y - 1))
+            in_segment = False
+    assert len(segments) >= 2
+    band = arr[segments[0][1] + 1:segments[1][0], :, :]
+    is_text = np.any(band < 128, axis=2)
+
+    assert not is_text[:, cell0.photo_x + cell0.photo_w:cell1.photo_x].any()
+    # Le texte occupe plusieurs lignes : l'étendue verticale des pixels
+    # sombres sous la première vignette prouve que TOUTES les lignes sont
+    # bien dessinées (et donc visibles), pas seulement la première.
+    from portfolio.presentation import pt_to_px, CAPTION_LINE_SPACING_PX
+    line_height = max(6, pt_to_px(9)) + CAPTION_LINE_SPACING_PX
+    n_lines = len(texts[0])
+    assert n_lines >= 3
+    own_cell = is_text[:, cell0.photo_x:cell0.photo_x + cell0.photo_w]
+    text_rows = np.where(own_cell.any(axis=1))[0]
+    assert text_rows.size > 0
+    assert text_rows.max() - text_rows.min() >= (n_lines - 1) * line_height
+
+
+def test_plan_page_does_not_read_exif_without_a_caption(tmp_path, monkeypatch):
+    """Aucun coût par défaut : sans légende positionnée sous/sur/à côté de
+    la photo (comportement par défaut), la planification ne doit lire AUCUNE
+    métadonnée EXIF (un ou plusieurs accès fichier par photo)."""
+    def boom(path):
+        raise AssertionError("get_exif_metadata ne doit pas être appelée sans légende")
+
+    monkeypatch.setattr("portfolio.contactsheet.get_exif_metadata", boom)
+    images = _make_images(tmp_path, 4)
+
+    for profile in (
+        Profile(),  # défaut : ni position ni champs
+        Profile(captions=CaptionSettings(fields=["filename"])),  # champs mais position "none"
+        Profile(layout=LayoutSettings(caption_position="below")),  # position mais aucun champ
+    ):
+        config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=4, profile=profile)
+        cs_gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
+        page, texts = cs_gen._plan_page(images)
+        assert texts == {}
+        assert len(page.cells) == 4
+
+
+def test_draw_caption_never_draws_more_lines_than_the_reserved_height(tmp_path):
+    """Filet de sécurité de _draw_caption() : plus de lignes que la hauteur
+    réservée n'en contient (légende "à droite" sur une petite vignette, ou
+    plafond MAX_AUTO_CAPTION_LINES atteint) -> les lignes en trop sont
+    supprimées, jamais dessinées dans l'espace de la photo suivante."""
+    from PIL import ImageDraw
+    from portfolio.presentation import pt_to_px, CAPTION_LINE_SPACING_PX, resolve_theme
+
+    profile = Profile(captions=CaptionSettings(fields=["filename"], font_size=9))
+    config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", profile=profile)
+    cs_gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
+
+    canvas = Image.new("RGB", (800, 600), (255, 255, 255))
+    draw = ImageDraw.Draw(canvas)
+    line_height = max(6, pt_to_px(9)) + CAPTION_LINE_SPACING_PX
+    y0 = 20
+    cs_gen._draw_caption(
+        draw, [f"ligne {i}" for i in range(6)], 10, y0, 700, 2 * line_height,
+        profile.captions, resolve_theme(profile.theme),
+    )
+
+    arr = np.array(canvas).astype(int)
+    dark_rows = np.where(np.any(arr < 128, axis=(1, 2)))[0]
+    assert dark_rows.size > 0, "le texte doit bien être dessiné"
+    # Tolérance de quelques pixels pour le jambage (descendante) de la
+    # dernière ligne autorisée, mais certainement pas 4 lignes de plus.
+    assert dark_rows.max() < y0 + 2 * line_height + 8

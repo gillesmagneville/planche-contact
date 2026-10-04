@@ -48,7 +48,7 @@ from .layout_engine import (
     pt_to_px,
     CAPTION_LINE_SPACING_PX,
 )
-from .captions import resolve_caption_lines
+from .captions import resolve_caption_lines, resolve_caption_parts, layout_caption_lines
 from .themes import Palette, THEME_PALETTES, get_palette, resolve_theme, apply_custom_colors
 
 __all__ = [
@@ -78,6 +78,8 @@ __all__ = [
     "pt_to_px",
     "CAPTION_LINE_SPACING_PX",
     "resolve_caption_lines",
+    "resolve_caption_parts",
+    "layout_caption_lines",
     "Palette",
     "THEME_PALETTES",
     "get_palette",

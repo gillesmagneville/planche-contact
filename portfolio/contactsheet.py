@@ -3,20 +3,30 @@ from pathlib import Path
 
 from .utils import apply_watermark, get_font, get_exif_metadata
 from .presentation import (
-    compute_page_layout, resolve_theme, resolve_caption_lines, canvas_size_px, pt_to_px,
-    CAPTION_LINE_SPACING_PX,
+    compute_page_layout, compute_effective_per_page, resolve_theme, layout_caption_lines,
+    canvas_size_px, pt_to_px, CAPTION_LINE_SPACING_PX,
 )
 from .i18n import _
+
+#: Nombre maximal de lignes de légende que la mise en page ajoute d'elle-même
+#: quand le texte, une fois passé à la ligne dans la largeur d'une vignette,
+#: dépasse captions.lines (voir ContactSheetGenerator._plan_page()). Borne
+#: de sécurité contre une boucle de réajustement sans fin sur des vignettes
+#: extrêmement étroites : au-delà, _draw_caption() borne de toute façon le
+#: texte à la hauteur réservée, jamais de débordement dans la photo suivante.
+MAX_AUTO_CAPTION_LINES = 10
 
 
 def _fit_text_to_width(draw, text, font, max_width):
     """Tronque `text` avec une ellipsis ("…") si sa largeur rendue dépasse
-    `max_width`, sinon le renvoie inchangé. Utilisé par
-    ContactSheetGenerator._draw_caption() pour qu'une ligne de légende
-    (un ou plusieurs champs déjà joints par
-    presentation.captions.resolve_caption_lines()) ne déborde jamais de
-    la cellule qui lui est réservée, quel que soit le nombre de champs
-    configurés - voir CHANGELOG.md.
+    `max_width`, sinon le renvoie inchangé. Dernier filet de sécurité de
+    ContactSheetGenerator._draw_caption() : les légendes sont normalement
+    déjà passées à la ligne dans la largeur disponible
+    (presentation.captions.layout_caption_lines()), de sorte que cette
+    troncature ne s'applique plus qu'à un MOT isolé plus large que la
+    cellule (ex : nom de fichier interminable sur une vignette minuscule) -
+    jamais à une légende ordinaire composée de plusieurs champs. Voir
+    CHANGELOG.md.
 
     Recherche linéaire (retranche un caractère à la fois) : suffisant ici,
     une légende ne dépassant jamais quelques dizaines de caractères et
@@ -69,8 +79,12 @@ class ContactSheetGenerator:
             return None
 
         profile = self.profile
-        page = compute_page_layout(profile, photo_count=len(images))
         palette = resolve_theme(profile.theme)
+        # La géométrie dépend du TEXTE des légendes (leur nombre de lignes
+        # une fois passées à la ligne dans la largeur d'une vignette
+        # détermine la hauteur à réserver, donc la taille des vignettes) :
+        # voir _plan_page().
+        page, caption_lines_by_idx = self._plan_page(images)
 
         canvas_w, canvas_h = page.canvas_w, page.canvas_h
         margin = page.margin_px
@@ -118,13 +132,6 @@ class ContactSheetGenerator:
         # de retrancher l'espace de légende de l'écart entre lignes).
         y_shift = y_start - page.content_top_px
 
-        # Légendes personnalisables (cahier des charges §1) : on ne lit les
-        # métadonnées EXIF (coûteux, un ou plusieurs accès fichier par
-        # photo - voir utils.get_exif_metadata()) QUE si au moins un champ
-        # de légende est effectivement configuré - comportement par défaut
-        # (aucune légende) sans le moindre coût supplémentaire.
-        caption_fields = profile.captions.effective_fields()
-
         for idx, thumb in enumerate(thumbnails):
             if idx >= effective_per_page or idx >= len(page.cells):
                 break
@@ -143,17 +150,76 @@ class ContactSheetGenerator:
             x, y = cell.photo_x, cell.photo_y + y_shift
             sheet.paste(thumb, (x, y))
 
-            if caption_fields and cell.caption_x is not None:
-                metadata = get_exif_metadata(images[idx]["path"])
-                lines = resolve_caption_lines(profile, metadata)
-                if lines:
-                    self._draw_caption(
-                        draw, lines, cell.caption_x, cell.caption_y + y_shift, cell.caption_w,
-                        profile.captions, palette,
-                    )
+            lines = caption_lines_by_idx.get(idx)
+            if lines and cell.caption_x is not None:
+                self._draw_caption(
+                    draw, lines, cell.caption_x, cell.caption_y + y_shift,
+                    cell.caption_w, cell.caption_h, profile.captions, palette,
+                )
 
         self._draw_page_number(draw, canvas_w, canvas_h, page_num, total_pages, palette)
         return sheet
+
+    def _plan_page(self, images):
+        """Calcule la géométrie de la page ET le texte (déjà passé à la
+        ligne) des légendes de chaque photo - renvoie
+        `(PageLayout, {index_photo: [lignes]})`.
+
+        Sans légende sous/sur la photo (cas par défaut), strictement
+        équivalent à un simple `compute_page_layout()` : aucune métadonnée
+        EXIF n'est lue (coûteux, un ou plusieurs accès fichier par photo -
+        voir utils.get_exif_metadata()), aucun coût supplémentaire.
+
+        Avec une légende, les lignes à réserver dépendent du texte réel,
+        lui-même dépendant de la largeur de la vignette, qui dépend à son
+        tour de la hauteur réservée (plus de lignes -> vignettes plus
+        petites -> légendes plus étroites -> parfois encore plus de
+        lignes) : on part de captions.lines, on mesure le texte réel
+        passé à la ligne dans la largeur d'une vignette
+        (presentation.captions.layout_caption_lines()), et si une photo
+        demande plus de lignes que celles réservées, on recalcule la
+        géométrie avec ce nombre-là jusqu'à stabilité - au plus
+        MAX_AUTO_CAPTION_LINES lignes, le nombre de lignes ne faisant que
+        croître d'une itération à l'autre. Les légendes "à droite" n'ont
+        pas besoin de cette boucle : leur largeur est fixe
+        (caption_area_mm) et leur hauteur suit déjà celle de la vignette.
+
+        Conséquence assumée : chaque PAGE ajuste la hauteur de légende à
+        SES propres photos (une page dont une photo a un nom d'objectif
+        très long peut avoir des vignettes légèrement plus petites que la
+        précédente)."""
+        profile = self.profile
+        caption_fields = profile.captions.effective_fields()
+        position = profile.layout.caption_position
+        if not caption_fields or position not in ("below", "above", "right"):
+            return compute_page_layout(profile, photo_count=len(images)), {}
+
+        per_page = compute_effective_per_page(profile)
+        metadata = [get_exif_metadata(img["path"]) for img in images[:per_page]]
+
+        font = get_font(max(6, pt_to_px(profile.captions.font_size)))
+        scratch = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+
+        def measure(text):
+            bbox = scratch.textbbox((0, 0), text, font=font)
+            return bbox[2] - bbox[0]
+
+        n_lines = max(1, profile.captions.lines)
+        max_lines = max(n_lines, MAX_AUTO_CAPTION_LINES)
+        while True:
+            page = compute_page_layout(profile, photo_count=len(images), caption_lines=n_lines)
+            texts = {}
+            needed = 1
+            for idx, cell in enumerate(page.cells):
+                if idx >= len(metadata) or cell.caption_w is None:
+                    continue
+                lines = layout_caption_lines(profile, metadata[idx], cell.caption_w, measure)
+                if lines:
+                    texts[idx] = lines
+                    needed = max(needed, len(lines))
+            if position == "right" or needed <= n_lines or n_lines >= max_lines:
+                return page, texts
+            n_lines = min(needed, max_lines)
 
     def _draw_header(self, draw, canvas_w, palette):
         font_title = get_font(54, bold=True)
@@ -187,22 +253,27 @@ class ContactSheetGenerator:
 
         return y
 
-    def _draw_caption(self, draw, lines, x, y, width, caption_settings, palette):
+    def _draw_caption(self, draw, lines, x, y, width, height, caption_settings, palette):
         """Dessine les lignes de légende d'UNE photo (cahier des charges
-        §1), déjà résolues par
-        portfolio.presentation.captions.resolve_caption_lines() - cette
-        méthode ne fait QUE les positionner/dessiner, aucune règle de
-        formatage n'est dupliquée ici. `x`/`y` : coin haut-gauche de la
-        zone de légende réservée pour cette photo ; `width` : largeur
-        utile de cette zone, pour le centrage/alignement horizontal.
+        §1), déjà résolues ET passées à la ligne par _plan_page()
+        (presentation.captions.layout_caption_lines()) - cette méthode ne
+        fait QUE les positionner/dessiner, aucune règle de formatage ni de
+        retour à la ligne n'est dupliquée ici. `x`/`y` : coin haut-gauche
+        de la zone de légende réservée pour cette photo ; `width`/`height` :
+        dimensions utiles de cette zone, pour le centrage/alignement
+        horizontal et pour borner le nombre de lignes dessinées.
 
-        Chaque ligne est tronquée (ellipsis "…") si elle dépasse `width` -
-        correctif d'un bug signalé : plusieurs champs de légende joints
-        sur une même ligne (ex: nom de fichier + date + appareil + ISO...)
-        pouvaient produire un texte bien plus large que la vignette, sans
-        aucune limite, débordant alors largement dans les cellules
-        voisines (gauche/droite) et rendant les légendes illisibles. Voir
-        CHANGELOG.md."""
+        Deux filets de sécurité, jamais un débordement dans les cellules
+        voisines (bug signalé : légendes qui se chevauchaient, illisibles) :
+        - une ligne plus large que `width` (un MOT isolé trop long) est
+          tronquée avec "…" ;
+        - s'il y a plus de lignes que `height` n'en peut contenir (légende
+          "à droite" sur une petite vignette, ou plafond
+          MAX_AUTO_CAPTION_LINES atteint), les lignes en trop sont
+          supprimées et la dernière se termine par "…".
+        Dans le cas ordinaire (plusieurs champs sur une vignette de taille
+        normale), aucun des deux ne s'applique : tout le texte est visible.
+        Voir CHANGELOG.md."""
         font_px = max(6, pt_to_px(caption_settings.font_size))
         font = get_font(font_px)
         # CAPTION_LINE_SPACING_PX : même constante que
@@ -211,6 +282,11 @@ class ContactSheetGenerator:
         # en dur ici, pour qu'une ligne dessinée ne puisse pas un jour
         # redevenir plus haute que l'espace réellement réservé.
         line_height = font_px + CAPTION_LINE_SPACING_PX
+
+        max_lines = max(1, height // line_height)
+        if len(lines) > max_lines:
+            lines = list(lines[:max_lines])
+            lines[-1] = lines[-1] + "…"
 
         for i, line in enumerate(lines):
             line = _fit_text_to_width(draw, line, font, width)

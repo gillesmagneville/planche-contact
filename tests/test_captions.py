@@ -157,3 +157,94 @@ def test_unknown_or_malformed_field_value_is_omitted_not_raised():
     profile = Profile(captions=CaptionSettings(fields=["filename", "dimensions", "gps"]))
     metadata = {"filename": "p.jpg", "dimensions": "pas un tuple", "gps": (1,)}
     assert resolve_caption_lines(profile, metadata) == ["p.jpg"]
+
+
+# ---------------------------------------------------------------------------
+# layout_caption_lines() : retour à la ligne dans une largeur en pixels
+# (rendu JPEG/PDF) - correctif du bug "informations tronquées par « … »
+# sous les photos" (voir CHANGELOG.md).
+# ---------------------------------------------------------------------------
+
+from portfolio.presentation import layout_caption_lines  # noqa: E402
+
+_FULL_METADATA = {
+    "filename": "photo.jpg",
+    "camera": "Canon EOS R5",
+    "lens": "RF 24-70mm F2.8 L IS USM",
+    "dimensions": (6000, 4000),
+}
+
+
+def _measure(text):
+    """Police fictive à chasse fixe : 10 px par caractère - rend les
+    largeurs prévisibles sans dépendre d'une vraie police."""
+    return len(text) * 10
+
+
+def test_layout_caption_lines_wraps_at_field_boundaries_instead_of_overflowing():
+    """Avec plusieurs champs et lines=1, tout tenait sur UNE ligne bien plus
+    large qu'une vignette. Les champs doivent maintenant passer à la ligne
+    AVANT de dépasser la largeur, sans jamais couper un champ en deux ni
+    laisser le séparateur en début/fin de ligne."""
+    profile = Profile(captions=CaptionSettings(
+        fields=["filename", "camera", "lens", "dimensions"], lines=1,
+    ))
+
+    lines = layout_caption_lines(profile, _FULL_METADATA, max_width=300, measure=_measure)
+
+    assert lines == [
+        "photo.jpg · Canon EOS R5",
+        "RF 24-70mm F2.8 L IS USM",
+        "6000 × 4000",
+    ]
+    assert all(_measure(line) <= 300 for line in lines)
+
+
+def test_layout_caption_lines_is_identical_to_resolve_caption_lines_when_everything_fits():
+    """Aucune régression pour le cas ordinaire : quand la largeur suffit,
+    le résultat est exactement celui de resolve_caption_lines(), y compris
+    la répartition explicite sur `lines` lignes."""
+    for n_lines in (1, 2, 3):
+        profile = Profile(captions=CaptionSettings(
+            fields=["filename", "camera", "lens", "dimensions"], lines=n_lines,
+        ))
+        assert (
+            layout_caption_lines(profile, _FULL_METADATA, max_width=100_000, measure=_measure)
+            == resolve_caption_lines(profile, _FULL_METADATA)
+        ), n_lines
+
+
+def test_layout_caption_lines_wraps_inside_a_single_field_that_is_too_wide():
+    """Un champ À LUI SEUL plus large que la zone (nom d'objectif long)
+    passe à la ligne aux espaces, plutôt que d'être tronqué."""
+    profile = Profile(captions=CaptionSettings(fields=["lens"], lines=1))
+
+    lines = layout_caption_lines(profile, _FULL_METADATA, max_width=150, measure=_measure)
+
+    assert lines == ["RF 24-70mm F2.8", "L IS USM"]
+
+
+def test_layout_caption_lines_keeps_a_single_oversized_word_intact():
+    """Un mot sans espace plus large que la zone n'est jamais découpé ici
+    (ce module ne connaît pas le rendu) : c'est contactsheet._draw_caption()
+    qui le borne à l'affichage."""
+    profile = Profile(captions=CaptionSettings(fields=["filename", "camera"], lines=1))
+    metadata = {"filename": "a_very_long_filename_without_any_space.jpg", "camera": "Canon"}
+
+    lines = layout_caption_lines(profile, metadata, max_width=100, measure=_measure)
+
+    assert lines == ["a_very_long_filename_without_any_space.jpg", "Canon"]
+
+
+def test_layout_caption_lines_returns_empty_list_without_fields_or_metadata():
+    assert layout_caption_lines(Profile(captions=CaptionSettings()), _FULL_METADATA, 300, _measure) == []
+    profile = Profile(captions=CaptionSettings(fields=["filename"]))
+    assert layout_caption_lines(profile, {}, 300, _measure) == []
+
+
+def test_layout_caption_lines_degenerate_width_falls_back_to_plain_lines():
+    profile = Profile(captions=CaptionSettings(fields=["filename", "camera"], lines=1))
+    assert (
+        layout_caption_lines(profile, _FULL_METADATA, max_width=0, measure=_measure)
+        == resolve_caption_lines(profile, _FULL_METADATA)
+    )

@@ -28,7 +28,7 @@ redondante qui pourrait diverger.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from .profile import Profile
 
@@ -137,6 +137,28 @@ def _chunk_evenly(items: list[str], n: int) -> list[list[str]]:
     return chunks
 
 
+def resolve_caption_parts(profile: Profile, metadata: dict) -> list[str]:
+    """Textes mis en forme des champs de légende d'UNE photo, dans l'ordre
+    configuré, SANS les avoir encore répartis sur des lignes ni joints par
+    le séparateur - uniquement les champs réellement présents dans les
+    métadonnées (liste vide sinon, jamais d'exception). Étape commune à
+    resolve_caption_lines() (répartition simple, utilisée par la galerie
+    HTML, dont le navigateur gère lui-même le retour à la ligne) et à
+    layout_caption_lines() (répartition tenant compte d'une largeur en
+    pixels, utilisée par le rendu JPEG/PDF)."""
+    captions = profile.captions
+    fields = captions.effective_fields()
+    if not fields or not metadata:
+        return []
+    return [
+        text for text in (
+            _format_field(field, metadata, captions.format_overrides)
+            for field in fields
+        )
+        if text
+    ]
+
+
 def resolve_caption_lines(profile: Profile, metadata: dict) -> list[str]:
     """Résout la ou les lignes de légende d'UNE photo, à partir de ses
     métadonnées (voir portfolio.utils.get_exif_metadata()) et des réglages
@@ -146,21 +168,93 @@ def resolve_caption_lines(profile: Profile, metadata: dict) -> list[str]:
     liste VIDE si aucun champ n'est configuré ou si aucune métadonnée n'a
     pu être extraite pour les champs demandés (ex: photo sans EXIF) : dans
     ce cas, l'appelant ne doit rien dessiner, jamais une légende vide ou
-    une exception."""
-    captions = profile.captions
-    fields = captions.effective_fields()
-    if not fields or not metadata:
-        return []
+    une exception.
 
-    parts = [
-        text for text in (
-            _format_field(field, metadata, captions.format_overrides)
-            for field in fields
-        )
-        if text
-    ]
+    Ne tient PAS compte d'une largeur disponible : voir
+    layout_caption_lines() pour un rendu en pixels fixes (JPEG/PDF)."""
+    parts = resolve_caption_parts(profile, metadata)
     if not parts:
         return []
 
-    chunks = _chunk_evenly(parts, max(1, captions.lines))
-    return [captions.separator.join(chunk) for chunk in chunks]
+    chunks = _chunk_evenly(parts, max(1, profile.captions.lines))
+    return [profile.captions.separator.join(chunk) for chunk in chunks]
+
+
+def _wrap_words(text: str, max_width: int, measure: Callable[[str], int]) -> list[str]:
+    """Dernier recours pour un champ À LUI SEUL plus large que la zone
+    (ex: un nom d'objectif très long) : retour à la ligne aux espaces,
+    glouton. Un mot isolé plus large que `max_width` reste seul sur sa
+    ligne, intact - c'est alors à l'appelant de le borner à l'affichage
+    (voir contactsheet._fit_text_to_width()), jamais ce module qui ne
+    connaît ni la police ni le rendu."""
+    if measure(text) <= max_width:
+        return [text]
+    lines: list[str] = []
+    current = ""
+    for word in text.split(" "):
+        candidate = word if not current else f"{current} {word}"
+        if not current or measure(candidate) <= max_width:
+            current = candidate
+        else:
+            lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines
+
+
+def _wrap_chunk(chunk: list[str], separator: str, max_width: int,
+                measure: Callable[[str], int]) -> list[str]:
+    """Remplit des lignes de gauche à droite avec les champs de `chunk`,
+    en passant à la ligne AVANT le champ qui ferait dépasser `max_width` :
+    un champ n'est donc jamais coupé en deux tant qu'il tient seul sur une
+    ligne, et le séparateur n'apparaît jamais en fin ni en début de ligne
+    (uniquement ENTRE deux champs d'une même ligne)."""
+    lines: list[str] = []
+    current = ""
+    for part in chunk:
+        if current:
+            candidate = f"{current}{separator}{part}"
+            if measure(candidate) <= max_width:
+                current = candidate
+                continue
+            lines.append(current)
+        pieces = _wrap_words(part, max_width, measure)
+        lines.extend(pieces[:-1])
+        current = pieces[-1]
+    if current:
+        lines.append(current)
+    return lines
+
+
+def layout_caption_lines(profile: Profile, metadata: dict, max_width: int,
+                         measure: Callable[[str], int]) -> list[str]:
+    """Comme resolve_caption_lines(), mais pour un rendu en pixels fixes :
+    aucune ligne renvoyée ne dépasse `max_width` (mesurée par `measure`,
+    fournie par l'appelant - ce module reste donc indépendant de PIL et de
+    toute police), tant que chaque MOT tient seul dans cette largeur.
+
+    CaptionSettings.lines est le nombre de lignes sur lequel les champs
+    sont d'abord répartis (voir resolve_caption_lines()) ; une ligne trop
+    large pour la zone passe ensuite à la ligne, aux frontières de champs
+    (voir _wrap_chunk()), au lieu d'être tronquée ("…") ou de déborder dans
+    les cellules voisines - correctif d'un bug signalé : avec plusieurs
+    champs cochés et "Lignes de texte" = 1, tout tenait sur une seule
+    ligne, bien plus large qu'une vignette. Le nombre de lignes réellement
+    nécessaire peut donc dépasser CaptionSettings.lines : c'est à l'appelant
+    de réserver la hauteur correspondante dans la mise en page (voir
+    contactsheet.py, `compute_page_layout(..., caption_lines=...)`).
+
+    `max_width` <= 0 (zone dégénérée) : repli sur resolve_caption_lines()."""
+    if max_width <= 0:
+        return resolve_caption_lines(profile, metadata)
+
+    parts = resolve_caption_parts(profile, metadata)
+    if not parts:
+        return []
+
+    separator = profile.captions.separator
+    lines: list[str] = []
+    for chunk in _chunk_evenly(parts, max(1, profile.captions.lines)):
+        lines.extend(_wrap_chunk(chunk, separator, max_width, measure))
+    return lines

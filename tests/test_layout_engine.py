@@ -330,3 +330,43 @@ def test_edge_case_small_photo_counts_do_not_crash(photo_count):
     profile = Profile(layout=LayoutSettings(template="grid", per_page=12))
     page = compute_page_layout(profile, photo_count=photo_count)
     assert len(page.cells) == photo_count
+
+
+def test_caption_lines_override_reserves_the_height_of_that_many_lines():
+    """`caption_lines` permet à contactsheet.py de réserver la hauteur des
+    lignes RÉELLEMENT nécessaires une fois les légendes passées à la ligne
+    (voir ContactSheetGenerator._plan_page()), qui peut dépasser le réglage
+    captions.lines : sans cela, les légendes plus hautes que prévu
+    déborderaient dans la rangée suivante."""
+    profile = Profile(layout=LayoutSettings(
+        template="grid", per_page=12, caption_position="below", caption_area_mm=8,
+    ), captions=CaptionSettings(fields=["filename"], lines=1, font_size=9))
+
+    default_page = compute_page_layout(profile, photo_count=12)
+    five_lines_page = compute_page_layout(profile, photo_count=12, caption_lines=5)
+
+    line_h = pt_to_px(9) + CAPTION_LINE_SPACING_PX
+    assert 5 * line_h > mm_to_px(8), "le scénario doit bien dépasser caption_area_mm pour être significatif"
+    assert five_lines_page.cells[0].caption_h == 5 * line_h
+    assert five_lines_page.cells[0].caption_h > default_page.cells[0].caption_h
+    # Plus de place pour le texte = vignettes plus petites, jamais l'inverse.
+    assert five_lines_page.thumb_size < default_page.thumb_size
+    # Sans argument : strictement identique à captions.lines (compatibilité).
+    assert compute_page_layout(profile, photo_count=12, caption_lines=1).cells[0].caption_h == \
+        default_page.cells[0].caption_h
+
+
+def test_caption_lines_override_is_ignored_for_right_captions():
+    """Pour "right", la largeur est fixe (caption_area_mm) et la hauteur
+    suit déjà celle de la vignette : le nombre de lignes ne change rien à
+    la géométrie."""
+    profile = Profile(layout=LayoutSettings(
+        template="grid", per_page=12, caption_position="right", caption_area_mm=20,
+    ), captions=CaptionSettings(fields=["filename"]))
+
+    base = compute_page_layout(profile, photo_count=12)
+    more_lines = compute_page_layout(profile, photo_count=12, caption_lines=9)
+
+    assert more_lines.thumb_size == base.thumb_size
+    assert more_lines.cells[0].caption_w == base.cells[0].caption_w
+    assert more_lines.cells[0].caption_h == base.cells[0].caption_h
