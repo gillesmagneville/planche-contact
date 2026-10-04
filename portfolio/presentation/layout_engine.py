@@ -192,6 +192,15 @@ class PageLayout:
 #: qui pourraient diverger.
 CAPTION_LINE_SPACING_PX = 4
 
+#: Espace vertical (légende "below"/"above") ou horizontal (légende
+#: "right") entre une photo et SA légende, en pixels à 300 ppp (~1,5 mm).
+#: Réservé EN PLUS de la zone de texte (voir compute_page_layout()), jamais
+#: pris sur elle : `cell.caption_w`/`cell.caption_h` restent la taille de la
+#: zone de texte seule (celle de "Zone de légende (mm)"). Sans cet espace,
+#: une photo qui remplit sa cellule (portrait, ou carrée) avait sa légende
+#: collée à son bord, le haut des lettres touchant presque l'image.
+CAPTION_PHOTO_GAP_PX = 18
+
 
 def _reserve_caption_px(profile: Profile, caption_lines: Optional[int] = None) -> tuple[int, int]:
     """Espace (largeur, hauteur) en pixels à réserver par cellule pour la
@@ -352,12 +361,20 @@ def compute_page_layout(profile: Profile, photo_count: int,
     available_h = canvas_h - 2 * margin_px - HEADER_RESERVED_PX_GRID
 
     caption_w_px, caption_h_px = _reserve_caption_px(profile, caption_lines)
+    # Écart photo/légende : réservé en plus de la zone de texte, dans le
+    # sens où la légende est accolée à la photo (largeur pour "right",
+    # hauteur pour "below"/"above"). Ce sont ces TOTAUX (zone + écart) qui
+    # entrent dans le calcul de la taille de vignette et du pas entre
+    # cellules ; les cellules exposent, elles, la zone de texte seule.
+    gap_px = CAPTION_PHOTO_GAP_PX if layout.caption_position in ("below", "above", "right") else 0
+    reserved_w_px = caption_w_px + (gap_px if layout.caption_position == "right" else 0)
+    reserved_h_px = caption_h_px + (gap_px if layout.caption_position in ("below", "above") else 0)
 
     effective_per_page = compute_effective_per_page(profile)
 
     if layout.template == "free":
         thumb_size, cols = _free_layout(profile, available_w, available_h, spacing_px,
-                                         caption_w_px, caption_h_px)
+                                         reserved_w_px, reserved_h_px)
         # "free" n'est pas concerné par la réduction d'effectif de
         # "large_thumbs" (compute_effective_per_page() renvoie
         # layout.per_page tel quel pour ce modèle) ; conservé ici pour que
@@ -366,7 +383,7 @@ def compute_page_layout(profile: Profile, photo_count: int,
         effective_per_page = layout.per_page
     elif layout.template == "large_thumbs":
         thumb_size, cols = _grid_search(available_w, available_h, effective_per_page, spacing_px,
-                                         LARGE_THUMBS_MAX_COLUMNS_TESTED, caption_w_px, caption_h_px)
+                                         LARGE_THUMBS_MAX_COLUMNS_TESTED, reserved_w_px, reserved_h_px)
     elif layout.template in ("landscape", "portrait"):
         # Recherche identique à "grid", mais la préférence entre deux
         # nombres de colonnes donnant une taille de vignette quasi
@@ -378,7 +395,7 @@ def compute_page_layout(profile: Profile, photo_count: int,
         # demande ne spécifiant pas de règle exacte au-delà du nom des
         # modèles.
         thumb_size, cols = _grid_search(available_w, available_h, effective_per_page, spacing_px,
-                                         GRID_MAX_COLUMNS_TESTED, caption_w_px, caption_h_px)
+                                         GRID_MAX_COLUMNS_TESTED, reserved_w_px, reserved_h_px)
         rows_at_cols = math.ceil(effective_per_page / cols)
         prefer_more_cols = layout.template == "landscape"
         candidates = range(1, min(effective_per_page + 1, GRID_MAX_COLUMNS_TESTED + 1))
@@ -388,18 +405,18 @@ def compute_page_layout(profile: Profile, photo_count: int,
             alt_rows = math.ceil(effective_per_page / alt_cols)
             cell_w = available_w // alt_cols if alt_cols > 1 else available_w
             cell_h = available_h // alt_rows if alt_rows > 1 else available_h
-            alt_thumb = min(max(1, cell_w - caption_w_px), max(1, cell_h - caption_h_px))
+            alt_thumb = min(max(1, cell_w - reserved_w_px), max(1, cell_h - reserved_h_px))
             if alt_thumb >= thumb_size * 0.95 and (
                 (prefer_more_cols and alt_cols > cols) or (not prefer_more_cols and alt_cols < cols)
             ):
                 cols, thumb_size, rows_at_cols = alt_cols, alt_thumb, alt_rows
         thumb_size = max(MIN_THUMB_SIZE_PX, _apply_spacing_clamp(
             thumb_size, available_w, available_h, cols, rows_at_cols, spacing_px,
-            caption_w_px, caption_h_px,
+            reserved_w_px, reserved_h_px,
         ))
     else:  # "grid", et filet de sécurité pour une valeur inconnue
         thumb_size, cols = _grid_search(available_w, available_h, effective_per_page, spacing_px,
-                                         GRID_MAX_COLUMNS_TESTED, caption_w_px, caption_h_px)
+                                         GRID_MAX_COLUMNS_TESTED, reserved_w_px, reserved_h_px)
 
     rows = math.ceil(effective_per_page / cols)
     content_top_px = margin_px + HEADER_RESERVED_PX_GRID
@@ -409,20 +426,22 @@ def compute_page_layout(profile: Profile, photo_count: int,
     for idx in range(n_cells):
         row = idx // cols
         col = idx % cols
-        cell_x = margin_px + col * (thumb_size + caption_w_px + spacing_px)
-        cell_y = content_top_px + row * (thumb_size + caption_h_px + spacing_px)
+        cell_x = margin_px + col * (thumb_size + reserved_w_px + spacing_px)
+        cell_y = content_top_px + row * (thumb_size + reserved_h_px + spacing_px)
 
         if layout.caption_position == "above":
-            caption_y, photo_y = cell_y, cell_y + caption_h_px
+            # légende, puis écart, puis photo
+            caption_y, photo_y = cell_y, cell_y + caption_h_px + gap_px
         else:
-            photo_y, caption_y = cell_y, cell_y + thumb_size
+            # photo, puis écart, puis légende
+            photo_y, caption_y = cell_y, cell_y + thumb_size + gap_px
 
         cell = CellLayout(
             index=idx, row=row, col=col,
             photo_x=cell_x, photo_y=photo_y, photo_w=thumb_size, photo_h=thumb_size,
         )
         if layout.caption_position == "right":
-            cell.caption_x = cell_x + thumb_size
+            cell.caption_x = cell_x + thumb_size + gap_px
             cell.caption_y = cell_y
             cell.caption_w = caption_w_px
             cell.caption_h = thumb_size

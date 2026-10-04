@@ -22,7 +22,7 @@ from portfolio.presentation import (
 from portfolio.presentation.layout_engine import (
     PAPER_SIZES_MM, mm_to_px, pt_to_px, canvas_size_px, MIN_THUMB_SIZE_PX,
     LARGE_THUMBS_MAX_COLUMNS_TESTED, LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE,
-    CAPTION_LINE_SPACING_PX,
+    CAPTION_LINE_SPACING_PX, CAPTION_PHOTO_GAP_PX,
 )
 
 
@@ -144,7 +144,7 @@ def test_caption_position_below_reserves_vertical_space():
 
     assert page_with_caption.thumb_size < page_no_caption.thumb_size
     cell = page_with_caption.cells[0]
-    assert cell.caption_y == cell.photo_y + cell.photo_h
+    assert cell.caption_y == cell.photo_y + cell.photo_h + CAPTION_PHOTO_GAP_PX
     assert cell.caption_h == mm_to_px(10)
 
 
@@ -153,7 +153,7 @@ def test_caption_position_above_places_caption_before_photo():
     page = compute_page_layout(profile, photo_count=12)
     cell = page.cells[0]
     assert cell.caption_y < cell.photo_y
-    assert cell.photo_y == cell.caption_y + cell.caption_h
+    assert cell.photo_y == cell.caption_y + cell.caption_h + CAPTION_PHOTO_GAP_PX
 
 
 def test_caption_position_right_reserves_horizontal_space():
@@ -173,7 +173,7 @@ def test_caption_position_right_reserves_horizontal_space():
 
     assert page_with_caption.thumb_size < page_no_caption.thumb_size
     cell = page_with_caption.cells[0]
-    assert cell.caption_x == cell.photo_x + cell.photo_w
+    assert cell.caption_x == cell.photo_x + cell.photo_w + CAPTION_PHOTO_GAP_PX
     assert cell.caption_w == mm_to_px(15)
 
 
@@ -370,3 +370,54 @@ def test_caption_lines_override_is_ignored_for_right_captions():
     assert more_lines.thumb_size == base.thumb_size
     assert more_lines.cells[0].caption_w == base.cells[0].caption_w
     assert more_lines.cells[0].caption_h == base.cells[0].caption_h
+
+
+def test_photo_caption_gap_is_reserved_on_top_of_the_text_zone():
+    """L'écart entre une photo et sa légende (CAPTION_PHOTO_GAP_PX) ne doit
+    jamais être pris SUR la zone de texte réglée par l'utilisateur
+    (caption_h reste « Zone de légende (mm) ») : il s'ajoute au pas entre
+    deux rangées, sinon la dernière ligne d'une légende pourrait toucher
+    la photo de la rangée suivante."""
+    profile = Profile(layout=LayoutSettings(
+        template="grid", per_page=12, caption_position="below", caption_area_mm=10,
+    ))
+    page = compute_page_layout(profile, photo_count=12)
+    assert page.rows >= 2
+    first, below_first = page.cells[0], page.cells[page.cols]
+
+    assert first.caption_h == mm_to_px(10)
+    assert first.caption_y - (first.photo_y + first.photo_h) == CAPTION_PHOTO_GAP_PX
+    assert below_first.photo_y - first.photo_y == (
+        page.thumb_size + CAPTION_PHOTO_GAP_PX + mm_to_px(10) + page.spacing_px
+    )
+
+
+def test_no_gap_is_reserved_without_a_caption():
+    """Sans légende, la géométrie reste exactement celle d'origine - aucun
+    écart fantôme réservé."""
+    page = compute_page_layout(Profile(), photo_count=12)
+    first, below_first = page.cells[0], page.cells[page.cols]
+    assert below_first.photo_y - first.photo_y == page.thumb_size + page.spacing_px
+    assert first.caption_x is None and first.caption_y is None
+
+
+@pytest.mark.parametrize("position", ["below", "above", "right"])
+@pytest.mark.parametrize("per_page", [6, 12, 24])
+def test_caption_zone_never_overlaps_another_photo_nor_leaves_the_page(position, per_page):
+    profile = Profile(
+        layout=LayoutSettings(template="grid", per_page=per_page, caption_position=position, caption_area_mm=10),
+        captions=CaptionSettings(fields=["filename"], lines=2),
+    )
+    page = compute_page_layout(profile, photo_count=per_page)
+
+    for a in page.cells:
+        cap_right = a.caption_x + a.caption_w
+        cap_bottom = a.caption_y + a.caption_h
+        assert cap_right <= page.canvas_w and cap_bottom <= page.canvas_h
+        assert a.photo_x + a.photo_w <= page.canvas_w and a.photo_y + a.photo_h <= page.canvas_h
+        for b in page.cells:
+            if a.index == b.index:
+                continue
+            overlap_x = a.caption_x < b.photo_x + b.photo_w and b.photo_x < cap_right
+            overlap_y = a.caption_y < b.photo_y + b.photo_h and b.photo_y < cap_bottom
+            assert not (overlap_x and overlap_y), (position, per_page, a.index, b.index)

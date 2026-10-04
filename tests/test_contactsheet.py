@@ -521,3 +521,106 @@ def test_draw_caption_never_draws_more_lines_than_the_reserved_height(tmp_path):
     # Tolérance de quelques pixels pour le jambage (descendante) de la
     # dernière ligne autorisée, mais certainement pas 4 lignes de plus.
     assert dark_rows.max() < y0 + 2 * line_height + 8
+
+
+# ---------------------------------------------------------------------------
+# Photo collée à sa légende (au lieu de rester en haut à gauche de la cellule
+# carrée, avec un vide sous les photos en paysage).
+# ---------------------------------------------------------------------------
+
+def test_thumb_offset_sits_the_photo_against_its_caption():
+    from portfolio.contactsheet import _thumb_offset
+
+    landscape, portrait = (400, 300), (300, 400)  # dans une cellule 400 x 400
+    # "below" : photo posée sur sa légende (alignée en bas), centrée par défaut
+    assert _thumb_offset("below", "center", landscape, 400) == (0, 100)
+    assert _thumb_offset("below", "center", portrait, 400) == (50, 0)
+    # horizontalement, la photo suit l'alignement du texte
+    assert _thumb_offset("below", "left", portrait, 400) == (0, 0)
+    assert _thumb_offset("below", "right", portrait, 400) == (100, 0)
+    # "above" : photo collée sous sa légende (alignée en haut)
+    assert _thumb_offset("above", "center", landscape, 400) == (0, 0)
+    # "right" : photo collée contre sa légende (alignée à droite)
+    assert _thumb_offset("right", "center", portrait, 400) == (100, 0)
+    assert _thumb_offset("right", "center", landscape, 400) == (0, 0)
+    # sans légende : comportement d'origine, aucun décalage
+    assert _thumb_offset("none", "center", landscape, 400) == (0, 0)
+    # jamais de décalage négatif si la vignette dépasse la cellule
+    assert _thumb_offset("below", "center", (500, 500), 400) == (0, 0)
+
+
+def _photo_segments(column, photo_color):
+    is_photo = np.all(np.abs(column - np.array(photo_color)) < 12, axis=1)
+    segments, in_segment, start = [], False, 0
+    for y, flag in enumerate(is_photo):
+        if flag and not in_segment:
+            start, in_segment = y, True
+        elif not flag and in_segment:
+            segments.append((start, y - 1))
+            in_segment = False
+    if in_segment:
+        segments.append((start, len(is_photo) - 1))
+    return segments
+
+
+def test_landscape_photo_has_its_caption_right_under_it(tmp_path, monkeypatch):
+    """Demande de l'utilisateur : « resserrer l'espace » entre une photo en
+    paysage et sa légende. La vignette 4:3 n'occupait que 3/4 de sa cellule
+    carrée, collée en haut, et la légende démarrait sous la CELLULE : un
+    vide d'un quart de vignette les séparait. Désormais la photo est posée
+    sur sa légende : seul l'écart voulu (CAPTION_PHOTO_GAP_PX) subsiste."""
+    from portfolio.presentation import pt_to_px, CAPTION_PHOTO_GAP_PX
+
+    photo_color = (10, 200, 10)
+    images, config, cs_gen = _caption_generator(tmp_path, monkeypatch, color=photo_color)
+    sheet = cs_gen.create_contact_sheet(images, 1, 1)
+    page, _ = cs_gen._plan_page(images)
+    cell0 = page.cells[0]
+
+    arr = np.array(sheet).astype(int)
+    segments = _photo_segments(arr[:, cell0.photo_x + cell0.photo_w // 2, :], photo_color)
+    assert len(segments) >= 2
+    photo_bottom, next_photo_top = segments[0][1], segments[1][0]
+
+    band = arr[photo_bottom + 1:next_photo_top, cell0.photo_x:cell0.photo_x + cell0.photo_w, :]
+    text_rows = np.where(np.any(band < 128, axis=(1, 2)))[0]
+    assert text_rows.size > 0
+    gap_to_text = int(text_rows.min())  # lignes vides entre le bas de la photo et le 1er pixel de texte
+
+    font_px = max(6, pt_to_px(9))
+    assert CAPTION_PHOTO_GAP_PX <= gap_to_text < CAPTION_PHOTO_GAP_PX + font_px, (
+        f"écart photo/légende de {gap_to_text}px : attendu l'écart voulu "
+        f"({CAPTION_PHOTO_GAP_PX}px) plus l'approche de la lettre, pas le vide d'une cellule carrée"
+    )
+
+
+def test_portrait_photo_is_centered_above_its_centered_caption(tmp_path, monkeypatch):
+    """Une photo en portrait (plus étroite que sa cellule carrée) était
+    collée à GAUCHE de la cellule alors que sa légende était centrée : elle
+    suit désormais l'alignement de la légende."""
+    photo_color = (10, 200, 10)
+    monkeypatch.setattr("portfolio.contactsheet.get_exif_metadata", _fake_rich_metadata)
+    images = _make_images(tmp_path, 6, color=photo_color, size=(600, 800))
+    profile = Profile(
+        layout=LayoutSettings(template="grid", per_page=6, caption_position="below", caption_area_mm=8),
+        captions=CaptionSettings(fields=["filename"], lines=1, font_size=9, alignment="center"),
+    )
+    config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=6,
+                    page_format="A4", profile=profile)
+    cs_gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
+    sheet = cs_gen.create_contact_sheet(images, 1, 1)
+    page, _ = cs_gen._plan_page(images)
+    cell0 = page.cells[0]
+
+    arr = np.array(sheet).astype(int)
+    center_x = cell0.photo_x + cell0.photo_w // 2
+    segments = _photo_segments(arr[:, center_x, :], photo_color)
+    assert segments, "la colonne centrale de la cellule doit traverser la photo"
+    row = arr[(segments[0][0] + segments[0][1]) // 2, :, :]
+    cols = np.where(np.all(np.abs(row - np.array(photo_color)) < 12, axis=1))[0]
+    cols = cols[(cols >= cell0.photo_x) & (cols < cell0.photo_x + cell0.photo_w)]
+
+    left_margin = int(cols.min() - cell0.photo_x)
+    right_margin = int(cell0.photo_x + cell0.photo_w - 1 - cols.max())
+    assert left_margin > 0, "une photo en portrait doit être plus étroite que sa cellule"
+    assert abs(left_margin - right_margin) <= 1, (left_margin, right_margin)

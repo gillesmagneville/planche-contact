@@ -55,6 +55,50 @@ def _fit_text_to_width(draw, text, font, max_width):
     return ellipsis
 
 
+def _thumb_offset(caption_position, alignment, thumb_wh, cell_size):
+    """Décalage (dx, dy), en pixels, de la vignette À L'INTÉRIEUR de sa
+    cellule carrée `cell_size x cell_size`, pour que la photo soit collée
+    à sa légende au lieu de rester en haut à gauche de la cellule.
+
+    Une vignette garde ses proportions (`Image.thumbnail`) : une photo en
+    paysage 4:3 n'occupe que les trois quarts de la hauteur de la cellule,
+    et la légende, placée sous la cellule (voir
+    layout_engine.compute_page_layout()), était donc séparée de sa photo
+    par un vide - d'autant plus visible que la légende fait plusieurs
+    lignes. Le vide se retrouve maintenant du côté opposé à la légende,
+    ce qui regroupe visuellement chaque photo avec sa légende ET garde les
+    légendes alignées d'une photo à l'autre (la zone de légende, elle,
+    n'a pas bougé) :
+
+    - "below" : photo posée sur sa légende (alignée en bas) ;
+    - "above" : photo collée sous sa légende (alignée en haut) ;
+    - "right" : photo collée contre sa légende (alignée à droite) ;
+    - horizontalement, pour "below"/"above", la photo suit l'alignement du
+      texte (gauche/centre/droite) - auparavant toujours à gauche, alors
+      que la légende était centrée sous la cellule.
+
+    Sans légende (`caption_position` autre que ces trois valeurs, y compris
+    "none" - la valeur à passer quand aucun champ n'est configuré) :
+    (0, 0), strictement le comportement d'origine."""
+    width, height = thumb_wh
+    free_w = max(0, cell_size - width)
+    free_h = max(0, cell_size - height)
+
+    if caption_position == "right":
+        return free_w, 0
+    if caption_position not in ("below", "above"):
+        return 0, 0
+
+    dy = free_h if caption_position == "below" else 0
+    if alignment == "left":
+        dx = 0
+    elif alignment == "right":
+        dx = free_w
+    else:
+        dx = free_w // 2
+    return dx, dy
+
+
 class ContactSheetGenerator:
     def __init__(self, config, thumbnail_generator):
         self.config = config
@@ -132,6 +176,13 @@ class ContactSheetGenerator:
         # de retrancher l'espace de légende de l'écart entre lignes).
         y_shift = y_start - page.content_top_px
 
+        # Position de légende réellement DESSINÉE : sans aucun champ
+        # configuré, la zone est réservée mais reste vide - on garde alors
+        # les vignettes exactement où elles étaient (voir _thumb_offset()).
+        drawn_caption_position = (
+            profile.layout.caption_position if profile.captions.effective_fields() else "none"
+        )
+
         for idx, thumb in enumerate(thumbnails):
             if idx >= effective_per_page or idx >= len(page.cells):
                 break
@@ -148,7 +199,10 @@ class ContactSheetGenerator:
 
             cell = page.cells[idx]
             x, y = cell.photo_x, cell.photo_y + y_shift
-            sheet.paste(thumb, (x, y))
+            dx, dy = _thumb_offset(
+                drawn_caption_position, profile.captions.alignment, thumb.size, thumb_size,
+            )
+            sheet.paste(thumb, (x + dx, y + dy))
 
             lines = caption_lines_by_idx.get(idx)
             if lines and cell.caption_x is not None:
