@@ -76,6 +76,17 @@ from portfolio.presentation import (
 )
 
 
+# Hauteur minimale de la zone de journal de la fenêtre principale.
+LOG_MIN_HEIGHT_PX = 120
+
+# Hauteur à laisser, dans la fenêtre principale, à tout ce qui n'est PAS le
+# formulaire défilant : barre de titre et onglets (~85 px), boutons d'action,
+# état, progression, journal (LOG_MIN_HEIGHT_PX) et leurs marges, plus de
+# quoi tenir compte de la barre des tâches/du bandeau du bureau. Sert à
+# déduire du plafond de hauteur de l'écran celui du formulaire défilant.
+MAIN_WINDOW_RESERVED_PX = 330
+
+
 def glib_idle_add(function, *args):
     """Enveloppe autour de GLib.idle_add(), tolérante à deux conventions
     d'appel possibles selon la version/le binding de PyGObject :
@@ -487,10 +498,20 @@ class PlancheContactGTK(Gtk.Application):
     # ====================== ONGLET GÉNÉRATION ======================
 
     def _build_generation_tab(self):
+        # L'onglet est en DEUX parties (voir la fin de cette méthode) :
+        # - le formulaire (`box` jusqu'à la grille des options de la galerie
+        #   HTML), dans une zone défilante : sur un petit écran, il défile
+        #   au lieu de pousser la fenêtre au-delà de la hauteur de l'écran ;
+        # - le bas, TOUJOURS visible : boutons d'action, état, progression et
+        #   journal (c'est là que s'affichent les messages de génération - ils
+        #   sortaient de l'écran quand la fenêtre était trop haute).
+        # Les petites marges (4 px) autour du formulaire évitent que la zone
+        # défilante ne rogne le halo de focus des champs en bordure.
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        box.set_margin_top(15)
-        box.set_margin_start(25)
-        box.set_margin_end(25)
+        box.set_margin_top(4)
+        box.set_margin_bottom(4)
+        box.set_margin_start(4)
+        box.set_margin_end(4)
 
         # Titre du projet + Nom de l'auteur (même ligne)
         hbox = Gtk.Box(spacing=10)
@@ -714,6 +735,27 @@ class PlancheContactGTK(Gtk.Application):
 
         box.append(grid)
 
+        form_box = box
+        form_scroll = Gtk.ScrolledWindow()
+        form_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        # Hauteur/largeur NATURELLES du formulaire propagées à la fenêtre
+        # (sinon la zone défilante s'ouvrirait quasi vide), plafonnées à ce
+        # que l'écran peut contenir (_apply_form_scroll_limits()) : c'est ce
+        # plafond qui fait apparaître l'ascenseur sur un petit écran, et lui
+        # seul - sur un grand écran la fenêtre garde la taille de son contenu.
+        form_scroll.set_propagate_natural_width(True)
+        form_scroll.set_propagate_natural_height(True)
+        form_scroll.set_child(form_box)
+        self.form_scroll = form_scroll
+        self.form_box = form_box
+        self._apply_form_scroll_limits()
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_top(15)
+        box.set_margin_start(25)
+        box.set_margin_end(25)
+        box.append(form_scroll)
+
         # Mise en page/légendes/thème personnalisables (cahier des charges
         # §1/§2/§4) : dans une fenêtre modale à part, clairement à l'écart
         # des réglages simples/courants ci-dessus - voir
@@ -730,12 +772,11 @@ class PlancheContactGTK(Gtk.Application):
         # masquée à sa fermeture (les réglages sont conservés).
         self.adv_content = self._build_advanced_section()
         self._adv_dialog = None
+        # Le bouton qui l'ouvre est sur la ligne des boutons d'action
+        # (juste après « Lancer »), plus bas dans cette méthode.
         self.adv_open_btn = Gtk.Button(label=_("adv.open_button"))
-        self.adv_open_btn.set_halign(Gtk.Align.START)
-        self.adv_open_btn.set_margin_top(4)
         self.adv_open_btn.set_tooltip_text(_("adv.open_button_tooltip"))
         self.adv_open_btn.connect("clicked", self._open_advanced_dialog)
-        box.append(self.adv_open_btn)
         self._apply_profile_to_widgets(default_profile())
 
         # Boutons
@@ -791,6 +832,7 @@ class PlancheContactGTK(Gtk.Application):
 
         left_box = Gtk.Box(spacing=10)
         left_box.append(self.run_button)
+        left_box.append(self.adv_open_btn)
         left_box.append(reset_btn)
         left_box.append(self.view_results_btn)
 
@@ -815,7 +857,11 @@ class PlancheContactGTK(Gtk.Application):
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_child(self.log_view)
         scrolled.set_vexpand(True)
-        scrolled.set_min_content_height(260)
+        # Hauteur minimale modeste : la fenêtre doit tenir sur un écran
+        # (260 px auparavant, soit ~140 px de trop). Le journal reste
+        # extensible : il récupère tout l'espace gagné en agrandissant la
+        # fenêtre (set_vexpand ci-dessus).
+        scrolled.set_min_content_height(LOG_MIN_HEIGHT_PX)
         box.append(scrolled)
 
         return box
@@ -882,22 +928,71 @@ class PlancheContactGTK(Gtk.Application):
         dialog.add_controller(key_controller)
         return dialog
 
+    def _screen_size(self):
+        """(largeur, hauteur) en pixels de l'écran de la fenêtre principale.
+        Avant que celle-ci soit affichée (pas encore de surface - cas de la
+        construction de l'interface), on se rabat sur le premier écran du
+        système, normalement l'écran principal ; valeurs prudentes si rien
+        n'est lisible (aucune exception ne doit empêcher le démarrage)."""
+        try:
+            display = Gdk.Display.get_default()
+            monitor = None
+            surface = self.win.get_surface() if self.win is not None else None
+            if surface is not None:
+                monitor = display.get_monitor_at_surface(surface)
+            if monitor is None:
+                monitors = display.get_monitors()
+                if monitors.get_n_items() > 0:
+                    monitor = monitors.get_item(0)
+            if monitor is not None:
+                geometry = monitor.get_geometry()
+                if geometry.width > 0 and geometry.height > 0:
+                    return geometry.width, geometry.height
+        except Exception:
+            pass
+        return 1400, 800
+
+    def _apply_form_scroll_limits(self):
+        """Plafonne la zone défilante du formulaire de la fenêtre principale
+        pour que celle-ci, une fois ajoutés ses autres éléments (voir
+        MAIN_WINDOW_RESERVED_PX), tienne dans 85 % de la hauteur de l'écran
+        et dans 95 % de sa largeur. Sur un écran assez grand, le plafond
+        n'est jamais atteint : la fenêtre garde la taille de son contenu."""
+        width, height = self._screen_size()
+        self.form_scroll.set_max_content_width(int(width * 0.95))
+        self._configure_scroll_area(
+            self.form_scroll, self.form_box,
+            max(160, int(height * 0.85) - MAIN_WINDOW_RESERVED_PX),
+        )
+
+    def _configure_scroll_area(self, scrolled, content, max_height):
+        """Plafonne la hauteur d'une zone défilante et, SEULEMENT si son
+        contenu dépasse ce plafond (donc s'il va réellement défiler), y
+        affiche un ascenseur vertical classique, toujours présent : les
+        ascenseurs « surcouche » de GTK4 n'apparaissent qu'au survol, et
+        l'utilisateur ne devinerait pas que la zone défile.
+
+        « Toujours présent » (et non « automatique ») est ce qui fait
+        réserver à GTK la largeur de l'ascenseur dans la largeur naturelle
+        propagée à la fenêtre. Avec un ascenseur classique apparaissant à la
+        demande, il prend de la largeur à un contenu qui occupait déjà toute
+        la zone, et un ascenseur HORIZONTAL parasite apparaît aussi (constaté
+        sous Xvfb). Contenu qui tient dans le plafond : rien ne change -
+        aucun ascenseur, comportement par défaut."""
+        scrolled.set_max_content_height(max_height)
+        needs_scrolling = content.measure(Gtk.Orientation.VERTICAL, -1)[1] > max_height
+        scrolled.set_overlay_scrolling(not needs_scrolling)
+        scrolled.set_policy(
+            Gtk.PolicyType.AUTOMATIC,
+            Gtk.PolicyType.ALWAYS if needs_scrolling else Gtk.PolicyType.AUTOMATIC,
+        )
+
     def _advanced_dialog_limits(self):
         """(largeur, hauteur) maximales de la zone défilante, déduites de
         l'écran où se trouve la fenêtre principale : la fenêtre des réglages
         avancés, barre de titre et barre du bas comprises, doit tenir dans
-        l'écran - jamais plus haute que lui (le défaut corrigé ici). Repli
-        sur des valeurs prudentes si la taille de l'écran est introuvable."""
-        width, height = 1400, 800
-        try:
-            surface = self.win.get_surface()
-            monitor = Gdk.Display.get_default().get_monitor_at_surface(surface)
-            if monitor is not None:
-                geometry = monitor.get_geometry()
-                if geometry.width > 0 and geometry.height > 0:
-                    width, height = geometry.width, geometry.height
-        except Exception:
-            pass
+        l'écran - jamais plus haute que lui (le défaut corrigé ici)."""
+        width, height = self._screen_size()
         return int(width * 0.92), int(height * 0.72)
 
     def _open_advanced_dialog(self, button=None):
@@ -905,7 +1000,7 @@ class PlancheContactGTK(Gtk.Application):
             self._adv_dialog = self._build_advanced_dialog()
         max_width, max_height = self._advanced_dialog_limits()
         self.adv_scroll.set_max_content_width(max_width)
-        self.adv_scroll.set_max_content_height(max_height)
+        self._configure_scroll_area(self.adv_scroll, self.adv_content, max_height)
         self.adv_status_label.set_text("")
         self._adv_dialog.present()
 
@@ -1037,46 +1132,52 @@ class PlancheContactGTK(Gtk.Application):
         self.adv_fit_mode_dd.set_tooltip_text(_("adv.fit_mode_tooltip"))
         grid.attach(self.adv_fit_mode_dd, 5, 0, 1, 1)
 
-        grid.attach(Gtk.Label(label=_("adv.margin_label"), xalign=0), 0, 1, 1, 1)
-        self.adv_margin_spin = Gtk.SpinButton.new_with_range(0, 60, 1)
-        grid.attach(self.adv_margin_spin, 1, 1, 1, 1)
-
-        spacing_label = Gtk.Label(label=_("adv.spacing_label"), xalign=0)
-        spacing_label.set_margin_start(20)
-        grid.attach(spacing_label, 2, 1, 1, 1)
-        self.adv_spacing_spin = Gtk.SpinButton.new_with_range(0, 40, 1)
-        grid.attach(self.adv_spacing_spin, 3, 1, 1, 1)
-
+        # Quatre lignes de TROIS colonnes de réglages au plus, plutôt que
+        # trois lignes dont une de quatre : les libellés « Colonnes/Lignes
+        # (modèle Libre, 0 = auto) » étant les plus longs, les placer à côté
+        # de la marge et de l'espacement portait la fenêtre des réglages
+        # avancés à ~1260 px de large - plus qu'un écran de 1366 px une fois
+        # l'ascenseur compté. Les réglages du modèle (colonnes/lignes, actifs
+        # seulement pour « Libre ») suivent donc directement le modèle.
         cols_label = Gtk.Label(label=_("adv.free_columns_label"), xalign=0)
-        cols_label.set_margin_start(20)
-        grid.attach(cols_label, 4, 1, 1, 1)
+        grid.attach(cols_label, 0, 1, 1, 1)
         self.adv_free_cols_spin = Gtk.SpinButton.new_with_range(0, 12, 1)
-        grid.attach(self.adv_free_cols_spin, 5, 1, 1, 1)
+        grid.attach(self.adv_free_cols_spin, 1, 1, 1, 1)
 
         rows_label = Gtk.Label(label=_("adv.free_rows_label"), xalign=0)
         rows_label.set_margin_start(20)
-        grid.attach(rows_label, 6, 1, 1, 1)
+        grid.attach(rows_label, 2, 1, 1, 1)
         self.adv_free_rows_spin = Gtk.SpinButton.new_with_range(0, 12, 1)
-        grid.attach(self.adv_free_rows_spin, 7, 1, 1, 1)
+        grid.attach(self.adv_free_rows_spin, 3, 1, 1, 1)
 
-        grid.attach(Gtk.Label(label=_("adv.title_position_label"), xalign=0), 0, 2, 1, 1)
+        grid.attach(Gtk.Label(label=_("adv.margin_label"), xalign=0), 0, 2, 1, 1)
+        self.adv_margin_spin = Gtk.SpinButton.new_with_range(0, 60, 1)
+        grid.attach(self.adv_margin_spin, 1, 2, 1, 1)
+
+        spacing_label = Gtk.Label(label=_("adv.spacing_label"), xalign=0)
+        spacing_label.set_margin_start(20)
+        grid.attach(spacing_label, 2, 2, 1, 1)
+        self.adv_spacing_spin = Gtk.SpinButton.new_with_range(0, 40, 1)
+        grid.attach(self.adv_spacing_spin, 3, 2, 1, 1)
+
+        grid.attach(Gtk.Label(label=_("adv.title_position_label"), xalign=0), 0, 3, 1, 1)
         self.adv_title_position_dd = self._make_choice_dropdown(
             HEADER_POSITIONS, [f"adv.header_position.{p}" for p in HEADER_POSITIONS]
         )
-        grid.attach(self.adv_title_position_dd, 1, 2, 1, 1)
+        grid.attach(self.adv_title_position_dd, 1, 3, 1, 1)
 
         author_pos_label = Gtk.Label(label=_("adv.author_position_label"), xalign=0)
         author_pos_label.set_margin_start(20)
-        grid.attach(author_pos_label, 2, 2, 1, 1)
+        grid.attach(author_pos_label, 2, 3, 1, 1)
         self.adv_author_position_dd = self._make_choice_dropdown(
             HEADER_POSITIONS, [f"adv.header_position.{p}" for p in HEADER_POSITIONS]
         )
-        grid.attach(self.adv_author_position_dd, 3, 2, 1, 1)
+        grid.attach(self.adv_author_position_dd, 3, 3, 1, 1)
 
         self.adv_page_numbering_check = Gtk.CheckButton(label=_("adv.page_numbering_label"))
         self.adv_page_numbering_check.set_margin_start(20)
         self.adv_page_numbering_check.set_tooltip_text(_("adv.page_numbering_tooltip"))
-        grid.attach(self.adv_page_numbering_check, 4, 2, 2, 1)
+        grid.attach(self.adv_page_numbering_check, 4, 3, 2, 1)
 
         # --- Légendes par photo (cahier des charges §1) ---------------------
         box.append(subtitle("adv.captions_subtitle"))
@@ -1126,7 +1227,9 @@ class PlancheContactGTK(Gtk.Application):
         fields_flow = Gtk.FlowBox()
         fields_flow.set_selection_mode(Gtk.SelectionMode.NONE)
         fields_flow.set_min_children_per_line(3)
-        fields_flow.set_max_children_per_line(6)
+        # 4 par ligne au plus (6 auparavant) : à 6, cette grille à colonnes
+        # égales faisait ~1250 px de large (voir la grille de mise en page).
+        fields_flow.set_max_children_per_line(4)
         fields_flow.set_row_spacing(2)
         fields_flow.set_column_spacing(14)
         box.append(fields_flow)
