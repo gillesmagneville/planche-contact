@@ -180,6 +180,16 @@ class PageLayout:
     thumb_size: int
     effective_per_page: int = 0
     cells: list[CellLayout] = field(default_factory=list)
+    #: Largeur et hauteur de la grille COMPLÈTE d'une page pleine, zones de
+    #: légende comprises (colonnes x lignes calculées pour
+    #: `effective_per_page` photos, indépendamment du nombre de photos
+    #: réellement présentes sur CETTE page : toutes les pages d'une même
+    #: génération ont donc la même emprise, au même endroit). Servent à
+    #: centrer la grille sur la page : horizontalement ici
+    #: (compute_page_layout()), verticalement dans contactsheet.py, seul
+    #: à connaître la hauteur réelle de l'en-tête.
+    grid_w: int = 0
+    grid_h: int = 0
 
 
 #: Espacement vertical entre deux lignes de légende, en plus de la hauteur
@@ -421,12 +431,23 @@ def compute_page_layout(profile: Profile, photo_count: int,
     rows = math.ceil(effective_per_page / cols)
     content_top_px = margin_px + HEADER_RESERVED_PX_GRID
 
+    # Emprise de la grille d'une page pleine, et centrage HORIZONTAL : la
+    # taille de vignette est limitée par la largeur OU par la hauteur
+    # (le plus contraignant des deux), donc la grille est presque toujours
+    # moins large que la zone utile - tout le vide restait à DROITE de la
+    # page (jusqu'à plusieurs centimètres), la grille collée à la marge
+    # gauche. L'espace restant est désormais réparti à parts égales de
+    # chaque côté. Jamais en deçà de la marge, même si la grille déborde.
+    grid_w = cols * (thumb_size + reserved_w_px) + (cols - 1) * spacing_px
+    grid_h = rows * (thumb_size + reserved_h_px) + (rows - 1) * spacing_px
+    grid_left_px = margin_px + max(0, available_w - grid_w) // 2
+
     cells: list[CellLayout] = []
     n_cells = min(photo_count, effective_per_page)
     for idx in range(n_cells):
         row = idx // cols
         col = idx % cols
-        cell_x = margin_px + col * (thumb_size + reserved_w_px + spacing_px)
+        cell_x = grid_left_px + col * (thumb_size + reserved_w_px + spacing_px)
         cell_y = content_top_px + row * (thumb_size + reserved_h_px + spacing_px)
 
         if layout.caption_position == "above":
@@ -459,4 +480,5 @@ def compute_page_layout(profile: Profile, photo_count: int,
         cols=cols, rows=rows, thumb_size=thumb_size,
         effective_per_page=effective_per_page,
         cells=cells,
+        grid_w=grid_w, grid_h=grid_h,
     )

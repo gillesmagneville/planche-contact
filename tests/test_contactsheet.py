@@ -543,8 +543,14 @@ def test_thumb_offset_sits_the_photo_against_its_caption():
     # "right" : photo collée contre sa légende (alignée à droite)
     assert _thumb_offset("right", "center", portrait, 400) == (100, 0)
     assert _thumb_offset("right", "center", landscape, 400) == (0, 0)
-    # sans légende : comportement d'origine, aucun décalage
-    assert _thumb_offset("none", "center", landscape, 400) == (0, 0)
+    # sans légende : photo CENTRÉE dans sa cellule, dans les deux sens (elle
+    # était auparavant collée en haut à gauche, d'où un ensemble de photos
+    # décalé vers le haut et la gauche de la page)
+    assert _thumb_offset("none", "center", landscape, 400) == (0, 50)
+    assert _thumb_offset("none", "center", portrait, 400) == (50, 0)
+    assert _thumb_offset("none", "left", portrait, 400) == (50, 0)  # sans légende, l'alignement du texte n'a pas de sens
+    assert _thumb_offset("none", "center", (400, 400), 400) == (0, 0)
+    assert _thumb_offset("none", "center", (500, 500), 400) == (0, 0)
     # jamais de décalage négatif si la vignette dépasse la cellule
     assert _thumb_offset("below", "center", (500, 500), 400) == (0, 0)
 
@@ -909,4 +915,121 @@ def test_header_position_setting_reaches_the_rendered_sheet(tmp_path):
     assert left < width // 4
     assert right > 3 * width // 4
     assert header_extent("none")[0] is None
+
+
+# ---------------------------------------------------------------------------
+# Centrage de l'ensemble des photos sur la page. Deux causes d'un ensemble
+# décalé vers le haut et la gauche : (1) la grille démarrait à la marge
+# gauche/en haut de la zone utile, tout le vide restant à droite/en bas ;
+# (2) sans légende, chaque photo était collée en haut à gauche de sa
+# cellule carrée.
+# ---------------------------------------------------------------------------
+
+def _render_ink(tmp_path, photo_size, *, template="grid", per_page=8, page_format="A4",
+                orientation="portrait", n_photos=None, color=(10, 200, 10), title="Voyage"):
+    """Planche rendue ; renvoie (tableau RGB, PageLayout, bas de l'en-tête)."""
+    images = _make_images(tmp_path, n_photos or per_page, color=color, size=photo_size)
+    profile = Profile(layout=LayoutSettings(template=template, per_page=per_page,
+                                            page_format=page_format, orientation=orientation))
+    config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=per_page,
+                    page_format=page_format, title=title, profile=profile)
+    gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
+    page, _ = gen._plan_page(images)
+    return np.array(gen.create_contact_sheet(images, 1, 1)).astype(int), page
+
+
+def _ink_bbox(arr, color=(10, 200, 10)):
+    """(gauche, droite, haut, bas) des marges entre les pixels de photo et
+    le bord de la page."""
+    mask = np.all(np.abs(arr - np.array(color)) < 40, axis=2)
+    ys, xs = np.where(mask)
+    return (int(xs.min()), int(arr.shape[1] - 1 - xs.max()),
+            int(ys.min()), int(arr.shape[0] - 1 - ys.max()))
+
+
+CENTERING_CONFIGS = [
+    # (format, orientation, modèle, photos par page) : la plupart laissaient
+    # un grand vide d'un seul côté (jusqu'à ~6 cm à droite).
+    ("A4", "portrait", "grid", 8),
+    ("A4", "portrait", "grid", 24),
+    ("A4", "landscape", "grid", 12),
+    ("A4", "landscape", "grid", 48),
+    ("Letter", "portrait", "large_thumbs", 12),
+]
+
+
+@pytest.mark.parametrize("photo_size", [(2000, 1500), (1500, 2000), (1700, 1700)],
+                         ids=["paysage", "portrait", "carre"])
+@pytest.mark.parametrize("page_format,orientation,template,per_page", CENTERING_CONFIGS)
+def test_the_whole_set_of_photos_is_centered_horizontally_on_the_page(
+        tmp_path, page_format, orientation, template, per_page, photo_size):
+    arr, _ = _render_ink(tmp_path, photo_size, template=template, per_page=per_page,
+                         page_format=page_format, orientation=orientation)
+    left, right, _, _ = _ink_bbox(arr)
+    assert abs(left - right) <= 3, f"marge gauche {left} px, marge droite {right} px"
+
+
+@pytest.mark.parametrize("photo_size", [(2000, 1500), (1500, 2000)], ids=["paysage", "portrait"])
+@pytest.mark.parametrize("page_format,orientation,template,per_page", CENTERING_CONFIGS)
+def test_the_whole_set_of_photos_is_centered_vertically_below_the_header(
+        tmp_path, page_format, orientation, template, per_page, photo_size):
+    """Entre le bas de l'en-tête (titre, ici 128 px) + la marge et la marge
+    basse de la page, le vide est réparti à parts égales au-dessus et
+    au-dessous de l'ensemble des photos."""
+    arr, page = _render_ink(tmp_path, photo_size, template=template, per_page=per_page,
+                            page_format=page_format, orientation=orientation)
+    _, _, top, bottom = _ink_bbox(arr)
+    free_top = 128 + page.margin_px
+    free_bottom = page.margin_px
+    above, below = top - free_top, bottom - free_bottom
+    assert above >= 0 and below >= 0, f"photos hors de la zone libre : {above} / {below}"
+    assert abs(above - below) <= 3, f"vide au-dessus {above} px, au-dessous {below} px"
+
+
+def test_a_portrait_photo_is_centered_in_its_cell_not_stuck_to_its_left_edge(tmp_path):
+    """Cause (2) : sans légende, une photo portrait (plus étroite que sa
+    cellule carrée) restait collée à gauche de la cellule."""
+    arr, page = _render_ink(tmp_path, (1500, 2000), per_page=8)
+    cell = page.cells[0]
+    mask = np.all(np.abs(arr - np.array((10, 200, 10))) < 40, axis=2)
+    ys, xs = np.where(mask[:, cell.photo_x:cell.photo_x + cell.photo_w])
+    row = mask[int(ys.min()) + 5, :]
+    cols = np.where(row[cell.photo_x:cell.photo_x + cell.photo_w])[0]
+    left_gap = int(cols.min())
+    right_gap = cell.photo_w - 1 - int(cols.max())
+    assert left_gap > 20, "le test n'a pas de sens : la photo remplit sa cellule"
+    assert abs(left_gap - right_gap) <= 2, f"vide à gauche {left_gap} px, à droite {right_gap} px"
+
+
+def test_photos_keep_exactly_the_same_place_on_an_incomplete_last_page(tmp_path):
+    """Le centrage se calcule sur la grille d'une page PLEINE : la dernière
+    page, incomplète, garde ses photos exactement aux mêmes endroits que les
+    autres (aucun saut d'une page à l'autre)."""
+    full_arr, full_page = _render_ink(tmp_path, (2000, 1500), per_page=12, n_photos=12)
+    short_arr, short_page = _render_ink(tmp_path, (2000, 1500), per_page=12, n_photos=5)
+
+    assert (short_page.grid_w, short_page.grid_h) == (full_page.grid_w, full_page.grid_h)
+    for short_cell, full_cell in zip(short_page.cells, full_page.cells):
+        assert (short_cell.photo_x, short_cell.photo_y) == (full_cell.photo_x, full_cell.photo_y)
+    # même premier pixel de photo, en x comme en y
+    mask_full = np.all(np.abs(full_arr - np.array((10, 200, 10))) < 40, axis=2)
+    mask_short = np.all(np.abs(short_arr - np.array((10, 200, 10))) < 40, axis=2)
+    fy, fx = np.where(mask_full); sy, sx = np.where(mask_short)
+    assert (int(fx.min()), int(fy.min())) == (int(sx.min()), int(sy.min()))
+
+
+def test_captioned_sheet_is_centered_horizontally_too(tmp_path, monkeypatch):
+    """Avec légende sous les photos (cellule = photo + zone de texte), la
+    grille reste centrée sur la page."""
+    monkeypatch.setattr("portfolio.contactsheet.get_exif_metadata", _fake_rich_metadata)
+    images = _make_images(tmp_path, 12, color=(10, 200, 10), size=(2000, 1500))
+    profile = Profile(
+        layout=LayoutSettings(template="grid", per_page=12, caption_position="below", caption_area_mm=8),
+        captions=CaptionSettings(fields=["filename", "camera"], lines=2, alignment="center"),
+    )
+    config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=12, profile=profile)
+    gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
+    arr = np.array(gen.create_contact_sheet(images, 1, 1)).astype(int)
+    left, right, _, _ = _ink_bbox(arr)
+    assert abs(left - right) <= 3, f"marge gauche {left} px, marge droite {right} px"
 

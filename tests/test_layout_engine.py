@@ -421,3 +421,79 @@ def test_caption_zone_never_overlaps_another_photo_nor_leaves_the_page(position,
             overlap_x = a.caption_x < b.photo_x + b.photo_w and b.photo_x < cap_right
             overlap_y = a.caption_y < b.photo_y + b.photo_h and b.photo_y < cap_bottom
             assert not (overlap_x and overlap_y), (position, per_page, a.index, b.index)
+
+
+# ---------------------------------------------------------------------------
+# Centrage horizontal de la grille sur la page. La taille de vignette est
+# limitée par la largeur OU la hauteur : la grille est presque toujours moins
+# large que la zone utile, et tout le vide restait à droite (jusqu'à ~6 cm).
+# ---------------------------------------------------------------------------
+
+def _horizontal_margins(page, caption_position, caption_w_px):
+    """(marge gauche, marge droite) réelles de la grille, zones de légende
+    à droite comprises."""
+    reserved_w = (caption_w_px + CAPTION_PHOTO_GAP_PX) if caption_position == "right" else 0
+    first = page.cells[0].photo_x
+    last_right = page.cells[page.cols - 1].photo_x + page.thumb_size + reserved_w
+    return first, page.canvas_w - last_right
+
+
+@pytest.mark.parametrize("caption_position", ["none", "below", "above", "right"])
+@pytest.mark.parametrize("template", ["grid", "landscape", "portrait", "large_thumbs"])
+@pytest.mark.parametrize("orientation", ["portrait", "landscape"])
+@pytest.mark.parametrize("page_format", ["A5", "A4", "A3", "Letter"])
+@pytest.mark.parametrize("per_page", [8, 12, 24, 30, 48])
+def test_grid_is_centered_horizontally_between_the_page_margins(
+        per_page, page_format, orientation, template, caption_position):
+    fields = [] if caption_position == "none" else ["filename", "datetime"]
+    profile = Profile(
+        layout=LayoutSettings(template=template, per_page=per_page, page_format=page_format,
+                              orientation=orientation, caption_position=caption_position),
+        captions=CaptionSettings(fields=fields),
+    )
+    page = compute_page_layout(profile, compute_effective_per_page(profile),
+                               caption_lines=2 if fields else None)
+    caption_w = page.cells[0].caption_w or 0
+    left, right = _horizontal_margins(page, caption_position, caption_w)
+
+    assert left >= page.margin_px, "la grille ne doit jamais empiéter sur la marge gauche"
+    assert right >= page.margin_px or page.grid_w > page.canvas_w - 2 * page.margin_px
+    assert abs(left - right) <= 1, f"marge gauche {left} px, marge droite {right} px"
+
+
+def test_known_case_a4_portrait_8_photos_used_to_leave_all_the_empty_space_on_the_right():
+    page = compute_page_layout(Profile(layout=LayoutSettings(per_page=8)), 8)
+    left, right = _horizontal_margins(page, "none", 0)
+
+    # Avant : 141 px à gauche (la marge), 846 px à droite.
+    assert left == 493 and right == 494
+
+
+def test_grid_extent_is_exposed_for_vertical_centering():
+    page = compute_page_layout(Profile(layout=LayoutSettings(per_page=12)), 12)
+
+    assert page.grid_w == page.cols * page.thumb_size + (page.cols - 1) * page.spacing_px
+    assert page.grid_h == page.rows * page.thumb_size + (page.rows - 1) * page.spacing_px
+
+
+def test_grid_extent_includes_caption_zones():
+    profile = Profile(
+        layout=LayoutSettings(per_page=12, caption_position="below"),
+        captions=CaptionSettings(fields=["filename"]),
+    )
+    page = compute_page_layout(profile, 12, caption_lines=2)
+    row_pitch = page.cells[page.cols].photo_y - page.cells[0].photo_y
+
+    assert page.grid_h == page.rows * (row_pitch - page.spacing_px) + (page.rows - 1) * page.spacing_px
+
+
+def test_centering_does_not_depend_on_the_number_of_photos_on_the_page():
+    """Une page incomplète (dernière page) garde la même grille, donc les
+    mêmes positions pour ses photos, que les pages pleines."""
+    profile = Profile(layout=LayoutSettings(per_page=12))
+    full = compute_page_layout(profile, 12)
+    short = compute_page_layout(profile, 5)
+
+    assert (short.grid_w, short.grid_h) == (full.grid_w, full.grid_h)
+    assert [(c.photo_x, c.photo_y) for c in short.cells] == [(c.photo_x, c.photo_y) for c in full.cells[:5]]
+

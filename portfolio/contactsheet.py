@@ -78,8 +78,13 @@ def _thumb_offset(caption_position, alignment, thumb_wh, cell_size):
       que la légende était centrée sous la cellule.
 
     Sans légende (`caption_position` autre que ces trois valeurs, y compris
-    "none" - la valeur à passer quand aucun champ n'est configuré) :
-    (0, 0), strictement le comportement d'origine."""
+    "none" - la valeur à passer quand aucun champ n'est configuré) : photo
+    CENTRÉE dans sa cellule, dans les deux sens. Elle était auparavant
+    collée en haut à gauche de la cellule (décalage (0, 0)), ce qui
+    laissait un vide à droite d'une photo portrait et sous une photo
+    paysage : l'ensemble des photos paraissait décalé vers le haut et la
+    gauche de la page, même une fois la grille elle-même centrée (voir
+    layout_engine.compute_page_layout() et create_contact_sheet())."""
     width, height = thumb_wh
     free_w = max(0, cell_size - width)
     free_h = max(0, cell_size - height)
@@ -87,7 +92,7 @@ def _thumb_offset(caption_position, alignment, thumb_wh, cell_size):
     if caption_position == "right":
         return free_w, 0
     if caption_position not in ("below", "above"):
-        return 0, 0
+        return free_w // 2, free_h // 2
 
     dy = free_h if caption_position == "below" else 0
     if alignment == "left":
@@ -209,6 +214,20 @@ class ContactSheetGenerator:
         # légendes empiétaient sur la ligne de vignettes suivante, faute
         # de retrancher l'espace de légende de l'écart entre lignes).
         y_shift = y_start - page.content_top_px
+
+        # Centrage VERTICAL de la grille dans l'espace réellement libre sous
+        # l'en-tête (jusqu'à la marge basse) : la taille de vignette est
+        # limitée par la largeur OU par la hauteur, donc la grille laisse
+        # presque toujours un vide d'un seul côté - en bas de page, jusqu'à
+        # plusieurs centimètres. Le vide restant est réparti à parts égales
+        # au-dessus et au-dessous. Calculé sur la grille d'une page PLEINE
+        # (page.grid_h) : toutes les pages d'une génération - dernière page
+        # incomplète comprise - gardent leurs photos exactement aux mêmes
+        # endroits. Jamais de décalage négatif (la grille ne remonte pas sous
+        # l'en-tête) ; le centrage horizontal est fait par le moteur
+        # (layout_engine.compute_page_layout()).
+        free_h = canvas_h - margin - y_start
+        y_shift += max(0, free_h - page.grid_h) // 2
 
         # Position de légende réellement DESSINÉE : sans aucun champ
         # configuré, la zone est réservée mais reste vide - on garde alors
