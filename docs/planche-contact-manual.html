@@ -250,6 +250,7 @@ python3 portfolio.py \
     <li>Le filigrane en diagonale est généralement plus élégant et moins gênant visuellement.</li>
     <li>La galerie HTML est autonome : vous pouvez copier tout le dossier <code>gallery/</code> ailleurs (clé USB, serveur web...) sans rien casser.</li>
     <li>Pour que le bouton de téléchargement de la visionneuse ouvre bien la boîte de dialogue d'enregistrement du navigateur (plutôt que d'ouvrir l'image), consultez la galerie via un serveur web plutôt qu'en double-cliquant directement sur <code>index.html</code> (voir la note ci-dessous).</li>
+    <li>Si la galerie s'affiche sombre alors que le thème Clair ou Neutre est choisi, c'est le navigateur qui l'assombrit de force : option « Auto Dark Mode for Web Contents » de Chrome/Edge (<code>chrome://flags/#enable-force-dark</code>) ou extension qui assombrit les pages. La galerie déclare son thème au navigateur, ce qui écarte ce noircissement quand le navigateur est en préférence sombre, mais pas quand il est forcé en toutes circonstances : désactivez l'option, ou ajoutez la galerie aux exceptions de l'extension. Pour vérifier, ouvrez <code>index.html</code> dans un autre navigateur ou en navigation privée.</li>
     <li>Sur les dossiers volumineux (plusieurs centaines de photos), le traitement exploite automatiquement tous les cœurs disponibles de la machine : plus la machine dispose de cœurs, plus la génération est rapide.</li>
 </ul>
 <div class="note">

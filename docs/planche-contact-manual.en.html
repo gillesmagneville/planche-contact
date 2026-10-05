@@ -250,6 +250,7 @@ python3 portfolio.py \
     <li>A diagonal watermark is usually more elegant and visually less intrusive.</li>
     <li>The HTML gallery is self-contained: you can copy the whole <code>gallery/</code> folder elsewhere (USB drive, web server...) without breaking anything.</li>
     <li>For the viewer's download button to trigger the browser's usual save dialog (rather than opening the image), view the gallery through a web server rather than double-clicking <code>index.html</code> directly (see the note below).</li>
+    <li>If the gallery appears dark although the Light or Neutral theme is chosen, the browser is forcibly darkening it: the "Auto Dark Mode for Web Contents" option of Chrome/Edge (<code>chrome://flags/#enable-force-dark</code>) or an extension that darkens pages. The gallery declares its theme to the browser, which prevents this darkening when the browser's preference is dark, but not when it is forced unconditionally: turn the option off, or add the gallery to the extension's exceptions. To check, open <code>index.html</code> in another browser or in a private window.</li>
     <li>For large folders (several hundred photos), processing automatically uses all available cores on the machine: the more cores, the faster the generation.</li>
 </ul>
 <div class="note">

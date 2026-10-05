@@ -250,6 +250,7 @@ python3 portfolio.py \
     <li>La marca de agua en diagonal suele ser más elegante y visualmente menos molesta.</li>
     <li>La galería HTML es autónoma: puede copiar toda la carpeta <code>gallery/</code> a otro lugar (memoria USB, servidor web...) sin romper nada.</li>
     <li>Para que el botón de descarga del visor abra realmente el cuadro de diálogo de guardado habitual del navegador (en lugar de abrir la imagen), consulte la galería a través de un servidor web en lugar de hacer doble clic directamente en <code>index.html</code> (véase la nota siguiente).</li>
+    <li>Si la galería aparece oscura aunque se haya elegido el tema Claro o Neutro, es el navegador quien la oscurece a la fuerza: opción «Auto Dark Mode for Web Contents» de Chrome/Edge (<code>chrome://flags/#enable-force-dark</code>) o una extensión que oscurece las páginas. La galería declara su tema al navegador, lo que evita ese oscurecimiento cuando la preferencia del navegador es oscura, pero no cuando se fuerza en todas las circunstancias: desactive la opción o añada la galería a las excepciones de la extensión. Para comprobarlo, abra <code>index.html</code> en otro navegador o en una ventana privada.</li>
     <li>En carpetas voluminosas (varios cientos de fotos), el procesamiento utiliza automáticamente todos los núcleos disponibles de la máquina: cuantos más núcleos tenga la máquina, más rápida será la generación.</li>
 </ul>
 <div class="note">

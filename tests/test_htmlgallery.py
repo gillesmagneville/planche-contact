@@ -246,6 +246,57 @@ def test_second_toggle_click_returns_to_the_requested_theme(tmp_path):
     assert toggle.index("removeAttribute('data-theme')") < toggle.index("setAttribute('data-theme', next)")
 
 
+@pytest.mark.parametrize("mode,declared", [
+    ("light", "only light"),
+    ("neutral", "only light"),
+    ("dark", "dark"),
+    ("system", "light dark"),
+])
+def test_page_declares_its_color_scheme_to_the_browser(tmp_path, mode, declared):
+    """Régression : « thème clair demandé, page sombre affichée ». Sans
+    déclaration `color-scheme`, un navigateur dont le mode sombre
+    automatique est actif (Chrome/Edge « Auto Dark Mode for Web Contents »,
+    Chrome Android, extensions) noircit de force une galerie claire.
+    `only light` est le refus normalisé de ce noircissement (`light` seul
+    ne l'empêche pas - vérifié dans Chromium) ; la page doit le déclarer
+    à la fois en <meta> (avant tout rendu) et en CSS, pour chaque thème."""
+    _, images = _make_images(tmp_path, 2)
+    html = _generate(tmp_path, images, Profile(theme=ThemeSettings(mode=mode)))
+
+    assert f'<meta name="color-scheme" content="{declared}">' in html
+    baseline = html.split(":root {", 1)[1].split("}", 1)[0]
+    assert f"color-scheme: {declared};" in baseline
+
+
+def test_default_clair_gallery_refuses_forced_darkening(tmp_path):
+    """Cas exact signalé : « Clair » choisi dans l'interface (profil par
+    défaut, donc AUCUN --profile transmis au CLI)."""
+    _, images = _make_images(tmp_path, 2)
+    html = _generate(tmp_path, images, Profile())
+
+    assert '<meta name="color-scheme" content="only light">' in html
+    assert ":root { --bg: #ffffff; --text: #000000;" in html
+    assert "color-scheme: only light;" in html.split(":root {", 1)[1].split("}", 1)[0]
+
+
+@pytest.mark.parametrize("override,declared", [
+    ("light", "only light"),
+    ("dark", "dark"),
+    ("neutral", "only light"),
+])
+@pytest.mark.parametrize("mode", ["light", "dark", "neutral", "system"])
+def test_visitor_override_updates_the_declared_color_scheme(tmp_path, mode, override, declared):
+    """Quand le visiteur bascule le thème (bouton ◐), la déclaration doit
+    suivre : une page passée en sombre ne doit plus se dire « claire
+    uniquement » (le navigateur la noircirait une seconde fois), et
+    inversement."""
+    _, images = _make_images(tmp_path, 2)
+    html = _generate(tmp_path, images, Profile(theme=ThemeSettings(mode=mode)))
+
+    block = html.split(f':root[data-theme="{override}"] {{', 1)[1].split("}", 1)[0]
+    assert f"color-scheme: {declared};" in block
+
+
 def test_custom_accent_color_is_applied_to_every_theme_override(tmp_path):
     """Une couleur personnalisée (cahier des charges §4.3) s'applique de
     façon cohérente à TOUTES les variantes claire/sombre/neutre du

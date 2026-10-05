@@ -250,6 +250,7 @@ python3 portfolio.py \
     <li>Ein diagonales Wasserzeichen ist in der Regel eleganter und visuell weniger störend.</li>
     <li>Die HTML-Galerie ist eigenständig: Sie können den gesamten Ordner <code>gallery/</code> an einen anderen Ort kopieren (USB-Stick, Webserver...), ohne etwas zu beschädigen.</li>
     <li>Damit die Download-Schaltfläche der Ansicht tatsächlich den üblichen Speicherdialog des Browsers öffnet (statt das Bild zu öffnen), rufen Sie die Galerie über einen Webserver auf, statt direkt auf <code>index.html</code> zu doppelklicken (siehe Hinweis unten).</li>
+    <li>Wenn die Galerie dunkel erscheint, obwohl das Thema Hell oder Neutral gewählt ist, dunkelt der Browser sie zwangsweise ab: Option „Auto Dark Mode for Web Contents“ von Chrome/Edge (<code>chrome://flags/#enable-force-dark</code>) oder eine Erweiterung, die Seiten abdunkelt. Die Galerie meldet ihr Thema dem Browser, was diese Abdunkelung verhindert, wenn die Browser-Einstellung dunkel ist, aber nicht, wenn sie bedingungslos erzwungen wird: Deaktivieren Sie die Option oder nehmen Sie die Galerie in die Ausnahmen der Erweiterung auf. Zur Prüfung öffnen Sie <code>index.html</code> in einem anderen Browser oder in einem privaten Fenster.</li>
     <li>Bei umfangreichen Ordnern (mehrere hundert Fotos) nutzt die Verarbeitung automatisch alle verfügbaren Kerne des Rechners: je mehr Kerne, desto schneller die Erstellung.</li>
 </ul>
 <div class="note">

@@ -36,6 +36,25 @@ def _css_vars(palette) -> str:
     )
 
 
+#: Valeur `color-scheme` (propriété CSS ET balise <meta>) annoncée au
+#: navigateur pour chaque thème. Sans cette déclaration, un navigateur dont
+#: le « mode sombre automatique » est actif (option « Auto Dark Mode for
+#: Web Contents » de Chrome/Edge, mode sombre de Chrome sur Android, ou
+#: certaines extensions) noircit de force une galerie pourtant demandée
+#: claire : thème clair choisi dans l'interface, page sombre affichée.
+#: `only light` est le refus explicite et normalisé de ce noircissement
+#: (`light` seul ne l'empêche PAS - vérifié dans Chromium) ; `dark` et
+#: `light dark` déclarent que la page gère elle-même le thème sombre, donc
+#: rien n'est inversé une seconde fois, et les éléments natifs (barre de
+#: défilement, champs) suivent le thème de la page.
+_COLOR_SCHEME = {
+    "light": "only light",
+    "neutral": "only light",
+    "dark": "dark",
+    "system": "light dark",
+}
+
+
 def _init_worker_logging(log_path, language=None):
     """Reconfigure le logging dans les processus enfants (nécessaire avec
     'spawn', qui ne partage pas la configuration du processus parent).
@@ -218,6 +237,12 @@ class HTMLGalleryGenerator:
             return path.stem + ".jpg"
         return path.name
 
+    def _color_scheme(self) -> str:
+        """Valeur `color-scheme` du thème choisi pour la galerie (voir
+        _COLOR_SCHEME). Un choix manuel du visiteur (bouton ◐) la remplace
+        via les blocs `:root[data-theme=...]` de _build_theme_style_block()."""
+        return _COLOR_SCHEME.get(self.theme.mode, _COLOR_SCHEME["light"])
+
     def _build_theme_style_block(self) -> str:
         """Construit les déclarations CSS de thème (cahier des charges
         §4) : un jeu de variables `:root` par défaut (le thème choisi dans
@@ -254,10 +279,10 @@ class HTMLGalleryGenerator:
         }}"""
 
         return f"""
-        :root {{ {baseline_vars} }}{media_block}
-        :root[data-theme="light"] {{ {light_vars} }}
-        :root[data-theme="dark"] {{ {dark_vars} }}
-        :root[data-theme="neutral"] {{ {neutral_vars} }}"""
+        :root {{ {baseline_vars} color-scheme: {self._color_scheme()}; }}{media_block}
+        :root[data-theme="light"] {{ {light_vars} color-scheme: {_COLOR_SCHEME["light"]}; }}
+        :root[data-theme="dark"] {{ {dark_vars} color-scheme: {_COLOR_SCHEME["dark"]}; }}
+        :root[data-theme="neutral"] {{ {neutral_vars} color-scheme: {_COLOR_SCHEME["neutral"]}; }}"""
 
     def _effective_dark_js_expr(self) -> str:
         """Expression JS (booléenne) donnant le sens initial du bouton
@@ -418,6 +443,7 @@ class HTMLGalleryGenerator:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="{self._color_scheme()}">
     <title>{display_title}</title>
     <script>
         // Appliqué avant le premier rendu (tête du document, avant le CSS
