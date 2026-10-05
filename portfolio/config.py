@@ -25,6 +25,13 @@ class Config:
     generate_html: bool = False
     generate_csv: bool = False
     html_images_per_page: int = 48
+    # Joint à la galerie HTML les fichiers ORIGINAUX (pleine résolution,
+    # copiés tels quels, RAW compris) pour que le bouton de téléchargement
+    # de la visionneuse donne la photo de la prise de vue, et non la copie
+    # réduite (2000 px) affichée à l'écran. Désactivé par défaut : la
+    # galerie pèse alors autant que le dossier source, et ces originaux ne
+    # portent ni le filigrane ni aucune retouche (voir htmlgallery.py).
+    html_include_originals: bool = False
 
     # Header
     title: Optional[str] = None

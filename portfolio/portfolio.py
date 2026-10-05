@@ -64,6 +64,7 @@ def parse_args():
     parser.add_argument("--html", action="store_true", help=_("cli.help_html"))
     parser.add_argument("--csv", action="store_true", help=_("cli.help_csv"))
     parser.add_argument("--html-per-page", type=int, default=48, help=_("cli.help_html_per_page"))
+    parser.add_argument("--html-originals", action="store_true", help=_("cli.help_html_originals"))
     parser.add_argument("--watermark", default=None, help=_("cli.help_watermark"))
     # Choix laissés en français : valeur interne comparée en dur par
     # portfolio/config.py (voir PROJECT_CONTEXT.md §5) - seul le texte
@@ -209,11 +210,19 @@ def main():
         generate_html=args.html,
         generate_csv=args.csv,
         html_images_per_page=args.html_per_page,
+        html_include_originals=args.html_originals,
         watermark_text=args.watermark,
         watermark_orientation=args.watermark_orientation,
         watermark_opacity=args.watermark_opacity,
         **profile_kwargs,
     )
+
+    # Les originaux joints à la galerie sont copiés tels quels : ils ne
+    # portent donc pas le filigrane, qui perdrait son sens si l'utilisateur
+    # ne le savait pas. L'avertissement est écrit dans le journal ET sur la
+    # console (donc dans le journal de l'interface graphique).
+    if config.generate_html and config.html_include_originals and config.watermark_text:
+        logger.warning(_("cli.warn_originals_watermark"))
 
     # Phase 1: Scan
     print(f"PROGRESS:0/100 {_('cli.progress_scanning')}", flush=True)

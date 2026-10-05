@@ -374,3 +374,47 @@ def test_html_gallery_file_size_follows_language_in_worker_process(tmp_path, mon
     cli_module.main()
     size_en = _first_size(out_en)
     assert "KB" in size_en and "." in size_en, f"taille de fichier non traduite en anglais : {size_en!r}"
+
+
+def test_html_originals_flag_adds_full_size_originals_to_the_gallery(tmp_path, monkeypatch):
+    """--html-originals joint les originaux à la galerie ; sans lui, aucun
+    dossier originals/ n'est créé (comportement historique)."""
+    img_dir = tmp_path / "photos"
+    _make_photos(img_dir, 2)
+
+    out_plain = tmp_path / "plain"
+    monkeypatch.setattr(sys, "argv", ["portfolio.py", "-i", str(img_dir), "-o", str(out_plain), "--html"])
+    cli_module.main()
+    assert not (out_plain / "gallery" / "originals").exists()
+
+    out_orig = tmp_path / "orig"
+    monkeypatch.setattr(
+        sys, "argv", ["portfolio.py", "-i", str(img_dir), "-o", str(out_orig), "--html", "--html-originals"]
+    )
+    cli_module.main()
+    originals = sorted(p.name for p in (out_orig / "gallery" / "originals").iterdir())
+    assert originals == ["img_00.jpg", "img_01.jpg"]
+    for name in originals:
+        assert (out_orig / "gallery" / "originals" / name).read_bytes() == (img_dir / name).read_bytes()
+
+
+def test_html_originals_with_watermark_warns_that_originals_are_not_watermarked(tmp_path, monkeypatch, caplog):
+    """Un filigrane perd son sens si les originaux joints à la galerie
+    n'en portent pas et que l'utilisateur ne le sait pas : avertissement
+    explicite (journal + console, donc journal de l'interface), mais
+    seulement quand les deux options sont actives."""
+    img_dir = tmp_path / "photos"
+    _make_photos(img_dir, 1)
+
+    def run(name, *extra):
+        out = tmp_path / name
+        monkeypatch.setattr(sys, "argv", ["portfolio.py", "-i", str(img_dir), "-o", str(out), "--language", "fr", *extra])
+        caplog.clear()
+        with caplog.at_level("WARNING"):
+            cli_module.main()
+        return any("ne portent PAS le filigrane" in r.getMessage() for r in caplog.records)
+
+    assert run("a", "--html", "--html-originals", "--watermark", "(c) Moi") is True
+    assert run("b", "--html", "--html-originals") is False, "pas de filigrane : rien à signaler"
+    assert run("c", "--html", "--watermark", "(c) Moi") is False, "pas d'originaux : rien à signaler"
+    assert run("d", "--html-originals", "--watermark", "(c) Moi") is False, "pas de galerie HTML : rien à signaler"

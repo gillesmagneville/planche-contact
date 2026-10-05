@@ -3,6 +3,7 @@ import json
 import shutil
 from concurrent.futures import ProcessPoolExecutor
 from html import escape as html_escape
+from urllib.parse import quote
 import logging
 import multiprocessing
 import os
@@ -81,6 +82,23 @@ def _init_worker_logging(log_path, language=None):
         set_language(language)
 
 
+def _unique_original_name(name: str, used: set) -> str:
+    """Nom sous lequel un original est rangé dans `originals/`, unique dans
+    toute la galerie : deux photos de même nom dans deux sous-dossiers
+    (option -r) ne doivent jamais s'écraser l'une l'autre - perdre un
+    ORIGINAL en silence serait bien plus grave que pour une copie réduite.
+    La comparaison ignore la casse (Windows et macOS ne distinguent pas
+    `IMG_1.JPG` de `img_1.jpg`). `used` est mis à jour."""
+    candidate = name
+    stem, suffix = Path(name).stem, Path(name).suffix
+    counter = 2
+    while candidate.lower() in used:
+        candidate = f"{stem}_{counter}{suffix}"
+        counter += 1
+    used.add(candidate.lower())
+    return candidate
+
+
 def _process_full_image_worker(args):
     """Fonction worker (picklable, exécutée dans un processus séparé) qui
     prépare à la fois l'image "pleine taille" ET la vignette de la galerie
@@ -100,7 +118,10 @@ def _process_full_image_worker(args):
     prise de vue) pendant que le fichier est déjà ouvert, plutôt qu'une
     passe séparée qui relirait chaque photo une seconde fois."""
     (image_path, images_dir_str, thumbs_dir_str, thumb_filename,
-     watermark_text, watermark_opacity, watermark_orientation) = args
+     watermark_text, watermark_opacity, watermark_orientation) = args[:7]
+    # Originaux pleine taille (optionnels, voir Config.html_include_originals) :
+    # dossier de destination et nom unique choisi par le processus principal.
+    originals_dir_str, original_name = (args[7], args[8]) if len(args) > 8 else (None, None)
     images_dir = Path(images_dir_str)
     thumbs_dir = Path(thumbs_dir_str)
     path = Path(image_path)
@@ -145,6 +166,25 @@ def _process_full_image_worker(args):
             "size": format_file_size(size_bytes) if size_bytes is not None else None,
             "date": exif_date.strftime("%d/%m/%Y %H:%M") if exif_date else None,
         }
+
+        # Original pleine taille : copie OCTET POUR OCTET du fichier source
+        # (aucun redécodage ni recompression : résolution, EXIF et qualité
+        # d'origine intacts, y compris pour un RAW, que le navigateur ne
+        # sait pas afficher mais que le visiteur peut télécharger). En cas
+        # d'échec de la copie (disque plein...), la galerie reste complète :
+        # le téléchargement retombe simplement sur la copie réduite.
+        if originals_dir_str and original_name:
+            target_original = Path(originals_dir_str) / original_name
+            try:
+                shutil.copy2(path, target_original)
+                metadata["original"] = "originals/" + quote(original_name)
+                metadata["original_filename"] = path.name
+            except Exception as e:
+                logging.getLogger(__name__).warning(f"Original non copié pour {path.name}: {e}")
+                try:
+                    target_original.unlink()  # pas de fichier tronqué
+                except OSError:
+                    pass
         return (True, metadata)
     except Exception as e:
         logging.getLogger(__name__).warning(f"Erreur sur {path.name}: {e}")
@@ -178,6 +218,7 @@ class HTMLGalleryGenerator:
         self.author = getattr(config, 'author', None)
         self.input_dir = getattr(config, 'input_dir', None)
         self.images_per_page = getattr(config, 'html_images_per_page', 48)
+        self.include_originals = bool(getattr(config, 'html_include_originals', False))
 
         self.watermark_text = getattr(config, 'watermark_text', None)
         self.watermark_opacity = getattr(config, 'watermark_opacity', 40)
@@ -316,6 +357,9 @@ class HTMLGalleryGenerator:
         images_dir = output_dir / "images"
         thumbs_dir.mkdir(exist_ok=True)
         images_dir.mkdir(exist_ok=True)
+        originals_dir = output_dir / "originals"
+        if self.include_originals:
+            originals_dir.mkdir(exist_ok=True)
 
         display_title = self.project_title or (Path(self.input_dir).name if self.input_dir else "Galerie Photo")
         total_pages = (len(images) + self.images_per_page - 1) // self.images_per_page
@@ -332,16 +376,24 @@ class HTMLGalleryGenerator:
         # ici pour rester cohérent avec le numéro de page utilisé plus bas
         # par _generate_page.
         tasks = []
+        used_original_names = set()
         for i, item in enumerate(images):
             image_path = item.get('path') if isinstance(item, dict) else item
             if image_path:
                 page_num = i // self.images_per_page + 1
                 idx_in_page = i % self.images_per_page
                 thumb_filename = f"thumb_p{page_num}_{idx_in_page:04d}.jpg"
-                tasks.append((
+                task = (
                     str(image_path), str(images_dir), str(thumbs_dir), thumb_filename,
                     self.watermark_text, self.watermark_opacity, self.watermark_orientation
-                ))
+                )
+                if self.include_originals:
+                    # Nom unique décidé ICI, dans le processus principal (les
+                    # workers tournent en parallèle et ne peuvent pas se
+                    # coordonner entre eux).
+                    task += (str(originals_dir),
+                             _unique_original_name(Path(image_path).name, used_original_names))
+                tasks.append(task)
 
         results = [(False, None)] * len(images)
         if tasks:
@@ -716,12 +768,19 @@ class HTMLGalleryGenerator:
             full_image_urls.append(f"images/{filename}")
             meta = page_meta[idx] or {}
             width, height = meta.get("width"), meta.get("height")
-            gallery_meta.append({
+            entry = {
                 "filename": meta.get("filename") or filename,
                 "resolution": f"{width} × {height} px" if width and height else _("gallery.unknown"),
                 "size": meta.get("size") or _("gallery.unknown"),
                 "date": meta.get("date") or _("gallery.unknown"),
-            })
+            }
+            if meta.get("original"):
+                # Absent par défaut (marquage historique inchangé) : le
+                # téléchargement vise alors l'original au lieu de la copie
+                # réduite affichée dans la visionneuse.
+                entry["original"] = meta["original"]
+                entry["originalFilename"] = meta.get("original_filename") or entry["filename"]
+            gallery_meta.append(entry)
 
             thumb_link = f''' <a href="images/{filename}" onclick="return openLightbox(event, {position})">
         <img src="thumbs/{thumb_filename}" alt="">
@@ -763,6 +822,8 @@ class HTMLGalleryGenerator:
         # manuel - les traductions contiennent chacune leur propre
         # ponctuation).
         download_toast_js = json.dumps(_("gallery.download_toast"), ensure_ascii=False)
+        download_label_js = json.dumps(_("gallery.download"), ensure_ascii=False)
+        download_original_label_js = json.dumps(_("gallery.download_original"), ensure_ascii=False)
         wrap_forward_js = json.dumps(_("gallery.wrap_forward"), ensure_ascii=False)
         wrap_backward_js = json.dumps(_("gallery.wrap_backward"), ensure_ascii=False)
 
@@ -812,6 +873,8 @@ class HTMLGalleryGenerator:
 <script>
     const galleryImages = {json.dumps(full_image_urls, ensure_ascii=False)};
     const galleryMeta = {json.dumps(gallery_meta, ensure_ascii=False)};
+    const downloadLabel = {download_label_js};
+    const downloadOriginalLabel = {download_original_label_js};
     const totalPages = {total_pages};
     const currentPage = {current_page};
     let currentIndex = -1;
@@ -909,8 +972,11 @@ class HTMLGalleryGenerator:
     }}
 
     function downloadCurrentImage() {{
-        const url = galleryImages[currentIndex];
-        const filename = galleryMeta[currentIndex].filename;
+        // Original pleine taille quand la galerie l'embarque (option
+        // « originaux »), sinon la copie affichée dans la visionneuse.
+        const meta = galleryMeta[currentIndex];
+        const url = meta.original || galleryImages[currentIndex];
+        const filename = meta.originalFilename || meta.filename;
 
         // Depuis un correctif de sécurité largement adopté (CVE-2019-11730),
         // Firefox et Chrome traitent une page ouverte en file:// (double-clic
@@ -938,6 +1004,13 @@ class HTMLGalleryGenerator:
             }})
             .then(blob => triggerBlobDownload(blob, filename))
             .catch(() => {{
+                // Un original (éventuellement un RAW) n'est pas ce qui est
+                // affiché dans la visionneuse : le redessiner sur un canevas
+                // donnerait la copie réduite sous le nom de l'original.
+                if (meta.original) {{
+                    window.open(url, '_blank');
+                    return;
+                }}
                 // Repli improbable si fetch() échoue malgré tout en HTTP(S) :
                 // l'image est déjà chargée à l'écran (<img>), on la redessine
                 // sur un canevas caché pour en extraire un blob, sans
@@ -977,8 +1050,11 @@ class HTMLGalleryGenerator:
             (currentIndex + 1) + ' / ' + galleryImages.length;
 
         const dl = document.getElementById('lightbox-download');
-        dl.href = url;
-        dl.download = meta.filename;
+        dl.href = meta.original || url;
+        dl.download = meta.originalFilename || meta.filename;
+        const dlLabel = meta.original ? downloadOriginalLabel : downloadLabel;
+        dl.title = dlLabel;
+        dl.setAttribute('aria-label', dlLabel);
 
         document.getElementById('info-filename').textContent = meta.filename;
         document.getElementById('info-resolution').textContent = meta.resolution;

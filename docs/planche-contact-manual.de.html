@@ -64,7 +64,7 @@
 <ul>
     <li><strong>Kontaktbögen</strong> im JPEG-Format (eine oder mehrere Seiten);</li>
     <li>ein <strong>PDF</strong>, das alle Kontaktbögen zusammenfasst;</li>
-    <li>eine paginierte, eigenständige <strong>HTML-Galerie</strong> mit anklickbaren Miniaturbildern, die jedes Foto in einer Vollbild-Ansicht öffnen: Dateiname und Seitenzahl werden angezeigt, Navigation zwischen den Fotos der Seite (Tastatur oder Pfeile ‹ ›), direkter Sprung zu einer anderen Seite, Zoom von 50 % bis 200 %, Herunterladen des angezeigten Fotos, technische Informationen (Originalauflösung, Größe, Aufnahmedatum) und Vollbild-Umschaltung;</li>
+    <li>eine paginierte, eigenständige <strong>HTML-Galerie</strong> mit anklickbaren Miniaturbildern, die jedes Foto in einer Vollbild-Ansicht öffnen: Dateiname und Seitenzahl werden angezeigt, Navigation zwischen den Fotos der Seite (Tastatur oder Pfeile ‹ ›), direkter Sprung zu einer anderen Seite, Zoom von 50 % bis 200 %, Herunterladen des angezeigten Fotos (oder des Originals in voller Größe, mit der Option „Originale in voller Größe in der Galerie“), technische Informationen (Originalauflösung, Größe, Aufnahmedatum) und Vollbild-Umschaltung;</li>
     <li>ein <strong>CSV-Verzeichnis</strong>, das jedes Foto mit seiner Nummer aufführt.</li>
 </ul>
 <div class="note">
@@ -110,6 +110,7 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
 <tr><td><strong>Thema</strong></td><td>Hell (Standard), Dunkel, Neutral oder System: grafisches Thema, das identisch auf Kontaktbögen, PDF und HTML-Galerie angewendet wird (Details und benutzerdefinierte Farben: siehe §3.3).</td></tr>
 <tr><td><strong>Exportoptionen</strong></td><td>Kontrollkästchen: PDF erstellen, HTML-Galerie erstellen, CSV-Verzeichnis erstellen.</td></tr>
 <tr><td><strong>Bilder pro Seite</strong></td><td>Anzahl der Miniaturbilder pro HTML-Galerieseite (12 bis 64, in Schritten von 4, Standard: 48). Auf derselben Zeile wie das Kontrollkästchen „HTML-Galerie erstellen".</td></tr>
+<tr><td><strong>Originale in voller Größe in der Galerie</strong></td><td>Kontrollkästchen, standardmäßig aus, rechts neben dem Schieberegler „Bilder pro Seite“ (ausgegraut, wenn „HTML-Galerie erstellen“ nicht angehakt ist). Fügt der Galerie die Originaldateien hinzu, verlustfrei kopiert (einschließlich RAW): Die Download-Schaltfläche ⇩ der Ansicht liefert dann das Foto genau so, wie es aufgenommen wurde, in voller Auflösung und unter seinem Originalnamen, und nicht die verkleinerte Kopie (2000 px) auf dem Bildschirm. Die Galerie ist so groß wie der Quellordner. <strong>Die Originale tragen kein Wasserzeichen</strong> (nur die angezeigten Kopien): Wird zusätzlich ein Wasserzeichen verlangt, erscheint eine Warnung im Protokoll.</td></tr>
 </table>
 
 <p>Wenn keines der Felder Titel / Autor / Wasserzeichen ausgefüllt ist, zeigt die Kopfzeile der Kontaktbögen standardmäßig den Namen des Quellordners (ohne vollständigen Pfad) an, um einen völlig anonymen Kontaktbogen zu vermeiden.</p>
@@ -202,6 +203,7 @@ Eine Sprachänderung wird erst nach einem Neustart der Anwendung wirksam. Die ge
 <tr><td><code>-r, --recursive</code></td><td>Rekursive Analyse der Unterordner</td><td></td></tr>
 <tr><td><code>--sort</code></td><td>Sortierung der Fotos: <code>date</code> (EXIF) oder <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Anzahl der Bilder pro HTML-Galerieseite (Standard: 48)</td><td><code>--html-per-page 60</code></td></tr>
+<tr><td><code>--html-originals</code></td><td>Die Originale in voller Größe der HTML-Galerie hinzufügen (die Download-Schaltfläche liefert sie; die Galerie ist so groß wie die Quellfotos, und die Originale tragen kein Wasserzeichen)</td><td><code>--html --html-originals</code></td></tr>
 <tr><td><code>--language</code></td><td>Sprache der Meldungen und der erstellten HTML-Galerie: <code>system</code> (Standard), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language de</code></td></tr>
 <tr><td><code>--profile</code></td><td>JSON-Profildatei (Layout, Bildunterschriften, Thema — siehe §3.3), erstellt über die Schaltfläche „Profil speichern…" der grafischen Oberfläche, oder von Hand geschrieben/bearbeitet. Eine fehlende oder ungültige Datei greift stillschweigend auf die Standardeinstellungen zurück.</td><td><code>--profile mein-profil.json</code></td></tr>
 </table>
@@ -240,6 +242,7 @@ python3 portfolio.py \
 <tr><td><code>planches/</code></td><td>Einzelne Kontaktbögen (JPEG, 300 dpi)</td></tr>
 <tr><td><code>portfolio.pdf</code></td><td>Vollständiges PDF, das alle Kontaktbögen zusammenfasst</td></tr>
 <tr><td><code>gallery/</code></td><td>Paginierte, eigenständige HTML-Galerie (mit eigenen Miniaturbildern und „Vollbild"-Bildern)</td></tr>
+<tr><td><code>gallery/originals/</code></td><td>Originaldateien, unverändert kopiert, in voller Auflösung (nur mit der Option „Originale in voller Größe in der Galerie“)</td></tr>
 <tr><td><code>index.csv</code></td><td>Liste der Bilder mit ihrer Nummer</td></tr>
 <tr><td><code>generation.log</code></td><td>Detailliertes Protokoll der Erstellung</td></tr>
 </table>

@@ -733,6 +733,19 @@ class PlancheContactGTK(Gtk.Application):
         self.html_per_page_scale.connect("value-changed", self._snap_html_per_page)
         grid.attach(self.html_per_page_scale, 3, 4, 3, 1)
 
+        # Originaux pleine taille joints à la galerie HTML (bouton de
+        # téléchargement de la visionneuse) : sur cette même ligne, à droite
+        # du curseur, pour ne pas ajouter de hauteur au formulaire (voir
+        # PROJECT_CONTEXT.md : rien de variable/volumineux dans la fenêtre
+        # principale). Sans objet quand la galerie HTML est décochée.
+        self.html_originals_check = Gtk.CheckButton(label=_("gen.html_originals"))
+        self.html_originals_check.set_margin_start(20)
+        self.html_originals_check.set_tooltip_text(_("gen.html_originals_tooltip"))
+        grid.attach(self.html_originals_check, 6, 4, 2, 1)
+        self.html_check.connect(
+            "toggled", lambda check: self.html_originals_check.set_sensitive(check.get_active())
+        )
+
         box.append(grid)
 
         form_box = box
@@ -1652,6 +1665,7 @@ class PlancheContactGTK(Gtk.Application):
         self.html_per_page_scale.set_value(48)
         self.pdf_check.set_active(True)
         self.html_check.set_active(True)
+        self.html_originals_check.set_active(False)
         self.csv_check.set_active(True)
         self._apply_profile_to_widgets(default_profile())
         self.log_buffer.set_text("")
@@ -2106,6 +2120,8 @@ class PlancheContactGTK(Gtk.Application):
             cmd.append("--pdf")
         if self.html_check.get_active():
             cmd.append("--html")
+            if self.html_originals_check.get_active():
+                cmd.append("--html-originals")
         if self.csv_check.get_active():
             cmd.append("--csv")
 

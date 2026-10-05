@@ -64,7 +64,7 @@
 <ul>
     <li>des <strong>planches contact</strong> au format JPEG (une ou plusieurs pages) ;</li>
     <li>un <strong>PDF</strong> assemblant toutes les planches ;</li>
-    <li>une <strong>galerie HTML</strong> paginée, autonome, avec vignettes cliquables ouvrant chaque photo dans une visionneuse plein écran : nom du fichier et numéro de page affichés, navigation entre les photos de la page (clavier ou flèches ‹ ›), saut direct à une autre page, zoom de 50 % à 200 %, téléchargement de la photo affichée, informations techniques (résolution d'origine, taille, date de prise de vue) et bascule en plein écran ;</li>
+    <li>une <strong>galerie HTML</strong> paginée, autonome, avec vignettes cliquables ouvrant chaque photo dans une visionneuse plein écran : nom du fichier et numéro de page affichés, navigation entre les photos de la page (clavier ou flèches ‹ ›), saut direct à une autre page, zoom de 50 % à 200 %, téléchargement de la photo affichée (ou de l'original pleine taille, avec l'option « Originaux pleine taille dans la galerie »), informations techniques (résolution d'origine, taille, date de prise de vue) et bascule en plein écran ;</li>
     <li>un <strong>index CSV</strong> listant chaque photo avec son numéro.</li>
 </ul>
 <div class="note">
@@ -110,6 +110,7 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
 <tr><td><strong>Thème</strong></td><td>Clair (défaut), Sombre, Neutre ou Système : thème graphique appliqué de façon identique aux planches, au PDF et à la galerie HTML (détails et couleurs personnalisées : voir §3.3).</td></tr>
 <tr><td><strong>Options d'export</strong></td><td>Cases à cocher : Générer PDF, Générer Galerie HTML, Générer Index CSV.</td></tr>
 <tr><td><strong>Images par page</strong></td><td>Nombre de vignettes par page de la galerie HTML (12 à 64, par pas de 4, défaut : 48). Sur la même ligne que la case « Générer Galerie HTML ».</td></tr>
+<tr><td><strong>Originaux pleine taille dans la galerie</strong></td><td>Case à cocher, décochée par défaut, à droite du curseur « Images par page » (grisée si « Générer Galerie HTML » est décochée). Joint à la galerie les fichiers originaux, copiés sans perte (RAW compris) : le bouton de téléchargement ⇩ de la visionneuse donne alors la photo de la prise de vue en pleine résolution, sous son nom d'origine, et non la copie réduite (2000 px) affichée à l'écran. La galerie pèse autant que le dossier source. <strong>Les originaux ne portent pas le filigrane</strong> (seules les copies affichées le portent) : un avertissement apparaît dans le journal si un filigrane est aussi demandé.</td></tr>
 </table>
 
 <p>Si aucun des trois champs Titre / Auteur / Filigrane n'est renseigné, l'en-tête des planches affiche par défaut le nom du dossier d'entrée (sans son chemin complet), pour éviter une planche totalement anonyme.</p>
@@ -202,6 +203,7 @@ Un changement de langue ne prend effet qu'au redémarrage de l'application. La l
 <tr><td><code>-r, --recursive</code></td><td>Analyse récursive des sous-dossiers</td><td></td></tr>
 <tr><td><code>--sort</code></td><td>Tri des photos : <code>date</code> (EXIF) ou <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Nombre d'images par page dans la galerie HTML (défaut : 48)</td><td><code>--html-per-page 60</code></td></tr>
+<tr><td><code>--html-originals</code></td><td>Joindre à la galerie HTML les originaux pleine taille (le bouton de téléchargement les donne ; la galerie pèse autant que les photos sources, et les originaux ne portent pas le filigrane)</td><td><code>--html --html-originals</code></td></tr>
 <tr><td><code>--language</code></td><td>Langue des messages et de la galerie HTML générée : <code>system</code> (défaut), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language fr</code></td></tr>
 <tr><td><code>--profile</code></td><td>Fichier de profil JSON (mise en page, légendes, thème — voir §3.3), produit par le bouton « Enregistrer le profil... » de l'interface graphique, ou écrit/modifié à la main. Un fichier absent ou invalide retombe silencieusement sur les réglages par défaut.</td><td><code>--profile mon-profil.json</code></td></tr>
 </table>
@@ -240,6 +242,7 @@ python3 portfolio.py \
 <tr><td><code>planches/</code></td><td>Planches contact individuelles (JPEG, 300 dpi)</td></tr>
 <tr><td><code>portfolio.pdf</code></td><td>PDF complet assemblant toutes les planches</td></tr>
 <tr><td><code>gallery/</code></td><td>Galerie HTML paginée et autonome (avec ses propres vignettes et images « pleine taille »)</td></tr>
+<tr><td><code>gallery/originals/</code></td><td>Fichiers originaux copiés tels quels, pleine résolution (uniquement avec l'option « Originaux pleine taille dans la galerie »)</td></tr>
 <tr><td><code>index.csv</code></td><td>Liste des images avec leur numéro</td></tr>
 <tr><td><code>generation.log</code></td><td>Journal détaillé de la génération</td></tr>
 </table>

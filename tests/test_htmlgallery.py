@@ -14,7 +14,10 @@ thème clair/sombre/système, bascule manuelle, persistance) a par ailleurs
 été effectuée manuellement lors du développement de ce câblage - voir
 CHANGELOG.md.
 """
+import filecmp
+import json
 import re
+from urllib.parse import quote, unquote
 
 import pytest
 from PIL import Image
@@ -23,6 +26,7 @@ from PIL.ExifTags import IFD
 from portfolio.config import Config
 from portfolio.thumbnail import ThumbnailGenerator
 from portfolio.htmlgallery import HTMLGalleryGenerator
+from portfolio.i18n import _
 from portfolio.presentation import (
     Profile, LayoutSettings, CaptionSettings, ThemeSettings, ThemeCustomColors, get_palette,
 )
@@ -50,13 +54,14 @@ def _make_images(tmp_path, n, *, with_exif=False, color=(90, 140, 200), size=(80
 
 
 def _generate(tmp_path, images, profile, *, per_page=12, title=None, author=None,
-              html_per_page=48):
+              html_per_page=48, include_originals=False, watermark=None):
     img_dir = images[0]["path"].parent
     out_dir = tmp_path / "out"
     config = Config(
         input_dir=img_dir, output_dir=out_dir, num_per_sheet=per_page,
         page_format="A4", profile=profile, title=title, author=author,
-        html_images_per_page=html_per_page,
+        html_images_per_page=html_per_page, html_include_originals=include_originals,
+        watermark_text=watermark,
     )
     gallery_gen = HTMLGalleryGenerator(config, ThumbnailGenerator(config))
     gallery_gen.create_gallery(images, out_dir)
@@ -379,3 +384,186 @@ def test_header_positions_apply_to_every_page(tmp_path):
     assert len(pages) >= 3
     for page in pages:
         assert '<h1 style="text-align: left">Mon Titre</h1>' in page.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Originaux pleine taille joints à la galerie (Config.html_include_originals) :
+# le bouton de téléchargement de la visionneuse ne donnait que la copie
+# réduite (2000 px) affichée à l'écran.
+# ---------------------------------------------------------------------------
+
+def _gallery_meta(html):
+    match = re.search(r"const galleryMeta = (\[.*?\]);", html)
+    assert match, "galleryMeta introuvable dans la page"
+    return json.loads(match.group(1))
+
+
+def _big_images(tmp_path, specs):
+    """specs : liste de (sous-dossier, nom, taille, couleur). Photos plus
+    grandes que GALLERY_FULL_MAX_SIZE (2000 px) pour que la copie affichée
+    soit forcément réduite."""
+    items = []
+    for subdir, name, size, color in specs:
+        folder = tmp_path / "photos" / subdir if subdir else tmp_path / "photos"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / name
+        Image.new("RGB", size, color).save(path, quality=95)
+        items.append({"path": path})
+    return items
+
+
+def test_gallery_has_no_originals_by_default(tmp_path):
+    """Sans l'option, rien ne change : pas de dossier originals/, pas de
+    clé « original » dans les métadonnées - le téléchargement vise la copie
+    affichée, comme avant."""
+    images = _big_images(tmp_path, [("", "a.jpg", (3000, 2000), (10, 20, 30))])
+    html = _generate(tmp_path, images, Profile())
+
+    assert not (tmp_path / "out" / "originals").exists()
+    assert all("original" not in entry for entry in _gallery_meta(html))
+
+
+def test_originals_are_copied_byte_for_byte_at_full_resolution(tmp_path):
+    """Régression : « le download ne donne pas l'image originale en pleine
+    taille ». Avec l'option, chaque original est copié OCTET POUR OCTET
+    (aucune recompression), la copie affichée restant réduite."""
+    images = _big_images(tmp_path, [
+        ("", "a.jpg", (3000, 2000), (10, 20, 30)),
+        ("", "b.jpg", (2400, 3600), (200, 100, 50)),
+    ])
+    html = _generate(tmp_path, images, Profile(), include_originals=True)
+    out = tmp_path / "out"
+
+    meta = _gallery_meta(html)
+    assert [e["original"] for e in meta] == ["originals/a.jpg", "originals/b.jpg"]
+    assert [e["originalFilename"] for e in meta] == ["a.jpg", "b.jpg"]
+    for item in images:
+        copy = out / "originals" / item["path"].name
+        assert filecmp.cmp(item["path"], copy, shallow=False), "l'original doit être identique octet pour octet"
+    assert Image.open(out / "originals" / "a.jpg").size == (3000, 2000)
+    assert max(Image.open(out / "images" / "a.jpg").size) == 2000, "la copie affichée reste réduite"
+
+
+def test_originals_with_the_same_name_never_overwrite_each_other(tmp_path):
+    """Deux photos de même nom dans deux sous-dossiers (option -r), y
+    compris à la casse près (Windows/macOS ne les distinguent pas) :
+    perdre un ORIGINAL en silence serait bien plus grave que pour une copie
+    réduite."""
+    images = _big_images(tmp_path, [
+        ("un", "IMG_1.jpg", (2200, 1500), (255, 0, 0)),
+        ("deux", "IMG_1.jpg", (2200, 1500), (0, 255, 0)),
+        ("trois", "img_1.JPG", (2200, 1500), (0, 0, 255)),
+    ])
+    html = _generate(tmp_path, images, Profile(), include_originals=True)
+    out = tmp_path / "out" / "originals"
+
+    meta = _gallery_meta(html)
+    names = [unquote(e["original"]).split("/", 1)[1] for e in meta]
+    assert len({n.lower() for n in names}) == 3, f"noms d'originaux non uniques : {names}"
+    for item, name in zip(images, names):
+        assert filecmp.cmp(item["path"], out / name, shallow=False)
+    # Le téléchargement garde, lui, le nom d'origine de chaque fichier.
+    assert [e["originalFilename"] for e in meta] == ["IMG_1.jpg", "IMG_1.jpg", "img_1.JPG"]
+
+
+def test_original_url_is_percent_encoded(tmp_path):
+    """Un nom avec espaces, accents, # ou parenthèses doit rester
+    téléchargeable : sans encodage, « # » coupait l'URL (fragment) et le
+    navigateur demandait un fichier inexistant."""
+    images = _big_images(tmp_path, [("", "Été du 12 #3 (copie).jpg", (2200, 1500), (9, 9, 9))])
+    html = _generate(tmp_path, images, Profile(), include_originals=True)
+
+    (entry,) = _gallery_meta(html)
+    assert entry["original"] == "originals/" + quote("Été du 12 #3 (copie).jpg")
+    assert "#" not in entry["original"] and " " not in entry["original"]
+    assert (tmp_path / "out" / unquote(entry["original"])).is_file()
+
+
+def test_download_button_targets_the_original_when_available(tmp_path):
+    """Le script de la visionneuse doit télécharger l'original (et sous son
+    nom d'origine) quand la page en connaît un, la copie affichée sinon ; le
+    bouton l'annonce par son libellé."""
+    images = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 2, 3))])
+    html = _generate(tmp_path, images, Profile(), include_originals=True)
+
+    assert "const url = meta.original || galleryImages[currentIndex];" in html
+    assert "const filename = meta.originalFilename || meta.filename;" in html
+    assert "dl.href = meta.original || url;" in html
+    assert "dl.download = meta.originalFilename || meta.filename;" in html
+    assert f"const downloadOriginalLabel = {json.dumps(_('gallery.download_original'), ensure_ascii=False)};" in html
+    # Un original (peut-être un RAW) n'est pas ce qu'affiche la visionneuse :
+    # le repli « redessiner l'image à l'écran » donnerait la copie réduite.
+    assert html.index("if (meta.original)") < html.index("canvas.toBlob")
+
+
+def test_worker_copies_a_raw_original_untouched(tmp_path, monkeypatch):
+    """Un RAW (illisible par un navigateur) est joint tel quel : le visiteur
+    télécharge le fichier de la prise de vue, l'image affichée venant de
+    l'aperçu décodé. Le worker est appelé directement (dans ce processus)
+    pour pouvoir simuler le décodage RAW, rawpy n'étant pas toujours
+    installé."""
+    from portfolio import htmlgallery
+
+    raw = tmp_path / "photos" / "DSC_0001.NEF"
+    raw.parent.mkdir()
+    raw.write_bytes(b"NEF-FAKE-" + bytes(range(256)) * 40)
+    monkeypatch.setattr(htmlgallery, "load_image", lambda *a, **k: Image.new("RGB", (3000, 2000), (5, 6, 7)))
+    images_dir, thumbs_dir, originals_dir = (tmp_path / d for d in ("images", "thumbs", "originals"))
+    for d in (images_dir, thumbs_dir, originals_dir):
+        d.mkdir()
+
+    ok, meta = htmlgallery._process_full_image_worker((
+        str(raw), str(images_dir), str(thumbs_dir), "t.jpg", None, 40, "Horizontal",
+        str(originals_dir), "DSC_0001.NEF",
+    ))
+
+    assert ok
+    assert (originals_dir / "DSC_0001.NEF").read_bytes() == raw.read_bytes()
+    assert meta["original"] == "originals/DSC_0001.NEF"
+    assert meta["original_filename"] == "DSC_0001.NEF"
+    assert meta["filename"] == "DSC_0001.jpg", "la copie affichée d'un RAW reste un JPEG"
+    assert (images_dir / "DSC_0001.jpg").is_file()
+
+
+def test_failed_original_copy_keeps_the_gallery_and_falls_back(tmp_path, monkeypatch):
+    """Disque plein ou fichier verrouillé : l'image reste dans la galerie,
+    sans fichier tronqué dans originals/, et le téléchargement retombe sur
+    la copie affichée (aucune clé « original »)."""
+    from portfolio import htmlgallery
+
+    src = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 1, 1))])[0]["path"]
+    images_dir, thumbs_dir, originals_dir = (tmp_path / d for d in ("images", "thumbs", "originals"))
+    for d in (images_dir, thumbs_dir, originals_dir):
+        d.mkdir()
+
+    def broken_copy(source, destination, *a, **k):
+        destination = htmlgallery.Path(destination)
+        destination.write_bytes(b"tronque")
+        raise OSError("disque plein")
+
+    monkeypatch.setattr(htmlgallery.shutil, "copy2", broken_copy)
+    ok, meta = htmlgallery._process_full_image_worker((
+        str(src), str(images_dir), str(thumbs_dir), "t.jpg", None, 40, "Horizontal",
+        str(originals_dir), "a.jpg",
+    ))
+
+    assert ok and "original" not in meta
+    assert list(originals_dir.iterdir()) == [], "aucun fichier tronqué ne doit rester"
+    assert (images_dir / "a.jpg").is_file()
+
+
+def test_worker_without_originals_arguments_still_works(tmp_path):
+    """Compatibilité : l'ancien appel à 7 arguments (sans originaux) reste
+    valide."""
+    from portfolio import htmlgallery
+
+    src = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 1, 1))])[0]["path"]
+    images_dir, thumbs_dir = tmp_path / "images", tmp_path / "thumbs"
+    images_dir.mkdir()
+    thumbs_dir.mkdir()
+
+    ok, meta = htmlgallery._process_full_image_worker((
+        str(src), str(images_dir), str(thumbs_dir), "t.jpg", None, 40, "Horizontal",
+    ))
+
+    assert ok and "original" not in meta
