@@ -22,7 +22,9 @@ from portfolio.presentation import (
 from portfolio.presentation.layout_engine import (
     PAPER_SIZES_MM, mm_to_px, pt_to_px, canvas_size_px, MIN_THUMB_SIZE_PX,
     LARGE_THUMBS_MAX_COLUMNS_TESTED, LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE,
-    CAPTION_LINE_SPACING_PX, CAPTION_PHOTO_GAP_PX,
+    CAPTION_LINE_SPACING_PX, CAPTION_PHOTO_GAP_PX, HEADER_RESERVED_PX_GRID,
+    FOOTER_PAGE_NUMBER_OFFSET_PX, FOOTER_CREDIT_OFFSET_PX, FOOTER_LICENSE_OFFSET_PX,
+    FOOTER_CLEARANCE_PX, FOOTER_RESERVED_PX,
 )
 
 
@@ -497,3 +499,50 @@ def test_centering_does_not_depend_on_the_number_of_photos_on_the_page():
     assert (short.grid_w, short.grid_h) == (full.grid_w, full.grid_h)
     assert [(c.photo_x, c.photo_y) for c in short.cells] == [(c.photo_x, c.photo_y) for c in full.cells[:5]]
 
+
+
+# ---------------------------------------------------------------------------
+# Pied de page des planches (numéro, crédit, développeur/licence) : la
+# grille ne doit jamais descendre dessus, quelle que soit la marge choisie.
+# ---------------------------------------------------------------------------
+
+def test_footer_lines_are_ordered_and_spaced_for_their_font_sizes():
+    """Valeurs de référence (police 26 px pour le numéro, 20 px pour les
+    deux mentions) : trois lignes distinctes, du haut vers le bas, sans
+    chevauchement, et la dernière à distance du bord de la planche."""
+    assert FOOTER_PAGE_NUMBER_OFFSET_PX > FOOTER_CREDIT_OFFSET_PX > FOOTER_LICENSE_OFFSET_PX
+    assert FOOTER_PAGE_NUMBER_OFFSET_PX - FOOTER_CREDIT_OFFSET_PX >= 34   # 26 px + interligne
+    assert FOOTER_CREDIT_OFFSET_PX - FOOTER_LICENSE_OFFSET_PX >= 24       # 20 px + interligne
+    assert FOOTER_LICENSE_OFFSET_PX >= 40                                  # texte + bord de planche
+    assert FOOTER_RESERVED_PX == FOOTER_PAGE_NUMBER_OFFSET_PX + FOOTER_CLEARANCE_PX
+    assert FOOTER_CLEARANCE_PX >= 10
+
+
+@pytest.mark.parametrize("margin_mm", [0, 3, 6, 10])
+@pytest.mark.parametrize("page_format", ["A5", "A4", "A3", "Letter"])
+@pytest.mark.parametrize("orientation", ["portrait", "landscape"])
+@pytest.mark.parametrize("template,per_page", [("grid", 8), ("grid", 24), ("large_thumbs", 12), ("free", 12)])
+def test_grid_stops_above_the_footer_when_the_margin_is_smaller_than_the_footer(
+        margin_mm, page_format, orientation, template, per_page):
+    profile = Profile(layout=LayoutSettings(page_format=page_format, orientation=orientation,
+                                            template=template, per_page=per_page, margin_mm=margin_mm))
+    page = compute_page_layout(profile, per_page)
+    assert page.content_bottom_px == page.canvas_h - FOOTER_RESERVED_PX
+    grid_bottom = page.content_top_px + page.grid_h
+    assert grid_bottom <= page.content_bottom_px, (
+        f"la grille descend à {grid_bottom} px, le pied de page commence à {page.content_bottom_px} px"
+    )
+
+
+@pytest.mark.parametrize("margin_mm", [11, 12, 15, 20, 30])
+def test_footer_reservation_changes_nothing_when_the_margin_is_large_enough(margin_mm):
+    """À partir de ~10,7 mm de marge (la marge par défaut est de 12 mm), la
+    marge basse l'emporte sur le pied de page : zone utile, emplacement et
+    taille des vignettes strictement identiques à ceux d'avant l'ajout de
+    la troisième ligne."""
+    profile = Profile(layout=LayoutSettings(margin_mm=margin_mm))
+    page = compute_page_layout(profile, 12)
+    margin_px = mm_to_px(margin_mm)
+    assert page.content_bottom_px == page.canvas_h - margin_px
+    # même hauteur utile qu'avant : toute la hauteur moins deux marges et l'en-tête
+    assert page.content_bottom_px - page.content_top_px == page.canvas_h - 2 * margin_px - HEADER_RESERVED_PX_GRID

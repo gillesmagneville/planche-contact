@@ -11,7 +11,7 @@ import uuid
 from PIL import Image, ImageOps
 
 from .rawloader import load_image, is_raw_file, get_original_dimensions
-from .utils import apply_watermark, get_exif_date, format_file_size, get_exif_metadata
+from .utils import apply_watermark, get_exif_date, format_file_size, get_exif_metadata, AUTHOR_NAME
 from .i18n import _, get_language, set_language
 from .presentation import get_palette, apply_custom_colors, resolve_caption_lines
 
@@ -850,7 +850,7 @@ class HTMLGalleryGenerator:
 {nav_html}
 <div class="footer">
     <p>{_('gallery.footer')}</p>
-    <p>{_('gallery.footer_credit', name='Gilles MAGNEVILLE')}</p>
+    <p>{_('gallery.footer_credit', name=AUTHOR_NAME)}</p>
     {self._theme_toggle_html()}
 </div>
 

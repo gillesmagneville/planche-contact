@@ -57,6 +57,31 @@ PAPER_SIZES_MM = {
 #: docstring du module.
 HEADER_RESERVED_PX_GRID = 180
 
+#: Pied de page des planches : trois lignes, de haut en bas - numéro de
+#: planche (optionnel), « Planche générée par Planche-Contact », puis la
+#: mention du développeur/de la licence. Chaque valeur est la distance, en
+#: pixels à 300 ppp, entre le BAS de la planche et l'origine (haut) du texte
+#: de la ligne ; contactsheet.py._draw_page_number() les utilise telles
+#: quelles, et FOOTER_RESERVED_PX en est dérivé - une seule source de
+#: vérité, pour qu'une ligne ajoutée ou déplacée ici ne puisse pas un jour
+#: empiéter sur la grille de vignettes sans que la réservation suive.
+FOOTER_PAGE_NUMBER_OFFSET_PX = 114
+FOOTER_CREDIT_OFFSET_PX = 76
+FOOTER_LICENSE_OFFSET_PX = 50
+
+#: Espace libre minimal entre la grille et la première ligne du pied de
+#: page (~1 mm).
+FOOTER_CLEARANCE_PX = 12
+
+#: Hauteur réservée en bas de page pour le pied de page, bord de planche
+#: compris (~10,7 mm). La zone utile de la grille s'arrête à
+#: `canvas_h - max(marge, FOOTER_RESERVED_PX)` : avec la marge par défaut
+#: (12 mm = 141 px) c'est la marge qui l'emporte et la géométrie est
+#: strictement inchangée ; avec une marge plus petite, la grille ne
+#: descend plus jusque sous le pied de page (les lignes de texte
+#: recouvraient auparavant les dernières photos).
+FOOTER_RESERVED_PX = FOOTER_PAGE_NUMBER_OFFSET_PX + FOOTER_CLEARANCE_PX
+
 #: Nombre de colonnes maximal testé par la recherche "grid" - valeur
 #: historique de contactsheet.py (range(1, min(num_per_sheet + 1, 9))).
 GRID_MAX_COLUMNS_TESTED = 8
@@ -190,6 +215,11 @@ class PageLayout:
     #: à connaître la hauteur réelle de l'en-tête.
     grid_w: int = 0
     grid_h: int = 0
+    #: Ordonnée (bord haut = 0) en dessous de laquelle la grille ne doit pas
+    #: descendre : bas de la zone utile, pied de page réservé compris (voir
+    #: FOOTER_RESERVED_PX). Sert à centrer verticalement la grille dans
+    #: contactsheet.py.
+    content_bottom_px: int = 0
 
 
 #: Espacement vertical entre deux lignes de légende, en plus de la hauteur
@@ -367,8 +397,11 @@ def compute_page_layout(profile: Profile, photo_count: int,
     margin_px = mm_to_px(layout.margin_mm)
     spacing_px = mm_to_px(layout.spacing_mm)
 
+    # Marge basse : celle du Profil, mais jamais en deçà du pied de page
+    # (FOOTER_RESERVED_PX) - sans effet à partir de ~10,7 mm de marge.
+    bottom_px = max(margin_px, FOOTER_RESERVED_PX)
     available_w = canvas_w - 2 * margin_px
-    available_h = canvas_h - 2 * margin_px - HEADER_RESERVED_PX_GRID
+    available_h = canvas_h - margin_px - bottom_px - HEADER_RESERVED_PX_GRID
 
     caption_w_px, caption_h_px = _reserve_caption_px(profile, caption_lines)
     # Écart photo/légende : réservé en plus de la zone de texte, dans le
@@ -481,4 +514,5 @@ def compute_page_layout(profile: Profile, photo_count: int,
         effective_per_page=effective_per_page,
         cells=cells,
         grid_w=grid_w, grid_h=grid_h,
+        content_bottom_px=canvas_h - bottom_px,
     )

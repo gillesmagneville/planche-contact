@@ -1,10 +1,11 @@
 from PIL import Image, ImageDraw, ImageOps
 from pathlib import Path
 
-from .utils import apply_watermark, get_font, get_exif_metadata
+from .utils import apply_watermark, get_font, get_exif_metadata, AUTHOR_NAME
 from .presentation import (
     compute_page_layout, compute_effective_per_page, resolve_theme, layout_caption_lines,
     canvas_size_px, pt_to_px, CAPTION_LINE_SPACING_PX,
+    FOOTER_PAGE_NUMBER_OFFSET_PX, FOOTER_CREDIT_OFFSET_PX, FOOTER_LICENSE_OFFSET_PX,
 )
 from .i18n import _
 
@@ -226,7 +227,7 @@ class ContactSheetGenerator:
         # endroits. Jamais de décalage négatif (la grille ne remonte pas sous
         # l'en-tête) ; le centrage horizontal est fait par le moteur
         # (layout_engine.compute_page_layout()).
-        free_h = canvas_h - margin - y_start
+        free_h = page.content_bottom_px - y_start
         y_shift += max(0, free_h - page.grid_h) // 2
 
         # Position de légende réellement DESSINÉE : sans aucun champ
@@ -423,19 +424,29 @@ class ContactSheetGenerator:
 
     def _draw_page_number(self, draw, canvas_w, canvas_h, page_num, total_pages, palette,
                           show_page_number=True):
-        """Numéro de planche ("Planche 1/3") puis mention de crédit. Le
-        numéro seul est optionnel (LayoutSettings.page_numbering) ; la
-        mention de crédit en bas de page reste toujours affichée."""
+        """Pied de page, trois lignes centrées : numéro de planche
+        ("Planche 1/3"), « Planche générée par Planche-Contact », puis la
+        mention du développeur et de la licence (la même que celle du pied
+        de la galerie HTML). Le numéro seul est optionnel
+        (LayoutSettings.page_numbering) ; les deux mentions restent toujours
+        affichées. Les positions viennent de layout_engine.FOOTER_*_OFFSET_PX,
+        qui réserve aussi la place correspondante sous la grille."""
         font = get_font(26)
         font_small = get_font(20)
 
+        lines = []
         if show_page_number:
-            page_text = _("sheet.page_label", page=page_num, total=total_pages)
-            bbox = draw.textbbox((0, 0), page_text, font=font)
-            page_w = bbox[2] - bbox[0]
-            draw.text(((canvas_w - page_w) / 2, canvas_h - 90), page_text, fill=palette.text, font=font)
+            lines.append((
+                _("sheet.page_label", page=page_num, total=total_pages),
+                FOOTER_PAGE_NUMBER_OFFSET_PX, font, palette.text,
+            ))
+        lines.append((_("sheet.footer"), FOOTER_CREDIT_OFFSET_PX, font_small, palette.text_secondary))
+        lines.append((
+            _("sheet.footer_credit", name=AUTHOR_NAME),
+            FOOTER_LICENSE_OFFSET_PX, font_small, palette.text_secondary,
+        ))
 
-        credit = _("sheet.footer")
-        bbox = draw.textbbox((0, 0), credit, font=font_small)
-        credit_w = bbox[2] - bbox[0]
-        draw.text(((canvas_w - credit_w) / 2, canvas_h - 50), credit, fill=palette.text_secondary, font=font_small)
+        for text, offset_px, line_font, color in lines:
+            bbox = draw.textbbox((0, 0), text, font=line_font)
+            text_w = bbox[2] - bbox[0]
+            draw.text(((canvas_w - text_w) / 2, canvas_h - offset_px), text, fill=color, font=line_font)

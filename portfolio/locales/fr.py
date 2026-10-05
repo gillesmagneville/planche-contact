@@ -205,6 +205,7 @@ STRINGS = {
     # portfolio/contactsheet.py, _draw_page_number()) ---
     "sheet.page_label": "Planche {page}/{total}",
     "sheet.footer": "Planche générée par Planche-Contact",
+    "sheet.footer_credit": "Développé par {name}, sous licence GNU GPL v3",
     "gallery.footer_credit": "Développé par {name}, sous licence GNU GPL v3",
     "prefs.title": "Préférences",
     "gallery.wrap_forward": "Fin de la galerie — retour à la première page.",

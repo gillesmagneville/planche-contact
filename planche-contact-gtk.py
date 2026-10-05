@@ -67,6 +67,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from portfolio.config import Config
 from portfolio.scanner import ImageScanner
 from portfolio.rawloader import load_image
+from portfolio.utils import AUTHOR_NAME
 from portfolio.i18n import _, set_language, get_language, AVAILABLE_LANGUAGES, detect_system_language
 from portfolio.presentation import (
     Profile, LayoutSettings, CaptionSettings, ThemeSettings, ThemeCustomColors,
@@ -2386,7 +2387,7 @@ class PlancheContactGTK(Gtk.Application):
 
         # Auteur
         author = Gtk.Label()
-        author.set_markup(f"<span size='small'>{_('about.developed_by', name='Gilles MAGNEVILLE')}</span>")
+        author.set_markup(f"<span size='small'>{_('about.developed_by', name=AUTHOR_NAME)}</span>")
         author.set_margin_top(25)
         box.append(author)
 

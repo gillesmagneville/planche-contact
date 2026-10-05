@@ -862,25 +862,49 @@ def test_a_short_title_keeps_its_historical_font_size(tmp_path):
     assert abs((right - left) - (bbox[2] - bbox[0])) <= GLYPH_BEARING_TOLERANCE_PX
 
 
-def _footer_ink(gen, page_numbering_arg):
-    canvas_w, canvas_h = 2480, 3508
+# Pied de page : trois lignes centrées, de haut en bas - numéro de planche
+# (optionnel), « Planche générée par Planche-Contact », puis « Développé par
+# Gilles MAGNEVILLE, sous licence GNU GPL v3 ». Bandes en pixels depuis le
+# BAS de la planche (valeurs écrites en dur, pas relues dans layout_engine :
+# un décalage involontaire des constantes doit faire échouer ces tests).
+FOOTER_NUMBER_BAND = (120, 80)
+FOOTER_CREDIT_BAND = (80, 52)
+FOOTER_LICENSE_BAND = (52, 20)
+#: Écart admis entre la largeur d'encre mesurée et celle du texte (police
+#: 20 px : crénage/anti-crénelage, pas davantage).
+FOOTER_TEXT_TOLERANCE_PX = 4
+
+
+def _band(gray, band):
+    top, bottom = band
+    return gray[gray.shape[0] - top:gray.shape[0] - bottom, :]
+
+
+def _footer_gray(gen, page_numbering_arg, canvas_w=2480, canvas_h=3508):
     canvas = Image.new("RGB", (canvas_w, canvas_h), "white")
     gen._draw_page_number(ImageDraw.Draw(canvas), canvas_w, canvas_h, 2, 5, _HEADER_PALETTE,
                           show_page_number=page_numbering_arg)
-    gray = np.array(canvas.convert("L")).astype(int)
-    number_band = gray[canvas_h - 100:canvas_h - 55, :]
-    credit_band = gray[canvas_h - 55:, :]
-    return (number_band < 128).any(), (credit_band < 128).any()
+    return np.array(canvas.convert("L")).astype(int)
 
 
-def test_page_number_is_drawn_by_default_with_the_credit_line(tmp_path):
+def _footer_ink_lines(gray):
+    """(numéro, crédit, licence) : True si la bande contient de l'encre."""
+    return tuple(bool((_band(gray, b) < 128).any())
+                 for b in (FOOTER_NUMBER_BAND, FOOTER_CREDIT_BAND, FOOTER_LICENSE_BAND))
+
+
+def _footer_ink(gen, page_numbering_arg):
+    return _footer_ink_lines(_footer_gray(gen, page_numbering_arg))
+
+
+def test_page_number_is_drawn_by_default_with_the_credit_lines(tmp_path):
     gen = _header_generator(tmp_path)
-    assert _footer_ink(gen, True) == (True, True)
+    assert _footer_ink(gen, True) == (True, True, True)
 
 
-def test_page_number_can_be_hidden_while_the_credit_line_stays(tmp_path):
+def test_page_number_can_be_hidden_while_the_credit_lines_stay(tmp_path):
     gen = _header_generator(tmp_path)
-    assert _footer_ink(gen, False) == (False, True)
+    assert _footer_ink(gen, False) == (False, True, True)
 
 
 def test_page_numbering_setting_reaches_the_rendered_sheet(tmp_path):
@@ -891,12 +915,87 @@ def test_page_numbering_setting_reaches_the_rendered_sheet(tmp_path):
         config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=6, profile=profile)
         gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
         sheet = gen.create_contact_sheet(images, 1, 3)
-        gray = np.array(sheet.convert("L")).astype(int)
-        h = gray.shape[0]
-        return (gray[h - 100:h - 55, :] < 128).any(), (gray[h - 55:, :] < 128).any()
+        return _footer_ink_lines(np.array(sheet.convert("L")).astype(int))
 
-    assert render(True) == (True, True)
-    assert render(False) == (False, True)
+    assert render(True) == (True, True, True)
+    assert render(False) == (False, True, True)
+
+
+@pytest.fixture
+def restore_language():
+    from portfolio.i18n import get_language, set_language
+    previous = get_language()
+    yield set_language
+    set_language(previous)
+
+
+@pytest.mark.parametrize("lang", ["fr", "en", "de", "es"])
+def test_license_line_is_centered_and_as_wide_as_its_text(tmp_path, restore_language, lang):
+    """La mention développeur/licence est dessinée entière (largeur = celle
+    du texte traduit mesuré à la police 20 px, aucune troncature) et
+    centrée sur la page, dans chaque langue."""
+    from portfolio.i18n import _
+    from portfolio.utils import AUTHOR_NAME, get_font
+
+    restore_language(lang)
+    text = _("sheet.footer_credit", name=AUTHOR_NAME)
+    assert AUTHOR_NAME in text and "GPL v3" in text
+
+    canvas_w = 2480
+    gray = _footer_gray(_header_generator(tmp_path), True, canvas_w=canvas_w)
+    left, right = _ink_columns(_band(gray, FOOTER_LICENSE_BAND))
+
+    probe = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+    bbox = probe.textbbox((0, 0), text, font=get_font(20))
+    assert abs((right - left + 1) - (bbox[2] - bbox[0])) <= FOOTER_TEXT_TOLERANCE_PX
+    assert abs(left - (canvas_w - 1 - right)) <= FOOTER_TEXT_TOLERANCE_PX
+
+
+def test_license_line_sits_below_the_credit_line_without_touching_it(tmp_path):
+    gray = _footer_gray(_header_generator(tmp_path), True)
+    rows = np.where((gray < 128).any(axis=1))[0]
+    h = gray.shape[0]
+    # trois groupes de lignes de pixels séparés par du blanc : numéro, crédit, licence
+    groups = np.split(rows, np.where(np.diff(rows) > 1)[0] + 1)
+    assert len(groups) == 3, f"{len(groups)} lignes de texte au lieu de 3"
+    # l'ordre est numéro, crédit, licence, de haut en bas, et la dernière
+    # ligne reste à distance du bord physique de la planche (~2 mm)
+    assert groups[0][-1] < groups[1][0] and groups[1][-1] < groups[2][0]
+    assert h - 1 - groups[2][-1] >= 20
+
+
+def test_license_line_uses_the_secondary_text_color(tmp_path):
+    palette = SimpleNamespace(text=(0, 0, 0), text_secondary=(120, 120, 120))
+    gen = _header_generator(tmp_path)
+    canvas = Image.new("RGB", (2480, 3508), "white")
+    gen._draw_page_number(ImageDraw.Draw(canvas), 2480, 3508, 1, 1, palette, show_page_number=True)
+    gray = np.array(canvas.convert("L")).astype(int)
+    assert _band(gray, FOOTER_NUMBER_BAND).min() == 0
+    assert _band(gray, FOOTER_CREDIT_BAND).min() == 120
+    assert _band(gray, FOOTER_LICENSE_BAND).min() == 120
+
+
+@pytest.mark.parametrize("lang", ["fr", "en", "de", "es"])
+def test_sheet_and_gallery_use_the_same_license_wording(restore_language, lang):
+    """Les planches/PDF et le pied de la galerie HTML affichent la même
+    mention, dans chaque langue : un seul texte à tenir à jour."""
+    from portfolio.i18n import _
+    from portfolio.utils import AUTHOR_NAME
+
+    restore_language(lang)
+    assert _("sheet.footer_credit", name=AUTHOR_NAME) == _("gallery.footer_credit", name=AUTHOR_NAME)
+
+
+def test_the_rendered_sheet_carries_the_license_line_and_the_pdf_inherits_it(tmp_path):
+    """Bout en bout : la planche JPEG réellement générée porte les deux
+    mentions ; le PDF est construit à partir de ces planches (il ne dessine
+    aucun texte lui-même) et les reprend donc à l'identique."""
+    images = _make_images(tmp_path, 6)
+    config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=6,
+                    profile=Profile(layout=LayoutSettings(per_page=6)))
+    sheet = ContactSheetGenerator(config, ThumbnailGenerator(config)).create_contact_sheet(images, 1, 1)
+    gray = np.array(sheet.convert("L")).astype(int)
+    assert _footer_ink_lines(gray) == (True, True, True)
 
 
 def test_header_position_setting_reaches_the_rendered_sheet(tmp_path):
@@ -926,11 +1025,14 @@ def test_header_position_setting_reaches_the_rendered_sheet(tmp_path):
 # ---------------------------------------------------------------------------
 
 def _render_ink(tmp_path, photo_size, *, template="grid", per_page=8, page_format="A4",
-                orientation="portrait", n_photos=None, color=(10, 200, 10), title="Voyage"):
+                orientation="portrait", n_photos=None, color=(10, 200, 10), title="Voyage",
+                margin_mm=None):
     """Planche rendue ; renvoie (tableau RGB, PageLayout, bas de l'en-tête)."""
     images = _make_images(tmp_path, n_photos or per_page, color=color, size=photo_size)
+    extra = {} if margin_mm is None else {"margin_mm": margin_mm}
     profile = Profile(layout=LayoutSettings(template=template, per_page=per_page,
-                                            page_format=page_format, orientation=orientation))
+                                            page_format=page_format, orientation=orientation,
+                                            **extra))
     config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=per_page,
                     page_format=page_format, title=title, profile=profile)
     gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
@@ -984,6 +1086,25 @@ def test_the_whole_set_of_photos_is_centered_vertically_below_the_header(
     above, below = top - free_top, bottom - free_bottom
     assert above >= 0 and below >= 0, f"photos hors de la zone libre : {above} / {below}"
     assert abs(above - below) <= 3, f"vide au-dessus {above} px, au-dessous {below} px"
+
+
+@pytest.mark.parametrize("margin_mm", [0, 3, 6, 10, 12, 20])
+@pytest.mark.parametrize("page_format,orientation,template,per_page", CENTERING_CONFIGS)
+def test_the_footer_lines_never_overlap_the_photos_whatever_the_margin(
+        tmp_path, page_format, orientation, template, per_page, margin_mm):
+    """Le pied de page compte désormais trois lignes : avec une marge
+    basse plus petite que lui, les dernières photos descendaient jusque
+    sous le texte. La grille s'arrête maintenant au-dessus du pied de
+    page, quelle que soit la marge choisie."""
+    arr, _ = _render_ink(tmp_path, (1500, 2000), template=template, per_page=per_page,
+                         page_format=page_format, orientation=orientation, margin_mm=margin_mm)
+    _, _, _, bottom_gap = _ink_bbox(arr)
+    assert bottom_gap >= FOOTER_NUMBER_BAND[0], (
+        f"les photos descendent à {bottom_gap} px du bas de la page, "
+        f"le pied de page commence à {FOOTER_NUMBER_BAND[0]} px"
+    )
+    footer_zone = arr[arr.shape[0] - FOOTER_NUMBER_BAND[0]:, :, :]
+    assert not np.all(np.abs(footer_zone - np.array((10, 200, 10))) < 40, axis=2).any()
 
 
 def test_a_portrait_photo_is_centered_in_its_cell_not_stuck_to_its_left_edge(tmp_path):

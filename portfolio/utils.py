@@ -14,6 +14,12 @@ except ImportError:
     EXIFREAD_AVAILABLE = False
 
 
+#: Nom du développeur cité dans les mentions « Développé par {name}, sous
+#: licence GNU GPL v3 » (pied de page des planches contact/PDF, de la galerie
+#: HTML et onglet « À propos ») - défini ici une seule fois.
+AUTHOR_NAME = "Gilles MAGNEVILLE"
+
+
 def setup_logging(log_path: Path) -> None:
     """Configure le logging (fichier + console)."""
     logging.basicConfig(
