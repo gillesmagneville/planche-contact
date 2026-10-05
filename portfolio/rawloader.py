@@ -104,8 +104,11 @@ def _large_enough(img_size, target_size, tolerance=0.9, fill=False):
     return side >= max(target_size) * tolerance
 
 
-def _load_raw(path: Path, use_embedded_thumb: bool = True, target_size=None, fill: bool = False) -> Image.Image:
-    """Charge un fichier RAW et retourne une image PIL en mode RGB."""
+def _load_raw(path: Path, use_embedded_thumb: bool = True, target_size=None, fill: bool = False,
+              min_ratio: float = 0.9) -> Image.Image:
+    """Charge un fichier RAW et retourne une image PIL en mode RGB.
+    `min_ratio` : part de `target_size` que l'aperçu embarqué doit couvrir
+    pour être accepté (voir _large_enough())."""
     if not RAWPY_AVAILABLE:
         raise RuntimeError(_("engine.raw_module_missing", name=path.name))
 
@@ -127,7 +130,7 @@ def _load_raw(path: Path, use_embedded_thumb: bool = True, target_size=None, fil
                     img = Image.fromarray(thumb.data).convert("RGB")
 
                 if img is not None:
-                    if target_size is None or _large_enough(img.size, target_size, fill=fill):
+                    if target_size is None or _large_enough(img.size, target_size, tolerance=min_ratio, fill=fill):
                         return img
                     # Aperçu trop petit pour l'usage demandé : on continue
                     # plus bas vers un dématriçage complet.
@@ -172,3 +175,38 @@ def load_image(path: Path, use_embedded_thumb: bool = True, target_size=None, fi
                 pass
         img.load()
         return img
+
+
+#: Part de la résolution du capteur qu'un aperçu JPEG embarqué doit couvrir
+#: pour servir d'image « pleine taille » (voir load_full_resolution()) :
+#: quasi exact, contrairement à la tolérance de 90 % des vignettes - un
+#: aperçu sensiblement plus petit que la prise de vue n'est pas la photo
+#: complète.
+FULL_RESOLUTION_PREVIEW_MIN_RATIO = 0.98
+
+
+def load_full_resolution(path: Path) -> Image.Image:
+    """Image à la résolution COMPLÈTE de la prise de vue, en RGB - pour
+    produire un fichier JPEG téléchargeable à partir d'un RAW (galerie HTML,
+    option « originaux pleine taille »), à la différence de load_image() qui
+    se contente d'une image « assez grande pour l'usage demandé ».
+
+    Fichier non RAW : identique à load_image(). RAW : l'aperçu JPEG embarqué
+    s'il couvre au moins FULL_RESOLUTION_PREVIEW_MIN_RATIO de la résolution
+    du capteur (c'est le rendu de l'appareil lui-même, et l'extraction est
+    quasi instantanée - beaucoup d'appareils y enregistrent une image pleine
+    taille) ; sinon, dématriçage complet. Lève une exception en cas d'échec
+    (rawpy absent, fichier illisible...) : jamais de repli sur un aperçu plus
+    petit, qui serait présenté comme l'original."""
+    path = Path(path)
+    if not is_raw_file(path):
+        return load_image(path)
+    dimensions = get_original_dimensions(path)
+    return _load_raw(
+        path,
+        # Résolution du capteur inconnue : impossible d'apprécier l'aperçu,
+        # dématriçage complet.
+        use_embedded_thumb=dimensions is not None,
+        target_size=dimensions,
+        min_ratio=FULL_RESOLUTION_PREVIEW_MIN_RATIO,
+    )

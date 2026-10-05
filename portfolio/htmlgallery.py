@@ -10,7 +10,7 @@ import os
 import uuid
 from PIL import Image, ImageOps
 
-from .rawloader import load_image, is_raw_file, get_original_dimensions
+from .rawloader import load_image, load_full_resolution, is_raw_file, get_original_dimensions
 from .utils import apply_watermark, get_exif_date, format_file_size, get_exif_metadata, AUTHOR_NAME
 from .i18n import _, get_language, set_language
 from .presentation import get_palette, apply_custom_colors, resolve_caption_lines
@@ -82,6 +82,13 @@ def _init_worker_logging(log_path, language=None):
         set_language(language)
 
 
+#: Qualité (et sous-échantillonnage 4:4:4, sans perte de détail des
+#: couleurs) du JPEG créé à partir d'un RAW pour `originals/` : c'est la
+#: version téléchargeable de la prise de vue, pas une copie d'affichage
+#: (qualité 90, 2000 px).
+GALLERY_ORIGINAL_JPEG_QUALITY = 95
+
+
 def _unique_file_name(name: str, used: set) -> str:
     """Nom de fichier unique dans toute la galerie (`images/` et
     `originals/`) : deux photos de même nom ne doivent jamais s'écraser
@@ -138,10 +145,24 @@ def _process_full_image_worker(args):
     visible_name = HTMLGalleryGenerator.display_filename(path)
     out_name = image_file_name or visible_name
     target = (GALLERY_FULL_MAX_SIZE, GALLERY_FULL_MAX_SIZE)
+    # Un RAW ne doit JAMAIS se retrouver dans la galerie (originals/ compris) :
+    # avec l'option « originaux », il est converti en JPEG à sa résolution
+    # complète (voir plus bas). Le même décodage sert alors à l'original ET
+    # aux copies affichées (un seul dématriçage, pas deux).
+    convert_raw_original = bool(originals_dir_str and original_name and is_raw_file(path))
     try:
-        img = load_image(path, use_embedded_thumb=True, target_size=target)
+        if convert_raw_original:
+            img = load_full_resolution(path)
+        else:
+            img = load_image(path, use_embedded_thumb=True, target_size=target)
         img = ImageOps.exif_transpose(img)
         img = img.convert("RGB")
+        # Image pleine résolution, ni réduite ni filigranée, destinée à
+        # l'original : les copies affichées sont faites sur une COPIE
+        # (thumbnail() et le filigrane la modifieraient).
+        full_resolution = img if convert_raw_original else None
+        if full_resolution is not None:
+            img = img.copy()
         img.thumbnail(target, Image.Resampling.LANCZOS)
 
         if watermark_text:
@@ -178,20 +199,46 @@ def _process_full_image_worker(args):
             "date": exif_date.strftime("%d/%m/%Y %H:%M") if exif_date else None,
         }
 
-        # Original pleine taille : copie OCTET POUR OCTET du fichier source
-        # (aucun redécodage ni recompression : résolution, EXIF et qualité
-        # d'origine intacts, y compris pour un RAW, que le navigateur ne
-        # sait pas afficher mais que le visiteur peut télécharger). En cas
-        # d'échec de la copie (disque plein...), la galerie reste complète :
-        # le téléchargement retombe simplement sur la copie réduite.
+        # Original pleine taille (option Config.html_include_originals).
+        # - Fichier JPEG, PNG, TIFF... : copie OCTET POUR OCTET (aucun
+        #   redécodage ni recompression : résolution, EXIF et qualité d'origine
+        #   intacts).
+        # - RAW : jamais copié tel quel (un visiteur ne sait pas l'ouvrir, et
+        #   aucun RAW ne doit subsister dans la galerie) mais converti en JPEG
+        #   à la résolution complète (voir rawloader.load_full_resolution()),
+        #   sous le même nom en `.jpg`. Les métadonnées de l'aperçu embarqué
+        #   (EXIF, profil couleur) sont conservées quand il y en a.
+        # Dans les deux cas, en cas d'échec (disque plein, conversion
+        # impossible...) la galerie reste complète : le téléchargement retombe
+        # simplement sur la copie réduite - sans jamais copier le RAW à la
+        # place.
         if originals_dir_str and original_name:
+            if is_raw_file(Path(original_name)):
+                # Garde-fou : quel que soit le nom reçu, un RAW n'est jamais
+                # écrit sous une extension RAW.
+                original_name = Path(original_name).stem + ".jpg"
             target_original = Path(originals_dir_str) / original_name
             try:
-                shutil.copy2(path, target_original)
+                if full_resolution is not None:
+                    save_options = {
+                        "quality": GALLERY_ORIGINAL_JPEG_QUALITY,
+                        "subsampling": 0,
+                        "optimize": True,
+                    }
+                    exif = full_resolution.getexif()
+                    if exif:
+                        save_options["exif"] = exif
+                    if full_resolution.info.get("icc_profile"):
+                        save_options["icc_profile"] = full_resolution.info["icc_profile"]
+                    full_resolution.save(target_original, "JPEG", **save_options)
+                else:
+                    shutil.copy2(path, target_original)
                 metadata["original"] = "originals/" + quote(original_name)
-                metadata["original_filename"] = path.name
+                # Nom proposé au téléchargement : celui de la photo (pour un
+                # RAW, son nom en `.jpg`, jamais l'extension RAW d'origine).
+                metadata["original_filename"] = visible_name
             except Exception as e:
-                logging.getLogger(__name__).warning(f"Original non copié pour {path.name}: {e}")
+                logging.getLogger(__name__).warning(f"Original non créé pour {path.name}: {e}")
                 try:
                     target_original.unlink()  # pas de fichier tronqué
                 except OSError:
@@ -400,7 +447,9 @@ class HTMLGalleryGenerator:
                 if self.include_originals:
                     original_task = (
                         str(originals_dir),
-                        _unique_file_name(Path(image_path).name, used_original_names),
+                        # Nom d'AFFICHAGE : un RAW devient `.jpg` (voir
+                        # _process_full_image_worker), jamais un nom RAW.
+                        _unique_file_name(self.display_filename(image_path), used_original_names),
                     )
                 tasks.append((
                     str(image_path), str(images_dir), str(thumbs_dir), thumb_filename,

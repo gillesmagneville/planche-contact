@@ -110,7 +110,7 @@ RAW support relies on the <code>rawpy</code> library, installed automatically in
 <tr><td><strong>Theme</strong></td><td>Light (default), Dark, Neutral or System: graphical theme applied identically to the sheets, the PDF and the HTML gallery (details and custom colors: see §3.3).</td></tr>
 <tr><td><strong>Export options</strong></td><td>Checkboxes: Generate PDF, Generate HTML Gallery, Generate CSV Index.</td></tr>
 <tr><td><strong>Images per page</strong></td><td>Number of thumbnails per HTML gallery page (12 to 64, in steps of 4, default: 48). On the same line as the "Generate HTML Gallery" checkbox.</td></tr>
-<tr><td><strong>Full-size originals in the gallery</strong></td><td>Checkbox, off by default, to the right of the "Images per page" slider (greyed out when "Generate HTML Gallery" is unchecked). Adds the original files to the gallery, copied losslessly (RAW included): the viewer's ⇩ download button then gives the photo exactly as shot, at full resolution and under its original name, instead of the reduced copy (2000 px) shown on screen. The gallery is as big as the source folder. <strong>The originals do not carry the watermark</strong> (only the displayed copies do): a warning appears in the log if a watermark is also requested.</td></tr>
+<tr><td><strong>Full-size originals in the gallery</strong></td><td>Checkbox, off by default, to the right of the "Images per page" slider (greyed out when "Generate HTML Gallery" is unchecked). Adds the photos to the gallery at full resolution: JPEG, PNG, TIFF... files are copied losslessly, while <strong>RAW files are converted to full-size JPEG</strong> (same resolution, quality 95, EXIF kept when the preview embedded in the RAW has any) under the same name with a <code>.jpg</code> extension: no RAW file is ever placed in the gallery. The viewer's ⇩ download button then gives the photo as shot, at full resolution and under its name, instead of the reduced copy (2000 px) shown on screen. The gallery becomes much bigger. <strong>The originals do not carry the watermark</strong> (only the displayed copies do): a warning appears in the log if a watermark is also requested.</td></tr>
 </table>
 
 <p>If none of the Title / Author / Watermark fields is filled in, the sheet header defaults to showing the input folder's name (without its full path), to avoid a completely anonymous sheet.</p>
@@ -203,7 +203,7 @@ Changing the language takes effect after restarting the application. The chosen 
 <tr><td><code>-r, --recursive</code></td><td>Recursively scan subfolders</td><td></td></tr>
 <tr><td><code>--sort</code></td><td>Sort photos by: <code>date</code> (EXIF) or <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Number of images per HTML gallery page (default: 48)</td><td><code>--html-per-page 60</code></td></tr>
-<tr><td><code>--html-originals</code></td><td>Add the full-size originals to the HTML gallery (the download button serves them; the gallery is as big as the source photos, and the originals do not carry the watermark)</td><td><code>--html --html-originals</code></td></tr>
+<tr><td><code>--html-originals</code></td><td>Add the full-size originals to the HTML gallery (the download button serves them; RAW files are converted to JPEG, no RAW file is placed in the gallery; the gallery gets much bigger, and the originals do not carry the watermark)</td><td><code>--html --html-originals</code></td></tr>
 <tr><td><code>--language</code></td><td>Language of the messages and of the generated HTML gallery: <code>system</code> (default), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language en</code></td></tr>
 <tr><td><code>--profile</code></td><td>JSON profile file (layout, captions, theme — see §3.3), produced by the "Save profile..." button in the graphical interface, or written/edited by hand. A missing or invalid file silently falls back to the default settings.</td><td><code>--profile my-profile.json</code></td></tr>
 </table>
@@ -242,7 +242,7 @@ python3 portfolio.py \
 <tr><td><code>planches/</code></td><td>Individual contact sheets (JPEG, 300 dpi)</td></tr>
 <tr><td><code>portfolio.pdf</code></td><td>Full PDF assembling all the sheets</td></tr>
 <tr><td><code>gallery/</code></td><td>Paginated, self-contained HTML gallery (with its own thumbnails and "full-size" images)</td></tr>
-<tr><td><code>gallery/originals/</code></td><td>Original files copied as they are, at full resolution (only with the "Full-size originals in the gallery" option)</td></tr>
+<tr><td><code>gallery/originals/</code></td><td>Photos at full resolution: files copied as they are, except RAW files, which are converted to JPEG (only with the "Full-size originals in the gallery" option)</td></tr>
 <tr><td><code>index.csv</code></td><td>List of images with their number</td></tr>
 <tr><td><code>generation.log</code></td><td>Detailed generation log</td></tr>
 </table>

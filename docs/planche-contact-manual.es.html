@@ -110,7 +110,7 @@ El soporte de archivos RAW se basa en la biblioteca <code>rawpy</code>, instalad
 <tr><td><strong>Tema</strong></td><td>Claro (por defecto), Oscuro, Neutro o Sistema: tema gráfico aplicado de forma idéntica a las hojas, al PDF y a la galería HTML (detalles y colores personalizados: véase §3.3).</td></tr>
 <tr><td><strong>Opciones de exportación</strong></td><td>Casillas: Generar PDF, Generar galería HTML, Generar índice CSV.</td></tr>
 <tr><td><strong>Imágenes por página</strong></td><td>Número de miniaturas por página de la galería HTML (de 12 a 64, en pasos de 4, por defecto: 48). En la misma línea que la casilla «Generar galería HTML».</td></tr>
-<tr><td><strong>Originales a tamaño completo en la galería</strong></td><td>Casilla, desmarcada por defecto, a la derecha del control «Imágenes por página» (atenuada si «Generar galería HTML» está desmarcada). Añade a la galería los archivos originales, copiados sin pérdida (RAW incluido): el botón de descarga ⇩ del visor entrega entonces la foto tal como se tomó, a resolución completa y con su nombre original, y no la copia reducida (2000 px) que se ve en pantalla. La galería pesa lo mismo que la carpeta de origen. <strong>Los originales no llevan la marca de agua</strong> (solo las copias mostradas): aparece una advertencia en el registro si también se pide una marca de agua.</td></tr>
+<tr><td><strong>Originales a tamaño completo en la galería</strong></td><td>Casilla, desmarcada por defecto, a la derecha del control «Imágenes por página» (atenuada si «Generar galería HTML» está desmarcada). Añade a la galería las fotos en resolución completa: los archivos JPEG, PNG, TIFF... se copian sin pérdida, mientras que los <strong>archivos RAW se convierten a JPEG de tamaño completo</strong> (misma resolución, calidad 95, EXIF conservado cuando la vista previa incrustada en el RAW lo incluye) con el mismo nombre y la extensión <code>.jpg</code>: ningún archivo RAW se coloca nunca en la galería. El botón de descarga ⇩ del visor entrega entonces la foto tal como se tomó, a resolución completa y con su nombre, y no la copia reducida (2000 px) que se ve en pantalla. La galería pesa mucho más. <strong>Los originales no llevan la marca de agua</strong> (solo las copias mostradas): aparece una advertencia en el registro si también se pide una marca de agua.</td></tr>
 </table>
 
 <p>Si ninguno de los campos Título / Autor / Marca de agua está rellenado, el encabezado de las hojas muestra por defecto el nombre de la carpeta de entrada (sin su ruta completa), para evitar una hoja completamente anónima.</p>
@@ -203,7 +203,7 @@ Un cambio de idioma solo tiene efecto tras reiniciar la aplicación. El idioma e
 <tr><td><code>-r, --recursive</code></td><td>Análisis recursivo de las subcarpetas</td><td></td></tr>
 <tr><td><code>--sort</code></td><td>Orden de las fotos: <code>date</code> (EXIF) o <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Número de imágenes por página en la galería HTML (por defecto: 48)</td><td><code>--html-per-page 60</code></td></tr>
-<tr><td><code>--html-originals</code></td><td>Añadir a la galería HTML los originales a tamaño completo (el botón de descarga los entrega; la galería pesa lo mismo que las fotos de origen, y los originales no llevan la marca de agua)</td><td><code>--html --html-originals</code></td></tr>
+<tr><td><code>--html-originals</code></td><td>Añadir a la galería HTML los originales a tamaño completo (el botón de descarga los entrega; los archivos RAW se convierten a JPEG, ningún RAW se coloca en la galería; la galería pesa mucho más, y los originales no llevan la marca de agua)</td><td><code>--html --html-originals</code></td></tr>
 <tr><td><code>--language</code></td><td>Idioma de los mensajes y de la galería HTML generada: <code>system</code> (por defecto), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language es</code></td></tr>
 <tr><td><code>--profile</code></td><td>Archivo de perfil JSON (diseño, leyendas, tema — véase §3.3), generado con el botón «Guardar perfil…» de la interfaz gráfica, o escrito/editado a mano. Un archivo ausente o no válido recurre silenciosamente a los valores por defecto.</td><td><code>--profile mi-perfil.json</code></td></tr>
 </table>
@@ -242,7 +242,7 @@ python3 portfolio.py \
 <tr><td><code>planches/</code></td><td>Hojas de contacto individuales (JPEG, 300 ppp)</td></tr>
 <tr><td><code>portfolio.pdf</code></td><td>PDF completo que reúne todas las hojas</td></tr>
 <tr><td><code>gallery/</code></td><td>Galería HTML paginada y autónoma (con sus propias miniaturas e imágenes «a tamaño completo»)</td></tr>
-<tr><td><code>gallery/originals/</code></td><td>Archivos originales copiados tal cual, a resolución completa (solo con la opción «Originales a tamaño completo en la galería»)</td></tr>
+<tr><td><code>gallery/originals/</code></td><td>Fotos en resolución completa: archivos copiados tal cual, salvo los RAW, convertidos a JPEG (solo con la opción «Originales a tamaño completo en la galería»)</td></tr>
 <tr><td><code>index.csv</code></td><td>Lista de las imágenes con su número</td></tr>
 <tr><td><code>generation.log</code></td><td>Registro detallado de la generación</td></tr>
 </table>

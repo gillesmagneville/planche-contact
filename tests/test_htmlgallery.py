@@ -17,10 +17,12 @@ CHANGELOG.md.
 import filecmp
 import json
 import re
+import shutil
+from pathlib import Path
 from urllib.parse import quote, unquote
 
 import pytest
-from PIL import Image
+from PIL import Image, JpegImagePlugin
 from PIL.ExifTags import IFD
 
 from portfolio.config import Config
@@ -496,21 +498,75 @@ def test_download_button_targets_the_original_when_available(tmp_path):
     assert html.index("if (meta.original)") < html.index("canvas.toBlob")
 
 
-def test_worker_copies_a_raw_original_untouched(tmp_path, monkeypatch):
-    """Un RAW (illisible par un navigateur) est joint tel quel : le visiteur
-    télécharge le fichier de la prise de vue, l'image affichée venant de
-    l'aperçu décodé. Le worker est appelé directement (dans ce processus)
-    pour pouvoir simuler le décodage RAW, rawpy n'étant pas toujours
-    installé."""
-    from portfolio import htmlgallery
+RAW_EXTENSIONS = (".cr2", ".cr3", ".nef", ".dng", ".arw")
 
-    raw = tmp_path / "photos" / "DSC_0001.NEF"
-    raw.parent.mkdir()
-    raw.write_bytes(b"NEF-FAKE-" + bytes(range(256)) * 40)
-    monkeypatch.setattr(htmlgallery, "load_image", lambda *a, **k: Image.new("RGB", (3000, 2000), (5, 6, 7)))
+
+def _raw_worker_dirs(tmp_path):
     images_dir, thumbs_dir, originals_dir = (tmp_path / d for d in ("images", "thumbs", "originals"))
     for d in (images_dir, thumbs_dir, originals_dir):
         d.mkdir()
+    return images_dir, thumbs_dir, originals_dir
+
+
+def _fake_raw(tmp_path, name="DSC_0001.NEF"):
+    raw = tmp_path / "photos" / name
+    raw.parent.mkdir(exist_ok=True)
+    raw.write_bytes(b"NEF-FAKE-" + bytes(range(256)) * 40)
+    return raw
+
+
+def _raw_files_under(folder):
+    return sorted(p.name for p in folder.rglob("*") if p.is_file() and p.suffix.lower() in RAW_EXTENSIONS)
+
+
+def test_worker_converts_a_raw_original_to_a_full_size_jpeg(tmp_path, monkeypatch):
+    """Un RAW n'est JAMAIS copié dans la galerie : l'original téléchargeable
+    est un JPEG à la résolution complète (ici 3000 x 2000, donc plus grand
+    que la copie affichée plafonnée à 2000 px), sous le nom de la photo en
+    `.jpg`. Le worker est appelé directement (dans ce processus) pour
+    pouvoir simuler le décodage RAW, rawpy n'étant pas toujours installé."""
+    from portfolio import htmlgallery
+
+    raw = _fake_raw(tmp_path)
+    monkeypatch.setattr(htmlgallery, "load_full_resolution",
+                        lambda path: Image.new("RGB", (3000, 2000), (5, 60, 200)))
+    monkeypatch.setattr(htmlgallery.shutil, "copy2", lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("un RAW ne doit jamais être copié tel quel")))
+    images_dir, thumbs_dir, originals_dir = _raw_worker_dirs(tmp_path)
+
+    ok, meta = htmlgallery._process_full_image_worker((
+        str(raw), str(images_dir), str(thumbs_dir), "t.jpg", None, 40, "Horizontal",
+        str(originals_dir), "DSC_0001.jpg",
+    ))
+
+    assert ok
+    original = originals_dir / "DSC_0001.jpg"
+    with Image.open(original) as img:
+        assert img.format == "JPEG"
+        assert img.size == (3000, 2000), "l'original garde la résolution complète"
+        assert all(abs(a - b) <= 6 for a, b in zip(img.getpixel((1500, 1000)), (5, 60, 200)))
+        # Version téléchargeable de la prise de vue, pas une copie d'affichage :
+        # qualité 95 (table de quantification fine) et couleurs en 4:4:4.
+        assert img.quantization[0][0] <= 3
+        assert JpegImagePlugin.get_sampling(img) == 0
+    assert original.read_bytes()[:9] != raw.read_bytes()[:9]
+    assert meta["original"] == "originals/DSC_0001.jpg"
+    assert meta["original_filename"] == "DSC_0001.jpg", "le téléchargement propose un .jpg, jamais l'extension RAW"
+    assert meta["filename"] == "DSC_0001.jpg"
+    assert max(Image.open(images_dir / "DSC_0001.jpg").size) == 2000, "la copie affichée reste réduite"
+    for folder in (images_dir, thumbs_dir, originals_dir):
+        assert _raw_files_under(folder) == []
+
+
+def test_worker_never_writes_a_raw_extension_even_when_given_a_raw_name(tmp_path, monkeypatch):
+    """Garde-fou : quel que soit le nom d'original reçu, un RAW est écrit en
+    `.jpg`."""
+    from portfolio import htmlgallery
+
+    raw = _fake_raw(tmp_path)
+    monkeypatch.setattr(htmlgallery, "load_full_resolution",
+                        lambda path: Image.new("RGB", (2400, 1600), (90, 90, 90)))
+    images_dir, thumbs_dir, originals_dir = _raw_worker_dirs(tmp_path)
 
     ok, meta = htmlgallery._process_full_image_worker((
         str(raw), str(images_dir), str(thumbs_dir), "t.jpg", None, 40, "Horizontal",
@@ -518,11 +574,231 @@ def test_worker_copies_a_raw_original_untouched(tmp_path, monkeypatch):
     ))
 
     assert ok
-    assert (originals_dir / "DSC_0001.NEF").read_bytes() == raw.read_bytes()
-    assert meta["original"] == "originals/DSC_0001.NEF"
-    assert meta["original_filename"] == "DSC_0001.NEF"
-    assert meta["filename"] == "DSC_0001.jpg", "la copie affichée d'un RAW reste un JPEG"
+    assert [p.name for p in originals_dir.iterdir()] == ["DSC_0001.jpg"]
+    assert meta["original"] == "originals/DSC_0001.jpg"
+
+
+def test_raw_original_has_no_watermark_while_the_displayed_copy_has_one(tmp_path, monkeypatch):
+    """Comme pour les autres originaux : le filigrane n'est appliqué qu'aux
+    copies affichées (avertissement déjà prévu côté interface/CLI)."""
+    from portfolio import htmlgallery
+
+    raw = _fake_raw(tmp_path)
+    monkeypatch.setattr(htmlgallery, "load_full_resolution",
+                        lambda path: Image.new("RGB", (2400, 1600), (120, 120, 120)))
+    images_dir, thumbs_dir, originals_dir = _raw_worker_dirs(tmp_path)
+
+    ok, _meta = htmlgallery._process_full_image_worker((
+        str(raw), str(images_dir), str(thumbs_dir), "t.jpg", "COPYRIGHT", 80, "Horizontal",
+        str(originals_dir), "DSC_0001.jpg",
+    ))
+
+    assert ok
+    low, high = Image.open(originals_dir / "DSC_0001.jpg").convert("L").getextrema()
+    assert high - low <= 6, "l'original d'un RAW ne doit porter aucun filigrane"
+    low, high = Image.open(images_dir / "DSC_0001.jpg").convert("L").getextrema()
+    assert high - low > 20, "la copie affichée doit, elle, porter le filigrane"
+
+
+def test_raw_original_keeps_exif_and_color_profile_and_is_not_rotated_twice(tmp_path, monkeypatch):
+    """L'aperçu embarqué d'un RAW porte l'EXIF (appareil...) et parfois un
+    profil couleur : conservés dans le JPEG téléchargeable. L'orientation
+    est appliquée aux pixels (comme pour la copie affichée) ET retirée de
+    l'EXIF, sinon un visualiseur retournerait l'image une seconde fois."""
+    from PIL import ImageCms
+    from portfolio import htmlgallery
+
+    raw = _fake_raw(tmp_path)
+    icc = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+    preview = Image.new("RGB", (3000, 2000), (200, 30, 30))
+    exif = Image.Exif()
+    exif[0x010F] = "AppareilTest"      # Make
+    exif[0x0112] = 6                   # Orientation : 90° - à appliquer
+    preview_path = tmp_path / "preview.jpg"
+    preview.save(preview_path, exif=exif, icc_profile=icc)
+    monkeypatch.setattr(htmlgallery, "load_full_resolution", lambda path: Image.open(preview_path))
+    images_dir, thumbs_dir, originals_dir = _raw_worker_dirs(tmp_path)
+
+    ok, _meta = htmlgallery._process_full_image_worker((
+        str(raw), str(images_dir), str(thumbs_dir), "t.jpg", None, 40, "Horizontal",
+        str(originals_dir), "DSC_0001.jpg",
+    ))
+
+    assert ok
+    with Image.open(originals_dir / "DSC_0001.jpg") as img:
+        assert img.size == (2000, 3000), "pixels pivotés selon l'orientation EXIF"
+        saved = img.getexif()
+        assert saved.get(0x010F) == "AppareilTest"
+        assert saved.get(0x0112) in (None, 1), "l'orientation ne doit plus figurer dans l'EXIF"
+        assert img.info.get("icc_profile") == icc
+
+
+def test_failed_raw_conversion_never_falls_back_to_copying_the_raw(tmp_path, monkeypatch):
+    """Si l'original JPEG ne peut pas être écrit (disque plein...), la photo
+    reste dans la galerie (téléchargement de la copie affichée) : le RAW,
+    lui, n'est jamais copié à la place."""
+    from portfolio import htmlgallery
+
+    raw = _fake_raw(tmp_path)
+    monkeypatch.setattr(htmlgallery, "load_full_resolution",
+                        lambda path: Image.new("RGB", (2400, 1600), (9, 9, 9)))
+    monkeypatch.setattr(htmlgallery.shutil, "copy2", lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("un RAW ne doit jamais être copié tel quel")))
+    images_dir, thumbs_dir, originals_dir = _raw_worker_dirs(tmp_path)
+    originals_dir.rmdir()  # destination absente : l'écriture de l'original échoue
+
+    ok, meta = htmlgallery._process_full_image_worker((
+        str(raw), str(images_dir), str(thumbs_dir), "t.jpg", None, 40, "Horizontal",
+        str(originals_dir), "DSC_0001.jpg",
+    ))
+
+    assert ok and "original" not in meta
     assert (images_dir / "DSC_0001.jpg").is_file()
+    assert _raw_files_under(tmp_path / "images") == []
+
+
+def test_unreadable_raw_leaves_nothing_in_the_gallery(tmp_path, monkeypatch):
+    """RAW illisible (rawpy absent, fichier corrompu) : la photo est écartée
+    de la galerie, sans RAW copié nulle part."""
+    from portfolio import htmlgallery
+
+    raw = _fake_raw(tmp_path)
+
+    def broken(path):
+        raise RuntimeError("rawpy absent")
+
+    monkeypatch.setattr(htmlgallery, "load_full_resolution", broken)
+    images_dir, thumbs_dir, originals_dir = _raw_worker_dirs(tmp_path)
+
+    ok, meta = htmlgallery._process_full_image_worker((
+        str(raw), str(images_dir), str(thumbs_dir), "t.jpg", None, 40, "Horizontal",
+        str(originals_dir), "DSC_0001.jpg",
+    ))
+
+    assert (ok, meta) == (False, None)
+    for folder in (images_dir, thumbs_dir, originals_dir):
+        assert list(folder.iterdir()) == []
+
+
+def test_raw_without_originals_option_still_uses_the_fast_decoding_path(tmp_path, monkeypatch):
+    """Sans l'option, rien ne change pour un RAW : décodage « assez grand
+    pour l'affichage » (aperçu embarqué), pas de dématriçage complet pour
+    rien."""
+    from portfolio import htmlgallery
+
+    raw = _fake_raw(tmp_path)
+    calls = []
+    monkeypatch.setattr(htmlgallery, "load_full_resolution",
+                        lambda path: calls.append("full") or Image.new("RGB", (3000, 2000)))
+    monkeypatch.setattr(htmlgallery, "load_image",
+                        lambda *a, **k: calls.append("fast") or Image.new("RGB", (3000, 2000)))
+    images_dir, thumbs_dir, _originals_dir = _raw_worker_dirs(tmp_path)
+
+    ok, meta = htmlgallery._process_full_image_worker((
+        str(raw), str(images_dir), str(thumbs_dir), "t.jpg", None, 40, "Horizontal",
+    ))
+
+    assert ok and "original" not in meta
+    assert calls == ["fast"]
+
+
+def test_raw_original_names_are_jpg_and_stay_unique_next_to_a_jpeg_of_the_same_name(tmp_path):
+    """RAW + JPEG de même nom (paire courante) : deux originaux `.jpg`
+    distincts, aucun écrasé ; l'original du RAW est bien un JPEG."""
+    from portfolio.htmlgallery import _unique_file_name
+
+    used = set()
+    names = [HTMLGalleryGenerator.display_filename(n) for n in ("IMG_1.CR2", "IMG_1.jpg", "IMG_2.NEF")]
+    unique = [_unique_file_name(n, used) for n in names]
+    assert unique == ["IMG_1.jpg", "IMG_1_2.jpg", "IMG_2.jpg"]
+    assert not any(n.lower().endswith(RAW_EXTENSIONS) for n in unique)
+
+
+class _InProcessExecutor:
+    """Remplace ProcessPoolExecutor pour que les workers s'exécutent dans CE
+    processus (donc monkeypatchables : un worker `spawn` réimporte le module
+    et ignore tout correctif)."""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def map(self, function, tasks):
+        return [function(task) for task in tasks]
+
+
+def test_gallery_with_raw_files_contains_no_raw_and_keeps_raw_jpeg_pairs_apart(tmp_path, monkeypatch):
+    """Galerie complète (nommage, métadonnées, page HTML) avec des RAW
+    simulés : aucun fichier RAW nulle part dans le dossier de la galerie ;
+    une paire RAW + JPEG de même nom donne deux originaux `.jpg` distincts
+    (aucun n'écrase l'autre) ; le téléchargement ne propose jamais
+    d'extension RAW."""
+    from portfolio import htmlgallery
+
+    photos = tmp_path / "photos"
+    photos.mkdir()
+    for name in ("IMG_1.CR2", "IMG_2.nef"):
+        (photos / name).write_bytes(b"RAW-FAKE-" + name.encode() + bytes(200))
+    Image.new("RGB", (2600, 1700), (10, 200, 10)).save(photos / "IMG_1.jpg", quality=95)
+    monkeypatch.setattr(htmlgallery, "ProcessPoolExecutor", _InProcessExecutor)
+    monkeypatch.setattr(htmlgallery, "load_full_resolution",
+                        lambda path: Image.new("RGB", (3200, 2100), (200, 10, 10)))
+    images = [{"path": photos / n} for n in ("IMG_1.CR2", "IMG_1.jpg", "IMG_2.nef")]
+
+    html = _generate(tmp_path, images, Profile(), include_originals=True)
+    out = tmp_path / "out"
+
+    assert _raw_files_under(out) == []
+    meta = _gallery_meta(html)
+    assert [e["originalFilename"] for e in meta] == ["IMG_1.jpg", "IMG_1.jpg", "IMG_2.jpg"]
+    files = [unquote(e["original"]).split("/", 1)[1] for e in meta]
+    assert files == ["IMG_1.jpg", "IMG_1_2.jpg", "IMG_2.jpg"]
+    sizes = [Image.open(out / "originals" / f).size for f in files]
+    assert sizes == [(3200, 2100), (2600, 1700), (3200, 2100)], "le RAW converti n'écrase pas le vrai JPEG"
+    assert Image.open(out / "originals" / "IMG_1_2.jpg").getpixel((1300, 850))[1] > 150
+
+
+REAL_DNG = Path(__file__).parent / "data" / "mini_raw.dng"
+
+
+def test_gallery_with_real_raw_files_contains_no_raw_at_all(tmp_path):
+    """De bout en bout avec un vrai fichier RAW (DNG de 160 x 120 px, rouge à
+    gauche / bleu à droite) décodé par LibRaw, dans de vrais processus
+    worker, en paire avec un JPEG de même nom : aucun fichier RAW nulle part
+    dans le dossier de la galerie, et les originaux sont de vrais JPEG à la
+    résolution du RAW, aux bonnes couleurs. Ignoré si rawpy n'est pas
+    installé (il figure pourtant dans requirements.txt)."""
+    pytest.importorskip("rawpy")
+    photos = tmp_path / "photos"
+    photos.mkdir()
+    for name in ("MINI.dng", "Autre.DNG"):
+        shutil.copy2(REAL_DNG, photos / name)
+    Image.new("RGB", (160, 120), (10, 200, 10)).save(photos / "MINI.jpg", quality=95)
+    images = [{"path": photos / n} for n in ("MINI.dng", "MINI.jpg", "Autre.DNG")]
+
+    html = _generate(tmp_path, images, Profile(), include_originals=True)
+    out = tmp_path / "out"
+
+    assert _raw_files_under(out) == [], "aucun RAW ne doit subsister dans la galerie"
+    meta = _gallery_meta(html)
+    assert len(meta) == 3
+    originals = [out / unquote(e["original"]) for e in meta]
+    assert len({o.name.lower() for o in originals}) == 3
+    for original in originals:
+        with Image.open(original) as img:
+            assert img.format == "JPEG" and img.size == (160, 120)
+    red_blue = [Image.open(o).convert("RGB") for o in (originals[0], originals[2])]
+    for img in red_blue:
+        left, right = img.getpixel((10, 60)), img.getpixel((150, 60))
+        assert left[0] > 200 and left[2] < 150, f"gauche attendu rouge : {left}"
+        assert right[2] > 200 and right[0] < 120, f"droite attendu bleu : {right}"
+    assert Image.open(originals[1]).convert("RGB").getpixel((80, 60))[1] > 150, "le vrai JPEG reste copié"
+    assert [e["originalFilename"] for e in meta] == ["MINI.jpg", "MINI.jpg", "Autre.jpg"]
 
 
 def test_failed_original_copy_keeps_the_gallery_and_falls_back(tmp_path, monkeypatch):
