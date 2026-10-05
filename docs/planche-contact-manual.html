@@ -115,7 +115,7 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
 <p>Si aucun des trois champs Titre / Auteur / Filigrane n'est renseigné, l'en-tête des planches affiche par défaut le nom du dossier d'entrée (sans son chemin complet), pour éviter une planche totalement anonyme.</p>
 
 <h3>3.3 Mise en page, légendes et thème (réglages avancés)</h3>
-<p>Un second bloc, replié par défaut (cliquer sur son titre pour l'ouvrir), permet de personnaliser en détail la mise en page, les légendes et les couleurs du thème graphique des planches (le thème lui-même se choisit dans la fenêtre principale, voir §3.2) — sans rien changer au comportement par défaut tant qu'il reste fermé.</p>
+<p>Le bouton « Réglages avancés… » de la fenêtre principale ouvre une fenêtre à part, qui permet de personnaliser en détail la mise en page, les légendes et les couleurs du thème graphique des planches (le thème lui-même se choisit dans la fenêtre principale, voir §3.2) — sans rien changer au comportement par défaut tant qu'on n'y touche pas. Cette fenêtre se ferme avec le bouton « Fermer » ou la touche Échap ; les réglages sont conservés entre deux ouvertures. Si l'écran est petit, son contenu défile (ascenseur) et le bouton « Fermer » reste toujours visible.</p>
 
 <p><strong>Mise en page</strong></p>
 <table>
@@ -148,7 +148,7 @@ La position GPS, si cochée, est affichée en clair sur la planche produite — 
 <p>L'ensemble de ces réglages (mise en page, légendes et thème) peut être enregistré dans un fichier JSON réutilisable (bouton « Enregistrer le profil... »), puis rechargé plus tard (bouton « Charger un profil... ») — pratique pour appliquer les mêmes réglages à plusieurs projets, ou pour les partager. Ce même fichier peut être transmis à la ligne de commande via <code>--profile</code> (voir §4.1).</p>
 
 <h3>3.4 Aperçu de la planche</h3>
-<p>Le bouton « Aperçu de la planche... » affiche, dans une fenêtre dédiée, la planche telle qu'elle sera réellement produite — mise en page, légendes, thème et filigrane compris — à partir des premières photos du dossier d'entrée (le même nombre que la génération réelle en placerait sur cette première page). Pratique pour vérifier l'effet d'un réglage avant de lancer une génération complète, en particulier sur un dossier contenant de nombreuses photos.</p>
+<p>Le bouton « Aperçu de la planche... », dans la fenêtre des réglages avancés, affiche, dans une fenêtre dédiée, la planche telle qu'elle sera réellement produite — mise en page, légendes, thème et filigrane compris — à partir des premières photos du dossier d'entrée (le même nombre que la génération réelle en placerait sur cette première page). Pratique pour vérifier l'effet d'un réglage avant de lancer une génération complète, en particulier sur un dossier contenant de nombreuses photos.</p>
 
 <h3>3.5 Aperçu du dossier d'entrée</h3>
 <p>Dès qu'un dossier d'entrée valide est renseigné (au démarrage si un dossier était déjà mémorisé, ou après saisie/sélection), une bande d'aperçu affiche automatiquement les vignettes des photos qu'il contient, par pages de 10, avec une pagination numérotée (<code>← Précédent 1 … 4 5 6 … 19 Suivant →</code>). Le scan et la génération des vignettes se font en arrière-plan : l'interface ne se fige pas, même sur un dossier contenant des centaines de photos.</p>

@@ -715,12 +715,27 @@ class PlancheContactGTK(Gtk.Application):
         box.append(grid)
 
         # Mise en page/légendes/thème personnalisables (cahier des charges
-        # §1/§2/§4) : repliée par défaut, clairement à l'écart des réglages
-        # simples/courants ci-dessus - voir _build_advanced_section().
-        self.adv_expander = Gtk.Expander(label=_("adv.expander_label"))
-        self.adv_expander.set_margin_top(4)
-        self.adv_expander.set_child(self._build_advanced_section())
-        box.append(self.adv_expander)
+        # §1/§2/§4) : dans une fenêtre modale à part, clairement à l'écart
+        # des réglages simples/courants ci-dessus - voir
+        # _build_advanced_section() et _open_advanced_dialog().
+        #
+        # Auparavant un Gtk.Expander dans cette fenêtre : une fois déplié,
+        # il l'agrandissait d'environ 550 px (jusqu'à ~1600 px de haut), bien
+        # au-delà de la hauteur d'un écran, et repoussait les boutons
+        # « Lancer »/« Quitter » hors de vue. Les widgets sont toujours
+        # construits ICI, une seule fois, et vivent aussi longtemps que
+        # l'application : _profile_from_widgets() lit donc leur état même si
+        # la fenêtre n'a jamais été ouverte (profil par défaut). La fenêtre,
+        # elle, n'est créée qu'à la première ouverture, puis seulement
+        # masquée à sa fermeture (les réglages sont conservés).
+        self.adv_content = self._build_advanced_section()
+        self._adv_dialog = None
+        self.adv_open_btn = Gtk.Button(label=_("adv.open_button"))
+        self.adv_open_btn.set_halign(Gtk.Align.START)
+        self.adv_open_btn.set_margin_top(4)
+        self.adv_open_btn.set_tooltip_text(_("adv.open_button_tooltip"))
+        self.adv_open_btn.connect("clicked", self._open_advanced_dialog)
+        box.append(self.adv_open_btn)
         self._apply_profile_to_widgets(default_profile())
 
         # Boutons
@@ -804,6 +819,116 @@ class PlancheContactGTK(Gtk.Application):
         box.append(scrolled)
 
         return box
+
+    # ====================== FENÊTRE DES RÉGLAGES AVANCÉS ======================
+
+    def _build_advanced_dialog(self):
+        """Fenêtre modale contenant self.adv_content (construit une fois pour
+        toutes par _build_advanced_section()). Le contenu défile dans sa
+        propre zone, dont la hauteur maximale suit celle de l'écran
+        (_advanced_dialog_limits()) : la barre du bas - message d'état et
+        bouton « Fermer » - reste toujours visible, même sur un petit écran."""
+        dialog = Gtk.Window(transient_for=self.win, modal=True)
+        dialog.set_title(_("adv.dialog_title"))
+        # Fermer la fenêtre (croix, Échap, bouton) la MASQUE seulement : les
+        # widgets qu'elle contient doivent survivre, ils portent les réglages.
+        dialog.set_hide_on_close(True)
+
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        dialog.set_child(root)
+
+        self.adv_scroll = Gtk.ScrolledWindow()
+        self.adv_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        # Sans cette propagation, la zone défilante s'ouvrirait à sa taille
+        # minimale (quasi nulle) au lieu de celle du contenu.
+        self.adv_scroll.set_propagate_natural_width(True)
+        self.adv_scroll.set_propagate_natural_height(True)
+        self.adv_scroll.set_vexpand(True)
+        self.adv_scroll.set_child(self.adv_content)
+        root.append(self.adv_scroll)
+
+        root.append(Gtk.Separator())
+        bar = Gtk.Box(spacing=10)
+        bar.set_margin_top(8)
+        bar.set_margin_bottom(8)
+        bar.set_margin_start(14)
+        bar.set_margin_end(14)
+
+        # Retour d'information VISIBLE ici : la fenêtre principale (et son
+        # journal) est masquée derrière cette fenêtre modale tant qu'elle
+        # est ouverte (voir _adv_notify()).
+        self.adv_status_label = Gtk.Label(label="")
+        self.adv_status_label.set_xalign(0)
+        self.adv_status_label.set_hexpand(True)
+        self.adv_status_label.set_wrap(True)
+        self.adv_status_label.add_css_class("dim-label")
+        bar.append(self.adv_status_label)
+
+        close_btn = Gtk.Button(label=_("adv.dialog_close"))
+        close_btn.add_css_class("suggested-action")
+        close_btn.connect("clicked", lambda b: dialog.close())
+        bar.append(close_btn)
+        root.append(bar)
+
+        key_controller = Gtk.EventControllerKey()
+
+        def on_key_pressed(controller, keyval, keycode, state):
+            if keyval == Gdk.KEY_Escape:
+                dialog.close()
+                return True
+            return False
+
+        key_controller.connect("key-pressed", on_key_pressed)
+        dialog.add_controller(key_controller)
+        return dialog
+
+    def _advanced_dialog_limits(self):
+        """(largeur, hauteur) maximales de la zone défilante, déduites de
+        l'écran où se trouve la fenêtre principale : la fenêtre des réglages
+        avancés, barre de titre et barre du bas comprises, doit tenir dans
+        l'écran - jamais plus haute que lui (le défaut corrigé ici). Repli
+        sur des valeurs prudentes si la taille de l'écran est introuvable."""
+        width, height = 1400, 800
+        try:
+            surface = self.win.get_surface()
+            monitor = Gdk.Display.get_default().get_monitor_at_surface(surface)
+            if monitor is not None:
+                geometry = monitor.get_geometry()
+                if geometry.width > 0 and geometry.height > 0:
+                    width, height = geometry.width, geometry.height
+        except Exception:
+            pass
+        return int(width * 0.92), int(height * 0.72)
+
+    def _open_advanced_dialog(self, button=None):
+        if self._adv_dialog is None:
+            self._adv_dialog = self._build_advanced_dialog()
+        max_width, max_height = self._advanced_dialog_limits()
+        self.adv_scroll.set_max_content_width(max_width)
+        self.adv_scroll.set_max_content_height(max_height)
+        self.adv_status_label.set_text("")
+        self._adv_dialog.present()
+
+    def _dialog_parent(self):
+        """Fenêtre parente à donner à toute fenêtre/boîte de dialogue ouverte
+        depuis l'interface : celle des réglages avancés tant qu'elle est
+        affichée (étant modale, elle bloque la fenêtre principale - une
+        fenêtre fille de CELLE-CI n'aurait aucun effet), la fenêtre
+        principale sinon."""
+        dialog = getattr(self, "_adv_dialog", None)
+        if dialog is not None and dialog.get_visible():
+            return dialog
+        return self.win
+
+    def _adv_notify(self, message):
+        """Message issu d'une action de la fenêtre des réglages avancés
+        (aperçu, enregistrer/charger un profil) : consigné dans le journal
+        de la fenêtre principale ET affiché dans la barre d'état de la
+        fenêtre avancée, seule visible pendant qu'elle est ouverte."""
+        self._log(message)
+        label = getattr(self, "adv_status_label", None)
+        if label is not None:
+            label.set_text(message)
 
     # ====================== MISE EN PAGE/LÉGENDES/THÈME AVANCÉS ======================
     # Cahier des charges §1/§2/§4 : ces réglages alimentent un Profil
@@ -1158,7 +1283,7 @@ class PlancheContactGTK(Gtk.Application):
 
     def _on_save_profile_clicked(self, button):
         dialog = Gtk.FileChooserNative.new(
-            _("adv.save_profile_dialog_title"), self.win,
+            _("adv.save_profile_dialog_title"), self._dialog_parent(),
             Gtk.FileChooserAction.SAVE, _("folder_picker.select"), _("folder_picker.cancel"),
         )
         dialog.set_current_name("profil.json")
@@ -1176,9 +1301,9 @@ class PlancheContactGTK(Gtk.Application):
                         path += ".json"
                     try:
                         save_profile(self._profile_from_widgets(), path)
-                        self._log(_("adv.profile_saved", path=path))
+                        self._adv_notify(_("adv.profile_saved", path=path))
                     except OSError as e:
-                        self._log(_("adv.profile_save_error", error=e))
+                        self._adv_notify(_("adv.profile_save_error", error=e))
             dlg.destroy()
             self._active_file_dialog = None
 
@@ -1188,7 +1313,7 @@ class PlancheContactGTK(Gtk.Application):
 
     def _on_load_profile_clicked(self, button):
         dialog = Gtk.FileChooserNative.new(
-            _("adv.load_profile_dialog_title"), self.win,
+            _("adv.load_profile_dialog_title"), self._dialog_parent(),
             Gtk.FileChooserAction.OPEN, _("folder_picker.select"), _("folder_picker.cancel"),
         )
         json_filter = Gtk.FileFilter()
@@ -1206,7 +1331,7 @@ class PlancheContactGTK(Gtk.Application):
                     # retombe silencieusement sur les valeurs par défaut.
                     profile = load_profile(path)
                     self._apply_profile_to_widgets(profile)
-                    self._log(_("adv.profile_loaded", path=path))
+                    self._adv_notify(_("adv.profile_loaded", path=path))
             dlg.destroy()
             self._active_file_dialog = None
 
@@ -1253,7 +1378,7 @@ class PlancheContactGTK(Gtk.Application):
     def _on_preview_clicked(self, button):
         input_dir = self.input_entry.get_text().strip()
         if not input_dir or not Path(input_dir).is_dir():
-            self._log(_("gen.select_input_first"))
+            self._adv_notify(_("gen.select_input_first"))
             return
 
         if not self.input_preview._files:
@@ -1329,7 +1454,7 @@ class PlancheContactGTK(Gtk.Application):
         ).start()
 
     def _build_preview_dialog(self):
-        dialog = Gtk.Window(transient_for=self.win, modal=True)
+        dialog = Gtk.Window(transient_for=self._dialog_parent(), modal=True)
         dialog.set_title(_("adv.preview_title"))
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -1982,7 +2107,7 @@ class PlancheContactGTK(Gtk.Application):
         dialog.set_message(message)
         dialog.set_detail(detail)
         dialog.set_buttons(["OK"])
-        dialog.show(self.win)
+        dialog.show(self._dialog_parent())
 
     def _open_path_with_default_app(self, path: Path) -> bool:
         """Ouvre un fichier avec l'application par défaut du système

@@ -115,7 +115,7 @@ RAW support relies on the <code>rawpy</code> library, installed automatically in
 <p>If none of the Title / Author / Watermark fields is filled in, the sheet header defaults to showing the input folder's name (without its full path), to avoid a completely anonymous sheet.</p>
 
 <h3>3.3 Layout, captions and theme (advanced settings)</h3>
-<p>A second block, collapsed by default (click its title to expand it), lets you fine-tune the layout, captions and graphical theme colors of the contact sheets (the theme itself is chosen in the main window, see §3.2) — without changing the default behavior at all while it stays closed.</p>
+<p>The "Advanced settings…" button in the main window opens a separate window that lets you fine-tune the layout, captions and graphical theme colors of the contact sheets (the theme itself is chosen in the main window, see §3.2) — without changing the default behavior at all as long as you leave it alone. This window closes with the "Close" button or the Escape key; your settings are kept between two openings. On a small screen its content scrolls (scrollbar) and the "Close" button always stays visible.</p>
 
 <p><strong>Layout</strong></p>
 <table>
@@ -148,7 +148,7 @@ GPS position, if enabled, is shown in plain text on the generated sheet — only
 <p>All of these settings (layout, captions and theme) can be saved to a reusable JSON file ("Save profile..." button), then loaded again later ("Load profile..." button) — handy for applying the same settings to several projects, or for sharing them. This same file can be passed to the command line via <code>--profile</code> (see §4.1).</p>
 
 <h3>3.4 Contact sheet preview</h3>
-<p>The "Preview sheet..." button shows, in a dedicated window, the contact sheet exactly as it will actually be produced — layout, captions, theme and watermark included — using the first photos in the input folder (the same number the real generation would place on that first page). Handy for checking the effect of a setting before running a full generation, especially on a folder containing many photos.</p>
+<p>The "Preview sheet..." button, in the advanced settings window, shows, in a dedicated window, the contact sheet exactly as it will actually be produced — layout, captions, theme and watermark included — using the first photos in the input folder (the same number the real generation would place on that first page). Handy for checking the effect of a setting before running a full generation, especially on a folder containing many photos.</p>
 
 <h3>3.5 Input folder preview</h3>
 <p>As soon as a valid input folder is set (at startup if a folder was already remembered, or after typing/choosing one), a preview strip automatically shows thumbnails of the photos it contains, in pages of 10, with numbered pagination (<code>← Previous 1 … 4 5 6 … 19 Next →</code>). Scanning and generating thumbnails happens in the background: the interface never freezes, even for a folder containing hundreds of photos.</p>

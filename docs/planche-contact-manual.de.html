@@ -115,7 +115,7 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
 <p>Wenn keines der Felder Titel / Autor / Wasserzeichen ausgefüllt ist, zeigt die Kopfzeile der Kontaktbögen standardmäßig den Namen des Quellordners (ohne vollständigen Pfad) an, um einen völlig anonymen Kontaktbogen zu vermeiden.</p>
 
 <h3>3.3 Layout, Bildunterschriften und Thema (erweiterte Einstellungen)</h3>
-<p>Ein zweiter Bereich, standardmäßig eingeklappt (Titel anklicken zum Öffnen), ermöglicht die detaillierte Anpassung von Layout, Bildunterschriften und den Farben des grafischen Themas der Kontaktbögen (das Thema selbst wird im Hauptfenster gewählt, siehe §3.2) — ohne das Standardverhalten zu ändern, solange er geschlossen bleibt.</p>
+<p>Die Schaltfläche „Erweiterte Einstellungen…“ im Hauptfenster öffnet ein eigenes Fenster, in dem Layout, Bildunterschriften und die Farben des grafischen Themas der Kontaktbögen im Detail angepasst werden können (das Thema selbst wird im Hauptfenster gewählt, siehe §3.2) — ohne das Standardverhalten zu ändern, solange man nichts daran verstellt. Dieses Fenster wird mit der Schaltfläche „Schließen“ oder der Escape-Taste geschlossen; die Einstellungen bleiben zwischen zwei Öffnungen erhalten. Auf einem kleinen Bildschirm lässt sich sein Inhalt scrollen (Bildlaufleiste), und die Schaltfläche „Schließen“ bleibt immer sichtbar.</p>
 
 <p><strong>Layout</strong></p>
 <table>
@@ -148,7 +148,7 @@ Die GPS-Position wird, falls aktiviert, im Klartext auf dem erstellten Kontaktbo
 <p>Alle diese Einstellungen (Layout, Bildunterschriften und Thema) können in einer wiederverwendbaren JSON-Datei gespeichert werden (Schaltfläche „Profil speichern…"), und später wieder geladen werden (Schaltfläche „Profil laden…") — praktisch, um dieselben Einstellungen auf mehrere Projekte anzuwenden oder sie weiterzugeben. Dieselbe Datei kann über <code>--profile</code> an die Befehlszeile übergeben werden (siehe §4.1).</p>
 
 <h3>3.4 Vorschau des Kontaktbogens</h3>
-<p>Die Schaltfläche „Kontaktbogen-Vorschau…" zeigt in einem eigenen Fenster den Kontaktbogen genau so an, wie er tatsächlich erstellt wird — einschließlich Layout, Bildunterschriften, Thema und Wasserzeichen —, anhand der ersten Fotos im Quellordner (dieselbe Anzahl, die die tatsächliche Erstellung auf dieser ersten Seite platzieren würde). Praktisch, um die Wirkung einer Einstellung zu überprüfen, bevor eine vollständige Erstellung gestartet wird, insbesondere bei einem Ordner mit vielen Fotos.</p>
+<p>Die Schaltfläche „Kontaktbogen-Vorschau…" im Fenster der erweiterten Einstellungen zeigt in einem eigenen Fenster den Kontaktbogen genau so an, wie er tatsächlich erstellt wird — einschließlich Layout, Bildunterschriften, Thema und Wasserzeichen —, anhand der ersten Fotos im Quellordner (dieselbe Anzahl, die die tatsächliche Erstellung auf dieser ersten Seite platzieren würde). Praktisch, um die Wirkung einer Einstellung zu überprüfen, bevor eine vollständige Erstellung gestartet wird, insbesondere bei einem Ordner mit vielen Fotos.</p>
 
 <h3>3.5 Vorschau des Quellordners</h3>
 <p>Sobald ein gültiger Quellordner angegeben ist (beim Start, wenn bereits ein Ordner gespeichert war, oder nach Eingabe/Auswahl), zeigt ein Vorschaustreifen automatisch Miniaturbilder der enthaltenen Fotos an, in Seiten zu je 10, mit nummerierter Seitennavigation (<code>← Zurück 1 … 4 5 6 … 19 Weiter →</code>). Das Scannen und Erstellen der Miniaturbilder erfolgt im Hintergrund: Die Benutzeroberfläche friert nicht ein, selbst bei einem Ordner mit Hunderten von Fotos.</p>

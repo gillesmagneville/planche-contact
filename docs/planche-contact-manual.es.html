@@ -115,7 +115,7 @@ El soporte de archivos RAW se basa en la biblioteca <code>rawpy</code>, instalad
 <p>Si ninguno de los campos Título / Autor / Marca de agua está rellenado, el encabezado de las hojas muestra por defecto el nombre de la carpeta de entrada (sin su ruta completa), para evitar una hoja completamente anónima.</p>
 
 <h3>3.3 Diseño, leyendas y tema (ajustes avanzados)</h3>
-<p>Un segundo bloque, plegado por defecto (haga clic en su título para desplegarlo), permite personalizar con detalle el diseño, las leyendas y los colores del tema gráfico de las hojas de contacto (el tema en sí se elige en la ventana principal, véase §3.2) — sin cambiar en nada el comportamiento por defecto mientras permanezca cerrado.</p>
+<p>El botón «Ajustes avanzados…» de la ventana principal abre una ventana aparte que permite personalizar con detalle el diseño, las leyendas y los colores del tema gráfico de las hojas de contacto (el tema en sí se elige en la ventana principal, véase §3.2) — sin cambiar en nada el comportamiento por defecto mientras no se toque. Esta ventana se cierra con el botón «Cerrar» o con la tecla Esc; los ajustes se conservan entre dos aperturas. En una pantalla pequeña su contenido se desplaza (barra de desplazamiento) y el botón «Cerrar» siempre permanece visible.</p>
 
 <p><strong>Diseño</strong></p>
 <table>
@@ -148,7 +148,7 @@ La posición GPS, si está activada, se muestra en texto claro en la hoja genera
 <p>Todos estos ajustes (diseño, leyendas y tema) pueden guardarse en un archivo JSON reutilizable (botón «Guardar perfil…»), y volver a cargarse más tarde (botón «Cargar perfil…») — útil para aplicar los mismos ajustes a varios proyectos, o para compartirlos. Este mismo archivo puede pasarse a la línea de comandos mediante <code>--profile</code> (véase §4.1).</p>
 
 <h3>3.4 Vista previa de la hoja</h3>
-<p>El botón «Vista previa de la hoja…» muestra, en una ventana dedicada, la hoja de contacto tal y como se producirá realmente — diseño, leyendas, tema y marca de agua incluidos — a partir de las primeras fotos de la carpeta de entrada (el mismo número que colocaría la generación real en esa primera página). Útil para comprobar el efecto de un ajuste antes de lanzar una generación completa, especialmente en una carpeta con muchas fotos.</p>
+<p>El botón «Vista previa de la hoja…», en la ventana de ajustes avanzados, muestra, en una ventana dedicada, la hoja de contacto tal y como se producirá realmente — diseño, leyendas, tema y marca de agua incluidos — a partir de las primeras fotos de la carpeta de entrada (el mismo número que colocaría la generación real en esa primera página). Útil para comprobar el efecto de un ajuste antes de lanzar una generación completa, especialmente en una carpeta con muchas fotos.</p>
 
 <h3>3.5 Vista previa de la carpeta de entrada</h3>
 <p>En cuanto se indica una carpeta de entrada válida (al iniciar, si ya se había guardado una carpeta, o tras escribirla/seleccionarla), una franja de vista previa muestra automáticamente las miniaturas de las fotos que contiene, en páginas de 10, con una paginación numerada (<code>← Anterior 1 … 4 5 6 … 19 Siguiente →</code>). El análisis y la generación de miniaturas se realizan en segundo plano: la interfaz no se congela, ni siquiera con una carpeta que contenga cientos de fotos.</p>

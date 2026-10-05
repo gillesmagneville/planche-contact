@@ -47,6 +47,11 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
   - Galerie HTML : le titre et l'auteur de l'en-tête suivent aussi leur position (alignement CSS, ou ligne supprimée si « Masqué » ; le titre de l'onglet du navigateur est conservé). Le compteur d'images et la pagination de la galerie ne changent pas : la numérotation des planches ne concerne que les planches et le PDF.
   - Réglages par défaut (titre et auteur centrés, numérotation cochée) : rendu des planches pixel pour pixel identique, balisage HTML identique, profil par défaut toujours non transmis au CLI.
   - Verrouillé par 22 nouveaux tests (`tests/test_contactsheet.py`, `tests/test_htmlgallery.py`) ; vérifiés en neutralisant temporairement chacun des câblages (ils échouent bien).
+- **Les réglages avancés rendaient la fenêtre principale plus haute que l'écran**, signalé par l'utilisateur : dépliée, la section avancée portait la fenêtre d'environ 1060 px à 1610 px de haut et repoussait les boutons « Lancer »/« Quitter » hors de vue. Elle s'ouvre désormais dans une **fenêtre modale à part**, via un bouton « Réglages avancés… » de la fenêtre principale, dont la hauteur ne dépend plus de ces réglages (environ 1075 px, dont 260 px minimum pour le journal de génération).
+  - Le contenu de cette fenêtre défile dans sa propre zone (ascenseur), dont la hauteur maximale suit celle de l'écran : sur un écran bas, la barre du bas - message d'état et bouton « Fermer » - reste toujours visible. Fermeture par le bouton, la croix ou la touche Échap.
+  - Les réglages sont conservés d'une ouverture à l'autre (la fenêtre est masquée, non détruite) ; ils s'appliquent à la génération et à l'aperçu même si la fenêtre n'a jamais été ouverte (profil par défaut inchangé).
+  - Les messages liés à cette fenêtre (aperçu sans dossier choisi, profil enregistré/chargé) s'affichent dans sa barre d'état - le journal de la fenêtre principale étant masqué tant qu'elle est ouverte - en plus du journal. L'aperçu et les sélecteurs de fichier s'ouvrent par-dessus elle.
+  - Aucun réglage, aucune valeur par défaut ni sortie ne change ; seules la place et l'ouverture de ces réglages changent. Vérifié sous GTK4 réel (Xvfb) sur un grand et un petit écran (1280×600 : ascenseur actif, bouton « Fermer » visible), dont un aperçu lancé depuis la fenêtre avancée.
 
 ### Ajouté
 
