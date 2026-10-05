@@ -567,3 +567,76 @@ def test_worker_without_originals_arguments_still_works(tmp_path):
     ))
 
     assert ok and "original" not in meta
+
+
+# ---------------------------------------------------------------------------
+# Copies AFFICHÉES (images/) : noms uniques et URL encodées. Défaut constaté en
+# testant les originaux : deux photos de même nom s'écrasaient (la galerie
+# montrait deux fois la même photo) et un « # » dans un nom coupait l'URL.
+# ---------------------------------------------------------------------------
+
+def _gallery_images(html):
+    match = re.search(r"const galleryImages = (\[.*?\]);", html)
+    assert match, "galleryImages introuvable dans la page"
+    return json.loads(match.group(1))
+
+
+def _center_color(path):
+    img = Image.open(path).convert("RGB")
+    return img.getpixel((img.width // 2, img.height // 2))
+
+
+def test_displayed_copies_of_same_named_photos_never_overwrite_each_other(tmp_path):
+    """Deux photos de même nom dans deux sous-dossiers (option -r : plusieurs
+    cartes mémoire dont la numérotation repart de zéro), y compris à la
+    casse près : chacune doit garder SA copie affichée. Avant le
+    correctif, la seconde écrasait la première et la visionneuse montrait
+    deux fois la même photo."""
+    colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
+    images = _big_images(tmp_path, [
+        ("carte1", "IMG_1.jpg", (2200, 1500), colors[0]),
+        ("carte2", "IMG_1.jpg", (2200, 1500), colors[1]),
+        ("carte3", "img_1.JPG", (2200, 1500), colors[2]),
+    ])
+    html = _generate(tmp_path, images, Profile())
+    out = tmp_path / "out"
+
+    urls = _gallery_images(html)
+    assert len({u.lower() for u in urls}) == 3, f"copies affichées non uniques : {urls}"
+    for url, expected in zip(urls, colors):
+        shown = _center_color(out / unquote(url))
+        assert all(abs(a - b) <= 12 for a, b in zip(shown, expected)), (
+            f"{url} montre {shown} au lieu de la photo d'origine {expected}"
+        )
+    # Le nom AFFICHÉ à l'utilisateur reste celui de la photo, pas celui du fichier.
+    assert [e["filename"] for e in _gallery_meta(html)] == ["IMG_1.jpg", "IMG_1.jpg", "img_1.JPG"]
+
+
+def test_unique_file_name_handles_raw_jpeg_pairs_and_case():
+    """Une paire RAW + JPEG (très courante) donne DEUX copies affichées
+    nommées pareil : `display_filename()` remplace l'extension RAW par
+    .jpg."""
+    from portfolio.htmlgallery import _unique_file_name
+
+    used = set()
+    names = [HTMLGalleryGenerator.display_filename(n) for n in ("IMG_1.CR2", "IMG_1.jpg", "IMG_2.NEF")]
+    assert names[0] == names[1] == "IMG_1.jpg", "préalable : la paire RAW+JPEG entre bien en collision"
+    unique = [_unique_file_name(n, used) for n in names]
+    assert unique == ["IMG_1.jpg", "IMG_1_2.jpg", "IMG_2.jpg"]
+    assert [_unique_file_name(n, used) for n in ("a.jpg", "a.jpg", "A.JPG")] == ["a.jpg", "a_2.jpg", "A_3.JPG"]
+
+
+def test_displayed_image_url_is_percent_encoded(tmp_path):
+    """Un « # », un « % », des espaces, des accents ou des parenthèses dans
+    un nom de photo : la visionneuse et le lien de la vignette doivent
+    viser le bon fichier (sans encodage, « # » coupait l'URL et la
+    visionneuse demandait un fichier inexistant)."""
+    name = "100% réussi #2 (final).jpg"
+    images = _big_images(tmp_path, [("", name, (2200, 1500), (30, 60, 90))])
+    html = _generate(tmp_path, images, Profile())
+
+    (url,) = _gallery_images(html)
+    assert url == "images/" + quote(name)
+    assert "#" not in url and " " not in url
+    assert (tmp_path / "out" / unquote(url)).is_file()
+    assert f'<a href="{url}" onclick="return openLightbox(event, 0)">' in html

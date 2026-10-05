@@ -82,11 +82,14 @@ def _init_worker_logging(log_path, language=None):
         set_language(language)
 
 
-def _unique_original_name(name: str, used: set) -> str:
-    """Nom sous lequel un original est rangé dans `originals/`, unique dans
-    toute la galerie : deux photos de même nom dans deux sous-dossiers
-    (option -r) ne doivent jamais s'écraser l'une l'autre - perdre un
-    ORIGINAL en silence serait bien plus grave que pour une copie réduite.
+def _unique_file_name(name: str, used: set) -> str:
+    """Nom de fichier unique dans toute la galerie (`images/` et
+    `originals/`) : deux photos de même nom ne doivent jamais s'écraser
+    l'une l'autre. Cas courants : un même numéro dans deux sous-dossiers
+    (option -r, plusieurs cartes mémoire) et surtout une paire RAW + JPEG
+    (`IMG_1.CR2` et `IMG_1.jpg`, dont les copies affichées s'appellent
+    toutes deux `IMG_1.jpg`). Perdre un ORIGINAL en silence serait bien plus
+    grave encore que pour une copie réduite.
     La comparaison ignore la casse (Windows et macOS ne distinguent pas
     `IMG_1.JPG` de `img_1.jpg`). `used` est mis à jour."""
     candidate = name
@@ -119,16 +122,21 @@ def _process_full_image_worker(args):
     passe séparée qui relirait chaque photo une seconde fois."""
     (image_path, images_dir_str, thumbs_dir_str, thumb_filename,
      watermark_text, watermark_opacity, watermark_orientation) = args[:7]
-    # Originaux pleine taille (optionnels, voir Config.html_include_originals) :
-    # dossier de destination et nom unique choisi par le processus principal.
-    originals_dir_str, original_name = (args[7], args[8]) if len(args) > 8 else (None, None)
+    # Arguments optionnels, tous choisis par le processus principal (les
+    # workers tournent en parallèle et ne peuvent pas se coordonner pour
+    # garantir l'unicité des noms) : dossier et nom unique de l'original
+    # pleine taille (voir Config.html_include_originals), puis nom unique de
+    # la copie affichée dans `images/`. Absents (appel historique à 7
+    # arguments) : aucun original, nom de copie = nom d'affichage.
+    originals_dir_str, original_name, image_file_name = (tuple(args[7:10]) + (None, None, None))[:3]
     images_dir = Path(images_dir_str)
     thumbs_dir = Path(thumbs_dir_str)
     path = Path(image_path)
     if not path.exists():
         return (False, None)
 
-    out_name = HTMLGalleryGenerator.display_filename(path)
+    visible_name = HTMLGalleryGenerator.display_filename(path)
+    out_name = image_file_name or visible_name
     target = (GALLERY_FULL_MAX_SIZE, GALLERY_FULL_MAX_SIZE)
     try:
         img = load_image(path, use_embedded_thumb=True, target_size=target)
@@ -160,7 +168,10 @@ def _process_full_image_worker(args):
             size_bytes = None
 
         metadata = {
-            "filename": out_name,
+            # Nom AFFICHÉ à l'utilisateur (visionneuse, informations) : celui de
+            # la photo, jamais le nom unique du fichier de la copie.
+            "filename": visible_name,
+            "image_file": out_name,
             "width": dimensions[0] if dimensions else None,
             "height": dimensions[1] if dimensions else None,
             "size": format_file_size(size_bytes) if size_bytes is not None else None,
@@ -377,23 +388,26 @@ class HTMLGalleryGenerator:
         # par _generate_page.
         tasks = []
         used_original_names = set()
+        used_image_names = set()
         for i, item in enumerate(images):
             image_path = item.get('path') if isinstance(item, dict) else item
             if image_path:
                 page_num = i // self.images_per_page + 1
                 idx_in_page = i % self.images_per_page
                 thumb_filename = f"thumb_p{page_num}_{idx_in_page:04d}.jpg"
-                task = (
-                    str(image_path), str(images_dir), str(thumbs_dir), thumb_filename,
-                    self.watermark_text, self.watermark_opacity, self.watermark_orientation
-                )
+                # Noms uniques décidés ICI, dans le processus principal.
+                original_task = (None, None)
                 if self.include_originals:
-                    # Nom unique décidé ICI, dans le processus principal (les
-                    # workers tournent en parallèle et ne peuvent pas se
-                    # coordonner entre eux).
-                    task += (str(originals_dir),
-                             _unique_original_name(Path(image_path).name, used_original_names))
-                tasks.append(task)
+                    original_task = (
+                        str(originals_dir),
+                        _unique_file_name(Path(image_path).name, used_original_names),
+                    )
+                tasks.append((
+                    str(image_path), str(images_dir), str(thumbs_dir), thumb_filename,
+                    self.watermark_text, self.watermark_opacity, self.watermark_orientation,
+                    *original_task,
+                    _unique_file_name(self.display_filename(image_path), used_image_names),
+                ))
 
         results = [(False, None)] * len(images)
         if tasks:
@@ -765,8 +779,12 @@ class HTMLGalleryGenerator:
             # ici, sans nouvelle écriture ni nouveau décodage.
 
             position = len(full_image_urls)
-            full_image_urls.append(f"images/{filename}")
             meta = page_meta[idx] or {}
+            # Fichier réellement écrit par le worker (nom unique, voir
+            # _unique_file_name), encodé pour l'URL : un « # » ou un « ? »
+            # dans un nom de photo coupait sinon l'adresse (fragment/requête).
+            image_url = "images/" + quote(meta.get("image_file") or filename)
+            full_image_urls.append(image_url)
             width, height = meta.get("width"), meta.get("height")
             entry = {
                 "filename": meta.get("filename") or filename,
@@ -782,7 +800,7 @@ class HTMLGalleryGenerator:
                 entry["originalFilename"] = meta.get("original_filename") or entry["filename"]
             gallery_meta.append(entry)
 
-            thumb_link = f''' <a href="images/{filename}" onclick="return openLightbox(event, {position})">
+            thumb_link = f''' <a href="{image_url}" onclick="return openLightbox(event, {position})">
         <img src="thumbs/{thumb_filename}" alt="">
     </a>\n'''
 
