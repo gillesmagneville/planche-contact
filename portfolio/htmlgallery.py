@@ -6,6 +6,7 @@ from html import escape as html_escape
 import logging
 import multiprocessing
 import os
+import uuid
 from PIL import Image, ImageOps
 
 from .rawloader import load_image, is_raw_file, get_original_dimensions
@@ -184,6 +185,19 @@ class HTMLGalleryGenerator:
             mode: apply_custom_colors(get_palette(mode), self.theme.custom)
             for mode in ("light", "dark", "neutral")
         }
+        # Clé localStorage du choix manuel d'un visiteur (bouton ◐), PROPRE À
+        # CETTE GÉNÉRATION de la galerie (suffixe aléatoire, identique sur
+        # toutes ses pages). Une clé unique et fixe pour toutes les galeries
+        # faisait qu'un seul clic sur ◐ - dans n'importe quelle galerie
+        # ouverte depuis la même origine (Chrome partage un seul
+        # localStorage entre tous les fichiers locaux file://, un serveur
+        # web entre tous ses sites sur le même hôte) - écrasait ensuite pour
+        # toujours le thème choisi dans la fenêtre principale, y compris
+        # pour une galerie régénérée avec un autre thème : la galerie
+        # « ignorait » le thème demandé. Avec une clé par génération, le
+        # choix d'un visiteur survit d'une page à l'autre de SA galerie,
+        # mais jamais à une régénération.
+        self._theme_storage_key = f"planche-contact-theme-{uuid.uuid4().hex[:12]}"
         # Légendes personnalisables (cahier des charges §1) : comme pour
         # ContactSheetGenerator, on ne relit les métadonnées EXIF de
         # chaque photo (coûteux, un accès fichier de plus par photo) QUE
@@ -410,10 +424,13 @@ class HTMLGalleryGenerator:
         // des couleurs), pour éviter tout "flash" visible d'un thème vers
         // l'autre chez un visiteur ayant déjà choisi le sien (voir
         // toggleTheme(), plus bas dans la page) - lui seul lit/écrit cette
-        // clé localStorage, propre à ce visiteur/ce navigateur.
+        // clé localStorage, propre à ce visiteur/ce navigateur ET à cette
+        // génération de la galerie (voir HTMLGalleryGenerator.__init__) : un
+        // choix mémorisé pour une ancienne galerie ne masque jamais le thème
+        // demandé pour celle-ci.
         (function() {{
             try {{
-                var t = localStorage.getItem('planche-contact-theme');
+                var t = localStorage.getItem('{self._theme_storage_key}');
                 if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
             }} catch (e) {{}}
         }})();
@@ -785,18 +802,25 @@ class HTMLGalleryGenerator:
         return n === 1 ? 'index.html' : 'page_' + String(n).padStart(3, '0') + '.html';
     }}
 
-    // Sélecteur de thème discret (cahier des charges §4) : bascule entre
-    // clair et sombre indépendamment du thème choisi pour la galerie, et
-    // mémorise le choix du visiteur (propre à son navigateur - voir le
-    // script en tête de page, qui applique ce choix avant le premier
-    // rendu pour éviter tout flash).
+    // Sélecteur de thème discret (cahier des charges §4) : bascule entre le
+    // thème de la galerie et son opposé clair/sombre, et mémorise le choix
+    // du visiteur (propre à son navigateur et à cette génération de la
+    // galerie - voir le script en tête de page, qui applique ce choix avant
+    // le premier rendu pour éviter tout flash). Un second clic RETIRE ce
+    // choix : la page retrouve alors exactement le thème demandé à la
+    // génération (y compris « neutre », qu'un simple va-et-vient
+    // clair/sombre ne permettrait jamais de retrouver).
     function toggleTheme() {{
         const current = document.documentElement.getAttribute('data-theme');
+        if (current) {{
+            document.documentElement.removeAttribute('data-theme');
+            try {{ localStorage.removeItem('{self._theme_storage_key}'); }} catch (e) {{}}
+            return;
+        }}
         const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const effectiveIsDark = current ? (current === 'dark') : ({self._effective_dark_js_expr()});
-        const next = effectiveIsDark ? 'light' : 'dark';
+        const next = ({self._effective_dark_js_expr()}) ? 'light' : 'dark';
         document.documentElement.setAttribute('data-theme', next);
-        try {{ localStorage.setItem('planche-contact-theme', next); }} catch (e) {{}}
+        try {{ localStorage.setItem('{self._theme_storage_key}', next); }} catch (e) {{}}
     }}
 
     function openLightbox(event, index) {{

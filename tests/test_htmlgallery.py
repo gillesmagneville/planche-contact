@@ -14,6 +14,8 @@ thème clair/sombre/système, bascule manuelle, persistance) a par ailleurs
 été effectuée manuellement lors du développement de ce câblage - voir
 CHANGELOG.md.
 """
+import re
+
 import pytest
 from PIL import Image
 from PIL.ExifTags import IFD
@@ -171,6 +173,77 @@ def test_theme_toggle_and_all_three_overrides_are_always_present(tmp_path, mode)
     for palette_mode in ("light", "dark", "neutral"):
         palette = get_palette(palette_mode)
         assert f':root[data-theme="{palette_mode}"] {{ --bg: {palette.background};' in html
+
+
+def _theme_keys(html):
+    """Toutes les clés localStorage de thème citées dans une page, sans
+    doublon (la clé fixe historique, sans suffixe, comprise)."""
+    return set(re.findall(r"planche-contact-theme[0-9a-f-]*", html))
+
+
+def test_visitor_theme_choice_is_stored_under_a_per_generation_key(tmp_path):
+    """Régression : le choix manuel d'un visiteur (bouton ◐) était mémorisé
+    sous UNE clé fixe, partagée par toutes les galeries ouvertes depuis la
+    même origine (Chrome partage un seul localStorage entre tous les
+    fichiers locaux). Un seul clic suffisait donc à faire ignorer, pour
+    toujours, le thème choisi dans la fenêtre principale - y compris pour
+    une galerie régénérée avec un autre thème. La clé doit maintenant être
+    propre à CHAQUE génération."""
+    _, images = _make_images(tmp_path, 2)
+    profile = Profile(theme=ThemeSettings(mode="dark"))
+    first = _theme_keys(_generate(tmp_path / "a", images, profile))
+    second = _theme_keys(_generate(tmp_path / "b", images, profile))
+
+    assert len(first) == 1 and len(second) == 1
+    (key_a,), (key_b,) = first, second
+    assert re.fullmatch(r"planche-contact-theme-[0-9a-f]{12}", key_a)
+    assert key_a != key_b, "deux générations ne doivent jamais partager le choix d'un visiteur"
+    assert "planche-contact-theme'" not in _generate(tmp_path / "c", images, profile), (
+        "l'ancienne clé fixe ne doit plus jamais être lue"
+    )
+
+
+def test_theme_key_is_shared_by_every_page_of_one_generation(tmp_path):
+    """Le choix d'un visiteur doit, lui, suivre d'une page à l'autre de la
+    MÊME galerie : toutes ses pages citent la même clé."""
+    _, images = _make_images(tmp_path, 5)
+    _generate(tmp_path, images, Profile(), html_per_page=2)
+    pages = sorted((tmp_path / "out").glob("*.html"))
+
+    assert len(pages) == 3
+    keys = [_theme_keys(page.read_text(encoding="utf-8")) for page in pages]
+    assert all(len(k) == 1 for k in keys)
+    assert keys[0] == keys[1] == keys[2]
+
+
+@pytest.mark.parametrize("mode", ["light", "dark", "neutral", "system"])
+def test_theme_toggle_reads_writes_and_clears_the_same_key(tmp_path, mode):
+    """Le script de tête (lecture), le bouton ◐ (écriture) et son retour au
+    thème demandé (suppression) doivent tous viser la MÊME clé : sinon un
+    choix mémorisé resterait appliqué malgré le second clic."""
+    _, images = _make_images(tmp_path, 2)
+    html = _generate(tmp_path, images, Profile(theme=ThemeSettings(mode=mode)))
+
+    (key,) = _theme_keys(html)
+    assert f"localStorage.getItem('{key}')" in html
+    assert f"localStorage.setItem('{key}', next)" in html
+    assert f"localStorage.removeItem('{key}')" in html
+
+
+def test_second_toggle_click_returns_to_the_requested_theme(tmp_path):
+    """Régression : le bouton ne faisait qu'alterner clair/sombre. Depuis
+    une galerie « Neutre », deux clics laissaient la page en « clair » sans
+    aucun moyen de retrouver le thème demandé. Un choix déjà mémorisé doit
+    maintenant être RETIRÉ (attribut data-theme supprimé), ce qui rend la
+    main au thème choisi à la génération."""
+    _, images = _make_images(tmp_path, 2)
+    html = _generate(tmp_path, images, Profile(theme=ThemeSettings(mode="neutral")))
+
+    toggle = html.split("function toggleTheme()")[1].split("function openLightbox")[0]
+    assert "if (current)" in toggle
+    assert "document.documentElement.removeAttribute('data-theme')" in toggle
+    # Le retour au thème demandé a lieu AVANT toute écriture d'un nouveau choix.
+    assert toggle.index("removeAttribute('data-theme')") < toggle.index("setAttribute('data-theme', next)")
 
 
 def test_custom_accent_color_is_applied_to_every_theme_override(tmp_path):
