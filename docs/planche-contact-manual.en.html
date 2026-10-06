@@ -257,7 +257,7 @@ python3 portfolio.py \
     <li>For large folders (several hundred photos), processing automatically uses all available cores on the machine: the more cores, the faster the generation.</li>
 </ul>
 <div class="note">
-When the gallery is opened directly by double-clicking <code>index.html</code> (without a web server), all browsers (Firefox, Chrome...) block, for security reasons, the mechanisms needed to force a download — a message then appears in the viewer explaining this, and the image opens in a new tab instead: right-clicking it and choosing <strong>"Save image as"</strong> still works normally in that case. To get one-click downloads back, simply view the gallery through a web server instead of locally — a simple command such as <code>python3 -m http.server</code> run inside the gallery folder is enough, with nothing else to install.
+When the gallery is opened directly by double-clicking <code>index.html</code> (without a web server), browsers block, for security reasons, reading neighbouring files, and therefore the scripted download; the ⇩ button then uses a plain download link: depending on the browser, it triggers the usual save or opens the image in a new tab (which is what Chrome and Chromium-based browsers do). A message appears in the viewer explaining this. If the image opened in a new tab, right-clicking it and choosing <strong>"Save image as"</strong> still works normally in that case. To get one-click downloads back, simply view the gallery through a web server instead of locally — a simple command such as <code>python3 -m http.server</code> run inside the gallery folder is enough, with nothing else to install.
 </div>
 
 <h2>8. About</h2>

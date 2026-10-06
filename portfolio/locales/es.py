@@ -150,7 +150,7 @@ STRINGS = {
     "unit.gb": "GB",
     "gallery.goto_page_label": "Ir a la página:",
     "gallery.goto_page_ok": "OK",
-    "gallery.download_toast": "No es posible descargar directamente al abrir este archivo de forma local (restricción de seguridad del navegador). La imagen se ha abierto en una nueva pestaña: haga clic derecho sobre ella y elija «Guardar imagen como». Para descargas con un solo clic, consulte esta galería a través de un servidor web en lugar de hacer doble clic en el archivo.",
+    "gallery.download_toast": "Abierta de forma local (doble clic en el archivo), la galería no puede forzar la descarga en todos los navegadores (restricción de seguridad). Si no se ha descargado nada, la imagen se ha abierto en una nueva pestaña: haga clic derecho sobre ella y elija «Guardar imagen como». Para descargas con un solo clic en cualquier navegador, consulte esta galería a través de un servidor web en lugar de hacer doble clic en el archivo.",
     "gallery.created_log": "Galería HTML creada: {pages} página(s) en {dir}",
 
     # --- CLI (portfolio/portfolio.py) ---

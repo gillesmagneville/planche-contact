@@ -447,7 +447,11 @@ bel et bien dans `portfolio.py` actuel).
   et affiche un message explicatif (bouton toast) plutôt que d'échouer
   silencieusement ; ne PAS retenter une solution "plus maligne" pour ce
   cas précis sans avoir revérifié que cette restriction navigateur a
-  changé.
+  changé. En `file://`, le bouton clique un lien `<a download target="_blank">`
+  (jamais `window.open()` : son résultat dépendait du TYPE du fichier -
+  un RAW déclenchait la boîte « Ouvrir/Enregistrer » de Firefox, un JPEG
+  s'affichait). Vérifié : Chromium ignore `download` en `file://` (nouvel
+  onglet) ; Firefox non testé (pas de Firefox dans le bac à sable).
 - **Filigrane** : toujours via `utils.apply_watermark()` — fonction
   unique, jamais de logique de filigrane dupliquée localement.
 - **Compatibilité GTK/Windows** : pattern défensif systématique pour les

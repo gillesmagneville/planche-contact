@@ -1053,8 +1053,21 @@ class HTMLGalleryGenerator:
         // navigateurs pour accéder à un fichier voisin - aucune de ces trois
         // voies ne permet de contourner ça en JavaScript. On le détecte donc
         // en amont plutôt que d'échouer silencieusement après coup.
+        // Un simple LIEN avec l'attribut `download` n'a, lui, pas besoin de
+        // lire le fichier : Firefox l'honore pour un fichier situé sous la
+        // page (enregistrement ou boîte de dialogue habituelle du navigateur),
+        // alors que Chrome/Chromium l'ignorent en file:// (vérifié). Dans ce
+        // cas le lien s'ouvre dans un nouvel onglet (target=_blank : on ne
+        // quitte jamais la galerie) et le message explique quoi faire.
         if (window.location.protocol === 'file:') {{
-            window.open(url, '_blank');
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
             showToast({download_toast_js});
             return;
         }}

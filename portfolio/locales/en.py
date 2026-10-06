@@ -152,7 +152,7 @@ STRINGS = {
     "unit.gb": "GB",
     "gallery.goto_page_label": "Go to page:",
     "gallery.goto_page_ok": "OK",
-    "gallery.download_toast": "Direct download isn't possible when opening this file locally (browser security restriction). The image opened in a new tab instead: right-click it and choose \"Save image as\". For one-click downloads, view this gallery through a web server instead of double-clicking the file.",
+    "gallery.download_toast": "Opened locally (double-clicking the file), the gallery cannot force a download in every browser (security restriction). If nothing was downloaded, the image opened in a new tab: right-click it and choose \"Save image as\". For one-click downloads everywhere, view this gallery through a web server instead of double-clicking the file.",
     "gallery.created_log": "HTML gallery created: {pages} page(s) in {dir}",
 
     # --- CLI (portfolio/portfolio.py) ---

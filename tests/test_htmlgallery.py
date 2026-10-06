@@ -714,6 +714,29 @@ def test_raw_original_names_are_jpg_and_stay_unique_next_to_a_jpeg_of_the_same_n
     assert not any(n.lower().endswith(RAW_EXTENSIONS) for n in unique)
 
 
+def test_download_from_a_local_file_page_uses_a_download_link_and_never_leaves_the_gallery(tmp_path):
+    """Galerie ouverte en double-clic (file://) : fetch() est bloqué, mais un
+    lien avec l'attribut `download` n'a pas besoin de lire le fichier -
+    Firefox l'honore (enregistrement/boîte de dialogue habituelle) ; Chrome
+    l'ignore et ouvre alors le lien dans un NOUVEL onglet (target=_blank :
+    sans cela, la page de la galerie serait remplacée par l'image). Le
+    message explicatif reste affiché dans tous les cas. Comportement vérifié
+    dans un vrai Chromium (voir CHANGELOG.md)."""
+    images = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 2, 3))])
+    html = _generate(tmp_path, images, Profile(), include_originals=True)
+
+    start = html.index("if (window.location.protocol === 'file:')")
+    block = html[start:html.index("return;", start)]
+    assert "link.href = url;" in block, "le lien vise l'original (ou la copie affichée)"
+    assert "link.download = filename;" in block
+    assert "link.target = '_blank';" in block
+    assert "link.click();" in block
+    assert "window.open" not in block
+    assert "showToast(" in block
+    # le message annonce la possibilité d'un simple affichage dans un onglet
+    assert json.dumps(_("gallery.download_toast"), ensure_ascii=False) in html
+
+
 class _InProcessExecutor:
     """Remplace ProcessPoolExecutor pour que les workers s'exécutent dans CE
     processus (donc monkeypatchables : un worker `spawn` réimporte le module
