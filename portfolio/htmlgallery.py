@@ -1,4 +1,5 @@
 from pathlib import Path
+import base64
 import json
 import shutil
 from concurrent.futures import ProcessPoolExecutor
@@ -80,6 +81,53 @@ def _init_worker_logging(log_path, language=None):
         )
     if language:
         set_language(language)
+
+
+#: Taille (en octets, multiple de 3 pour que le base64 reste continu d'un bloc
+#: à l'autre) des blocs lus par _write_download_script().
+_DOWNLOAD_SCRIPT_CHUNK_BYTES = 3 * 1024 * 1024
+
+
+def _write_download_script(original_path: Path, original_name: str) -> bool:
+    """Écrit `originals/<nom>.js`, fichier annexe d'un original : le contenu du
+    fichier en base64 dans un appel `pcOriginalLoaded(nom, base64)`.
+
+    Pourquoi : ouverte en double-clic (`file://`), une page ne peut ni lire
+    un fichier voisin (fetch/XHR/canvas bloqués par tous les navigateurs) ni
+    obtenir d'un lien qu'il télécharge plutôt qu'il n'affiche un JPEG. En
+    revanche, une balise `<script src>` voisine est chargée normalement
+    (jamais bloquée en `file://`) : la visionneuse l'insère à la demande,
+    reconstruit le fichier à partir du base64 et le télécharge sous son vrai
+    nom, avec la boîte de dialogue habituelle du navigateur (voir
+    downloadCurrentImage()). Servie en HTTP, la galerie n'en a pas besoin (le
+    fichier est récupéré directement) : ces fichiers peuvent être supprimés
+    avant une mise en ligne sans rien casser.
+
+    Écriture par blocs (jamais tout l'original en mémoire deux fois). Ne lève
+    jamais d'exception : en cas d'échec (disque plein...), le fichier annexe
+    partiel est supprimé - un script tronqué ne s'exécuterait pas et le clic
+    resterait sans effet - et la visionneuse retombe sur son comportement
+    habituel. Renvoie True si le fichier annexe est complet."""
+    script_path = original_path.with_name(original_name + ".js")
+    try:
+        with open(original_path, "rb") as source, open(script_path, "w", encoding="ascii") as out:
+            # json.dumps échappe tout caractère non ASCII : le nom reste exact
+            # dans un fichier strictement ASCII, quel que soit l'encodage servi.
+            out.write("window.pcOriginalLoaded(" + json.dumps(original_name) + ',"')
+            while True:
+                block = source.read(_DOWNLOAD_SCRIPT_CHUNK_BYTES)
+                if not block:
+                    break
+                out.write(base64.b64encode(block).decode("ascii"))
+            out.write('");')
+        return True
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"Fichier annexe de téléchargement non créé pour {original_name}: {e}")
+        try:
+            script_path.unlink()
+        except OSError:
+            pass
+        return False
 
 
 #: Qualité (et sous-échantillonnage 4:4:4, sans perte de détail des
@@ -237,6 +285,9 @@ def _process_full_image_worker(args):
                 # Nom proposé au téléchargement : celui de la photo (pour un
                 # RAW, son nom en `.jpg`, jamais l'extension RAW d'origine).
                 metadata["original_filename"] = visible_name
+                # Fichier annexe pour le téléchargement en double-clic (voir
+                # _write_download_script) : son échec n'invalide pas l'original.
+                _write_download_script(target_original, original_name)
             except Exception as e:
                 logging.getLogger(__name__).warning(f"Original non créé pour {path.name}: {e}")
                 try:
@@ -1038,6 +1089,56 @@ class HTMLGalleryGenerator:
         toast._hideTimer = setTimeout(() => toast.classList.remove('show'), 6000);
     }}
 
+    // Lien de téléchargement ordinaire (attribut `download`) : honoré par
+    // certains navigateurs pour un fichier voisin en file://, ignoré par
+    // d'autres (Chrome/Chromium ouvrent alors le lien dans un NOUVEL onglet
+    // grâce à target=_blank : la galerie n'est jamais quittée). Dans tous les
+    // cas, le message explique quoi faire si rien ne s'est téléchargé.
+    function openDownloadLink(url, filename) {{
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        showToast({download_toast_js});
+    }}
+
+    // Téléchargements en cours depuis un fichier annexe, par nom de fichier :
+    // le script annexe appelle pcOriginalLoaded(nom, base64) en s'exécutant.
+    const pendingLocalDownloads = {{}};
+
+    function pcOriginalLoaded(name, base64) {{
+        const pending = pendingLocalDownloads[name];
+        if (!pending) return;
+        delete pendingLocalDownloads[name];
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        triggerBlobDownload(new Blob([bytes], {{ type: 'image/jpeg' }}), pending.filename);
+    }}
+
+    function downloadOriginalFromScript(meta, filename, fallback) {{
+        const name = decodeURIComponent(meta.original.split('/').pop());
+        pendingLocalDownloads[name] = {{ filename: filename }};
+        const script = document.createElement('script');
+        // Le script s'exécute AVANT son événement load : si l'entrée existe
+        // encore alors, il manquait, était tronqué ou n'a pas fonctionné.
+        const failed = () => {{
+            script.remove();
+            if (pendingLocalDownloads[name]) {{
+                delete pendingLocalDownloads[name];
+                fallback();
+            }}
+        }};
+        script.onload = failed;
+        script.onerror = failed;
+        script.src = meta.original + '.js';
+        document.head.appendChild(script);
+    }}
+
     function downloadCurrentImage() {{
         // Original pleine taille quand la galerie l'embarque (option
         // « originaux »), sinon la copie affichée dans la visionneuse.
@@ -1053,22 +1154,21 @@ class HTMLGalleryGenerator:
         // navigateurs pour accéder à un fichier voisin - aucune de ces trois
         // voies ne permet de contourner ça en JavaScript. On le détecte donc
         // en amont plutôt que d'échouer silencieusement après coup.
-        // Un simple LIEN avec l'attribut `download` n'a, lui, pas besoin de
-        // lire le fichier : Firefox l'honore pour un fichier situé sous la
-        // page (enregistrement ou boîte de dialogue habituelle du navigateur),
-        // alors que Chrome/Chromium l'ignorent en file:// (vérifié). Dans ce
-        // cas le lien s'ouvre dans un nouvel onglet (target=_blank : on ne
-        // quitte jamais la galerie) et le message explique quoi faire.
+        // Deux voies restent possibles sans lire le fichier : une balise
+        // <script src> voisine (jamais bloquée en file://, voir ci-dessous),
+        // et un lien <a download>, que les navigateurs honorent ou non pour
+        // un fichier voisin (Chromium l'ignore en file:// ; signalé sans effet
+        // par un utilisateur de Firefox) - d'où le fichier annexe.
         if (window.location.protocol === 'file:') {{
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = filename;
-            link.target = '_blank';
-            link.rel = 'noopener';
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            showToast({download_toast_js});
+            // Original pleine taille : son fichier annexe .js (voir
+            // htmlgallery._write_download_script) permet un vrai
+            // téléchargement - nom exact, boîte de dialogue du navigateur -
+            // même sans serveur web, et quel que soit le navigateur.
+            if (meta.original) {{
+                downloadOriginalFromScript(meta, filename, () => openDownloadLink(url, filename));
+                return;
+            }}
+            openDownloadLink(url, filename);
             return;
         }}
 

@@ -392,10 +392,17 @@ def test_html_originals_flag_adds_full_size_originals_to_the_gallery(tmp_path, m
         sys, "argv", ["portfolio.py", "-i", str(img_dir), "-o", str(out_orig), "--html", "--html-originals"]
     )
     cli_module.main()
-    originals = sorted(p.name for p in (out_orig / "gallery" / "originals").iterdir())
-    assert originals == ["img_00.jpg", "img_01.jpg"]
-    for name in originals:
-        assert (out_orig / "gallery" / "originals" / name).read_bytes() == (img_dir / name).read_bytes()
+    originals_dir = out_orig / "gallery" / "originals"
+    # Chaque original est accompagné de son fichier annexe (téléchargement
+    # en double-clic, voir htmlgallery._write_download_script).
+    assert sorted(p.name for p in originals_dir.iterdir()) == [
+        "img_00.jpg", "img_00.jpg.js", "img_01.jpg", "img_01.jpg.js",
+    ]
+    for name in ("img_00.jpg", "img_01.jpg"):
+        assert (originals_dir / name).read_bytes() == (img_dir / name).read_bytes()
+        assert (originals_dir / (name + ".js")).read_text(encoding="ascii").startswith(
+            'window.pcOriginalLoaded("%s","' % name
+        )
 
 
 def test_html_originals_with_watermark_warns_that_originals_are_not_watermarked(tmp_path, monkeypatch, caplog):

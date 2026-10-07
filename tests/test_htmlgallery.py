@@ -14,6 +14,7 @@ thème clair/sombre/système, bascule manuelle, persistance) a par ailleurs
 été effectuée manuellement lors du développement de ce câblage - voir
 CHANGELOG.md.
 """
+import base64
 import filecmp
 import json
 import re
@@ -574,7 +575,7 @@ def test_worker_never_writes_a_raw_extension_even_when_given_a_raw_name(tmp_path
     ))
 
     assert ok
-    assert [p.name for p in originals_dir.iterdir()] == ["DSC_0001.jpg"]
+    assert sorted(p.name for p in originals_dir.iterdir()) == ["DSC_0001.jpg", "DSC_0001.jpg.js"]
     assert meta["original"] == "originals/DSC_0001.jpg"
 
 
@@ -714,27 +715,166 @@ def test_raw_original_names_are_jpg_and_stay_unique_next_to_a_jpeg_of_the_same_n
     assert not any(n.lower().endswith(RAW_EXTENSIONS) for n in unique)
 
 
-def test_download_from_a_local_file_page_uses_a_download_link_and_never_leaves_the_gallery(tmp_path):
-    """Galerie ouverte en double-clic (file://) : fetch() est bloqué, mais un
-    lien avec l'attribut `download` n'a pas besoin de lire le fichier -
-    Firefox l'honore (enregistrement/boîte de dialogue habituelle) ; Chrome
-    l'ignore et ouvre alors le lien dans un NOUVEL onglet (target=_blank :
-    sans cela, la page de la galerie serait remplacée par l'image). Le
-    message explicatif reste affiché dans tous les cas. Comportement vérifié
-    dans un vrai Chromium (voir CHANGELOG.md)."""
+def _file_branch(html):
+    """Corps de la branche `file:` de downloadCurrentImage()."""
+    start = html.index("if (window.location.protocol === 'file:')")
+    return html[start:html.index("// L'attribut HTML \"download\" natif", start)]
+
+
+def test_local_file_page_downloads_an_original_through_its_companion_script(tmp_path):
+    """Galerie ouverte en double-clic (file://) : fetch() est bloqué et
+    l'attribut `download` n'est pas honoré partout, mais une balise
+    <script src> voisine se charge toujours. Pour un original, le bouton
+    insère donc `originals/<nom>.js`, qui livre le fichier en base64 : il est
+    ensuite téléchargé sous son vrai nom. Sans fichier annexe exploitable
+    (script absent ou tronqué), retour au lien de téléchargement."""
     images = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 2, 3))])
     html = _generate(tmp_path, images, Profile(), include_originals=True)
 
-    start = html.index("if (window.location.protocol === 'file:')")
-    block = html[start:html.index("return;", start)]
-    assert "link.href = url;" in block, "le lien vise l'original (ou la copie affichée)"
-    assert "link.download = filename;" in block
-    assert "link.target = '_blank';" in block
-    assert "link.click();" in block
-    assert "window.open" not in block
-    assert "showToast(" in block
-    # le message annonce la possibilité d'un simple affichage dans un onglet
+    branch = _file_branch(html)
+    assert "downloadOriginalFromScript(meta, filename, () => openDownloadLink(url, filename));" in branch
+    assert branch.index("if (meta.original)") < branch.index("openDownloadLink(url, filename);\n            return;")
+    assert "script.src = meta.original + '.js';" in html
+    assert "script.onerror = failed;" in html and "script.onload = failed;" in html
+    assert "triggerBlobDownload(new Blob([bytes], { type: 'image/jpeg' }), pending.filename);" in html
+    # Le nom attendu par le script annexe est celui du fichier (décodé de l'URL).
+    assert "decodeURIComponent(meta.original.split('/').pop())" in html
+
+
+def test_download_link_fallback_never_leaves_the_gallery(tmp_path):
+    """Repli (copie affichée sans option « originaux », ou original sans
+    fichier annexe) : lien <a download>, honoré ou non selon le navigateur ;
+    target=_blank pour ne jamais remplacer la page de la galerie, et message
+    explicatif dans tous les cas."""
+    images = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 2, 3))])
+    html = _generate(tmp_path, images, Profile(), include_originals=False)
+
+    start = html.index("function openDownloadLink(url, filename)")
+    body = html[start:html.index("// Téléchargements en cours", start)]
+    for expected in ("link.href = url;", "link.download = filename;", "link.target = '_blank';", "link.click();"):
+        assert expected in body, expected
+    assert "window.open" not in body
+    assert "showToast(" in body
     assert json.dumps(_("gallery.download_toast"), ensure_ascii=False) in html
+    # sans « originaux », seul le lien est utilisé (le script annexe n'existe pas)
+    assert _file_branch(html).rstrip().endswith("}")
+    assert "openDownloadLink(url, filename);\n            return;" in _file_branch(html)
+
+
+def _script_payload(script_path):
+    """(nom, octets) décodés d'un fichier annexe `pcOriginalLoaded("nom","base64");`."""
+    text = script_path.read_text(encoding="ascii")
+    match = re.fullmatch(r'window\.pcOriginalLoaded\((".*?"),"([A-Za-z0-9+/=]*)"\);', text, re.S)
+    assert match, f"format inattendu : {text[:80]}"
+    return json.loads(match.group(1)), base64.b64decode(match.group(2))
+
+
+def test_every_original_comes_with_a_companion_script_that_carries_its_exact_bytes(tmp_path):
+    """Fichier annexe de chaque original, à côté de lui : le base64 décodé
+    est identique octet pour octet à l'original, et le nom qu'il annonce est
+    celui du fichier (y compris accents, espaces et # - échappés en ASCII)."""
+    images = _big_images(tmp_path, [
+        ("", "Été du 12 #3 (copie).jpg", (2200, 1500), (9, 9, 9)),
+        ("un", "IMG_1.jpg", (2200, 1500), (255, 0, 0)),
+        ("deux", "IMG_1.jpg", (2200, 1500), (0, 255, 0)),
+    ])
+    html = _generate(tmp_path, images, Profile(), include_originals=True)
+    out = tmp_path / "out" / "originals"
+
+    for entry in _gallery_meta(html):
+        original = out / unquote(entry["original"]).split("/", 1)[1]
+        name, payload = _script_payload(original.with_name(original.name + ".js"))
+        assert name == original.name
+        assert payload == original.read_bytes()
+    assert sorted(p.name for p in out.glob("*.js")) == [
+        "IMG_1.jpg.js", "IMG_1_2.jpg.js", "Été du 12 #3 (copie).jpg.js",
+    ]
+
+
+def test_there_is_no_companion_script_without_the_originals_option(tmp_path):
+    images = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 2, 3))])
+    _generate(tmp_path, images, Profile())
+    assert list((tmp_path / "out").rglob("*.js")) == []
+
+
+def test_companion_script_of_a_converted_raw_carries_the_jpeg_not_the_raw(tmp_path, monkeypatch):
+    from portfolio import htmlgallery
+
+    raw = _fake_raw(tmp_path)
+    monkeypatch.setattr(htmlgallery, "load_full_resolution",
+                        lambda path: Image.new("RGB", (3000, 2000), (5, 60, 200)))
+    images_dir, thumbs_dir, originals_dir = _raw_worker_dirs(tmp_path)
+
+    ok, _meta = htmlgallery._process_full_image_worker((
+        str(raw), str(images_dir), str(thumbs_dir), "t.jpg", None, 40, "Horizontal",
+        str(originals_dir), "DSC_0001.jpg",
+    ))
+
+    assert ok
+    name, payload = _script_payload(originals_dir / "DSC_0001.jpg.js")
+    assert name == "DSC_0001.jpg"
+    assert payload == (originals_dir / "DSC_0001.jpg").read_bytes()
+    assert payload[:3] == b"\xff\xd8\xff", "le fichier annexe livre le JPEG, jamais le RAW"
+    assert raw.read_bytes()[:9] not in payload[:64]
+
+
+def test_a_failed_companion_script_leaves_no_truncated_file_and_keeps_the_original(tmp_path, monkeypatch):
+    """Disque plein pendant l'écriture du fichier annexe : un script tronqué
+    s'exécuterait mal et le clic resterait sans effet - il est donc supprimé
+    (la visionneuse retombe sur le lien) ; l'original, lui, reste valide."""
+    from portfolio import htmlgallery
+
+    src = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 1, 1))])[0]["path"]
+    images_dir, thumbs_dir, originals_dir = _raw_worker_dirs(tmp_path)
+    real_b64 = htmlgallery.base64.b64encode
+    calls = []
+
+    def failing_b64(block):
+        calls.append(1)
+        raise OSError("disque plein")
+
+    monkeypatch.setattr(htmlgallery.base64, "b64encode", failing_b64)
+    ok, meta = htmlgallery._process_full_image_worker((
+        str(src), str(images_dir), str(thumbs_dir), "t.jpg", None, 40, "Horizontal",
+        str(originals_dir), "a.jpg",
+    ))
+    monkeypatch.setattr(htmlgallery.base64, "b64encode", real_b64)
+
+    assert calls, "le test n'a pas exercé l'écriture du fichier annexe"
+    assert ok and meta["original"] == "originals/a.jpg"
+    assert [p.name for p in originals_dir.iterdir()] == ["a.jpg"]
+    assert (originals_dir / "a.jpg").read_bytes() == src.read_bytes()
+
+
+def test_companion_script_of_an_original_larger_than_one_block_decodes_exactly(tmp_path):
+    """Avec la taille de bloc réelle : un original un peu plus grand qu'un bloc
+    (deux blocs, le second partiel) doit rester un base64 continu - un bloc
+    qui ne serait pas un multiple de 3 octets insérerait un `=` au milieu et
+    corromprait le fichier téléchargé."""
+    from portfolio import htmlgallery
+
+    assert htmlgallery._DOWNLOAD_SCRIPT_CHUNK_BYTES % 3 == 0
+    original = tmp_path / "grand.jpg"
+    data = bytes((i * 7919) % 251 for i in range(htmlgallery._DOWNLOAD_SCRIPT_CHUNK_BYTES + 1000))
+    original.write_bytes(data)
+    assert htmlgallery._write_download_script(original, "grand.jpg") is True
+    assert _script_payload(tmp_path / "grand.jpg.js") == ("grand.jpg", data)
+
+
+def test_companion_script_is_written_in_blocks_and_stays_one_valid_string(tmp_path, monkeypatch):
+    """Un original lu en plusieurs blocs (ici de 3 octets, multiple de 3 pour
+    que le base64 reste continu d'un bloc à l'autre) donne un seul littéral
+    JS, sans retour à la ligne, qui se décode en l'original exact."""
+    from portfolio import htmlgallery
+
+    monkeypatch.setattr(htmlgallery, "_DOWNLOAD_SCRIPT_CHUNK_BYTES", 3)
+    original = tmp_path / "o.jpg"
+    data = bytes(range(256)) * 3 + b"xy"
+    original.write_bytes(data)
+    assert htmlgallery._write_download_script(original, "o.jpg") is True
+    text = (tmp_path / "o.jpg.js").read_text(encoding="ascii")
+    assert "\n" not in text
+    assert _script_payload(tmp_path / "o.jpg.js") == ("o.jpg", data)
 
 
 class _InProcessExecutor:
