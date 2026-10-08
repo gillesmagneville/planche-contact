@@ -38,6 +38,138 @@ Generate high-resolution contact sheets, PDF documents, responsive HTML gallerie
 
 ---
 
+## Download
+
+**Latest stable release: [v5.1.10](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.1.10)**
+
+Planche-Contact is available as ready-to-use packages for Linux and Windows.
+
+### Linux
+
+**Debian / Ubuntu — 64-bit**
+
+[Download `planche-contact_5.1.10_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.1.10/planche-contact_5.1.10_amd64.deb)
+
+```bash
+sudo apt install ./planche-contact_5.1.10_amd64.deb
+```
+
+SHA-256:
+
+```text
+76c8617f00b610a79d04a48572c840658fc653d303e0d3efe81e2fcf9ccb9acb
+```
+
+### Windows
+
+**Windows 10 / 11 — Installer**
+
+[Download `planche-contact_5.1.10_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.1.10/planche-contact_5.1.10_windows-setup.exe)
+
+SHA-256:
+
+```text
+bfda000d4dc3b14bb289bfa12a3af53e134e0fc7bbde87184089ac0db1f8be10
+```
+
+**Windows — Portable version**
+
+[Download `planche-contact_5.1.10_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.1.10/planche-contact_5.1.10_windows-portable.zip)
+
+SHA-256:
+
+```text
+18cef5bbf7a5fc3aae20bf94c00341b9d65b70239b9d2d97da4f4c65c1df8839
+```
+
+If you simply want to use Planche-Contact, **you do not need to build it from source**.
+
+---
+
+## What makes Planche-Contact different?
+
+Planche-Contact is designed for photographers and image collections that need a simple, direct and professional workflow without the complexity of a Digital Asset Management system.
+
+- **No database**
+- **No catalog**
+- **No image import**
+- Works directly from your existing image folders
+- Supports both **JPEG and RAW**
+- Generates professional **300 dpi contact sheets**
+- Creates **PDF documents**
+- Generates responsive **HTML galleries**
+- Provides an integrated **HTML image viewer**
+- Allows **full-resolution image downloads**
+- Displays customizable **EXIF information**
+- Supports reusable **presentation profiles**
+- Provides a live preview before generation
+- Includes both **GUI and command-line** interfaces
+
+---
+
+## Key Features
+
+### Professional Contact Sheets
+
+Generate high-quality contact sheets from complete image folders with customizable layouts, captions, themes and presentation options.
+
+### RAW Support
+
+Process RAW files directly through **LibRaw**, supporting cameras from most major manufacturers.
+
+### Custom EXIF Captions
+
+Display the metadata that matters to you, including:
+
+- Filename
+- Date
+- Camera
+- Lens
+- Focal length
+- Aperture
+- Shutter speed
+- ISO
+- Image dimensions
+- GPS information
+
+### Reusable Presentation Profiles
+
+Save your preferred layout, captions, theme and other presentation settings as reusable **JSON profiles**.
+
+### Live Preview
+
+Preview the contact sheet before generating the final documents.
+
+### PDF Export
+
+Generate high-resolution PDF documents suitable for printing, archiving or sharing.
+
+### HTML Galleries
+
+Create responsive HTML galleries that can be viewed directly in a web browser.
+
+The generated galleries include an integrated image viewer with features such as:
+
+- Zoom
+- Image navigation
+- Image information
+- Full-resolution image access
+- Image download
+
+### CSV Export
+
+Generate CSV indexes containing image information for further processing or archiving.
+
+### Command Line Interface
+
+Use Planche-Contact from scripts or automated workflows through its command-line interface.
+
+### Linux and Windows
+
+The same core application is available on both Linux and Windows.
+
+---
+
 <p align="center">
 <img src="screenshots/main-window.png" width="1100" alt="Main Window">
 </p>
@@ -96,6 +228,26 @@ Ideal for photographers, museums, archives, studios and image collections.
 
 <td align="center" width="50%">
 
+<b>Main Window</b><br><br>
+
+<img src="screenshots/main-window.png" alt="Main Window">
+
+</td>
+
+<td align="center" width="50%">
+
+<b>Advanced Settings</b><br><br>
+
+<img src="screenshots/advanced-settings.png" alt="Advanced Settings">
+
+</td>
+
+</tr>
+
+<tr>
+
+<td align="center" width="50%">
+
 <b>Generated Contact Sheet</b><br><br>
 
 <img src="screenshots/contact-sheet.png" alt="Contact Sheet">
@@ -114,7 +266,15 @@ Ideal for photographers, museums, archives, studios and image collections.
 
 <tr>
 
-<td align="center">
+<td align="center" width="50%">
+
+<b>HTML Image Viewer</b><br><br>
+
+<img src="screenshots/html-viewer.png" alt="HTML Image Viewer">
+
+</td>
+
+<td align="center" width="50%">
 
 <b>Generated PDF</b><br><br>
 
@@ -122,16 +282,56 @@ Ideal for photographers, museums, archives, studios and image collections.
 
 </td>
 
-<td align="center">
-
-<b>Main Window</b><br><br>
-
-<img src="screenshots/main-window.png" alt="Main Window">
-
-</td>
-
 </tr>
 </table>
+
+---
+
+## Why use Planche-Contact?
+
+A typical workflow can be as simple as:
+
+```text
+JPEG / RAW image folder
+        │
+        ▼
+  Planche-Contact
+        │
+        ├──► Contact Sheet
+        │
+        ├──► PDF document
+        │
+        ├──► HTML Gallery
+        │         │
+        │         └──► Full-resolution image viewer
+        │
+        └──► CSV index
+```
+
+No catalog, no database and no image import are required.
+
+This makes Planche-Contact particularly useful when you simply want to **present, review, archive or share a folder of images** without introducing a full DAM workflow.
+
+---
+
+# What's new in v5.1.10?
+
+Version **5.1.10** continues the evolution of Planche-Contact with improvements to the HTML gallery, image viewer, presentation workflow, Windows support and overall robustness.
+
+Highlights include:
+
+- Improved HTML gallery and integrated image viewer
+- Full-resolution image downloads
+- RAW-to-JPEG conversion for gallery downloads
+- Improved handling of duplicate filenames
+- Robust URL encoding
+- `file://` download support through JavaScript sidecars
+- Improved GTK advanced settings interface
+- Continued improvements to presentation profiles and layouts
+- Additional tests and documentation improvements
+- Multilingual documentation and generated HTML galleries
+
+See the complete [v5.1.10 release notes](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.1.10) for the full list of changes.
 
 ---
 
