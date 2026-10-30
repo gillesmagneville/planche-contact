@@ -1,181 +1,183 @@
-# Planche-Contact — Contexte du projet
+# Planche-Contact — Project Context
 
-Ce document sert de référence technique complète pour quiconque (humain ou
-IA) reprend ce projet. Il couvre l'ensemble du projet : le moteur commun,
-l'interface graphique, et les deux portages (Linux et Windows).
+🇫🇷 [Version française](PROJECT_CONTEXT.fr.md)
+
+This document is the complete technical reference for anyone (human or
+AI) taking over this project. It covers the whole project: the common engine,
+the graphical interface, and the two ports (Linux and Windows).
 
 ---
 
-## 1. But du logiciel
+## 1. Purpose of the software
 
-**Planche-Contact** est un outil léger permettant de générer des planches
-contact photographiques de haute qualité (300 dpi) à partir d'un dossier de
-photos, sans base de données ni catalogue.
+**Planche-Contact** is a lightweight tool that generates high-quality
+(300 dpi) photographic contact sheets from a folder of photos, with no
+database and no catalog.
 
-À partir d'un même dossier source, l'outil produit au choix :
-- des **planches contact** (JPEG, une ou plusieurs pages) ;
-- un **PDF** assemblant toutes les planches ;
-- une **galerie HTML** paginée et autonome, avec vignettes cliquables ;
-- un **index CSV** listant chaque photo avec son numéro.
+From a single source folder, the tool produces, as chosen:
+- **contact sheets** (JPEG, one or more pages);
+- a **PDF** assembling all the sheets;
+- a paginated, standalone **HTML gallery** with clickable thumbnails;
+- a **CSV index** listing each photo with its number.
 
-Deux façons de l'utiliser :
-- **Interface graphique GTK4** (`planche-contact-gtk.py`)
-- **Ligne de commande** (`portfolio/portfolio.py`)
+Two ways to use it:
+- **GTK4 graphical interface** (`planche-contact-gtk.py`)
+- **Command line** (`portfolio/portfolio.py`)
 
-Formats de photos pris en charge : JPEG, PNG, TIFF, BMP, WEBP, HEIC/HEIF, et
+Supported photo formats: JPEG, PNG, TIFF, BMP, WEBP, HEIC/HEIF, and
 RAW (CR2, CR3, NEF, DNG, ARW).
 
-Plateformes : Linux (Debian/Ubuntu, paquet `.deb`) et Windows 10/11 (portable
-`.zip` ou installeur `.exe`) — même code source, packaging séparé.
+Platforms: Linux (Debian/Ubuntu, `.deb` package) and Windows 10/11 (portable
+`.zip` or `.exe` installer) — same source code, separate packaging.
 
 ---
 
 ## 2. Architecture
 
-### 2.1 Principe général
+### 2.1 General principle
 
-Le projet est structuré en **deux couches strictement séparées** :
+The project is structured in **two strictly separated layers**:
 
-1. **Le moteur (`portfolio/`)** : 100 % Python pur, aucune dépendance à
-   l'interface graphique. Utilisable seul en CLI. C'est cette couche qui est
-   *entièrement partagée* entre Linux et Windows, sans aucune adaptation.
-2. **L'interface graphique (`planche-contact-gtk.py`)** : GTK4 (PyGObject),
-   un seul fichier. Elle appelle le moteur soit en l'import direct (aperçus),
-   soit en sous-processus (génération, pour ne jamais geler l'interface).
+1. **The engine (`portfolio/`)**: 100% pure Python, no dependency on the
+   graphical interface. Usable on its own as a CLI. This is the layer that is
+   *entirely shared* between Linux and Windows, with no adaptation whatsoever.
+2. **The graphical interface (`planche-contact-gtk.py`)**: GTK4 (PyGObject),
+   a single file. It calls the engine either through a direct import (previews),
+   or as a subprocess (generation, so as never to freeze the interface).
 
-Le packaging (`.deb` d'un côté, `.exe`/`.zip` de l'autre) est la **seule**
-partie réellement dupliquée entre les deux plateformes — et encore, les deux
-scripts de build suivent la même logique (gestion de version, confirmation
-interactive, options `-Major/-Minor/-Patch`).
+Packaging (`.deb` on one side, `.exe`/`.zip` on the other) is the **only**
+part really duplicated between the two platforms — and even then, the two
+build scripts follow the same logic (version management, interactive
+confirmation, `-Major/-Minor/-Patch` options).
 
-### 2.2 Le moteur (`portfolio/`)
+### 2.2 The engine (`portfolio/`)
 
-| Module | Rôle |
+| Module | Role |
 |---|---|
-| `config.py` | Dataclass `Config` : tous les paramètres d'une génération |
-| `scanner.py` | Scan du dossier (récursif ou non), tri par date EXIF ou nom (délègue à `utils.get_exif_date()`), exclut `planches/` et `gallery/` du dossier de sortie configuré pour éviter de re-scanner ses propres fichiers générés (comparaison par identité réelle de fichier via `os.path.samefile()`, pas par texte — voir §5) |
-| `rawloader.py` | Chargement unifié image/RAW : aperçu JPEG embarqué en priorité (rapide), dématriçage complet (`rawpy`) uniquement si cet aperçu est absent ou trop petit ; `get_original_dimensions()` : résolution réelle d'origine (métadonnées seules, orientation EXIF/RAW appliquée), utilisée par la visionneuse de la galerie HTML ; `load_full_resolution()` : image à la résolution COMPLÈTE de la prise de vue (aperçu embarqué s'il couvre ≥ 98 % du capteur, sinon dématriçage), pour le JPEG « original » d'un RAW dans la galerie |
-| `thumbnail.py` | Génération de vignettes en parallèle (`ProcessPoolExecutor`, contexte `spawn` forcé) |
-| `contactsheet.py` | Génère les planches contact (en-tête, grille de vignettes, pied de page de 3 lignes : numéro de page, crédit, développeur/licence - positions et place réservée sous la grille dans `layout_engine.FOOTER_*`) |
-| `presentation/` | Moteur commun de mise en page/légendes/thème (`profile.py` : dataclass `Profile` + JSON ; `layout_engine.py` : géométrie des gabarits grille/paysage/portrait/grandes vignettes/libre ; `captions.py` : résolution des légendes EXIF, y compris leur retour à la ligne dans une largeur en pixels (`layout_caption_lines()`) ; `themes.py` : palettes Clair/Sombre/Neutre/Système). **Source unique de vérité**, utilisée à la fois par `contactsheet.py` (planches JPEG/PDF) et `htmlgallery.py` (galerie HTML) — jamais de règle de mise en page/légende/couleur dupliquée entre les deux. L'absence de Profil (ou un Profil partiel/invalide) ne change jamais le comportement par défaut ni ne lève d'exception (`default_profile()`) ; `Config.__post_init__()` synchronise rétrocompatiblement les réglages "simples" historiques (`page_format`/`num_per_sheet`) dans le Profil tant que celui-ci ne les a pas déjà personnalisés |
-| `pdfexport.py` | Assemble les planches en PDF (`reportlab`) ; marge haute réduite indépendamment des autres marges |
-| `htmlgallery.py` | Galerie HTML paginée ; **une seule passe de décodage** par photo (la vignette est dérivée de l'image pleine taille déjà décodée, pas un second décodage) ; `ImageOps.exif_transpose()` appliqué systématiquement pour respecter l'orientation (voir §5) ; filigrane appliqué **une seule fois** sur l'image pleine taille, la vignette étant dérivée par redimensionnement de cette version déjà filigranée (voir §5, évite un motif disproportionné/tronqué) ; visionneuse plein écran en JS vanilla intégrée à chaque page générée (précédent/suivant **franchissant les pages** avec bouclage sur l'ensemble de la galerie (avertissement affiché aux deux extrémités, voir §5), clavier, molette de la souris, sans dépendance externe) avec indicateur de page, saut direct à une page, nom du fichier, téléchargement (via blob, voir §5 — en `file://`, via un fichier annexe `.js` par original) de la copie affichée (2000 px) **ou, avec l'option `Config.html_include_originals` / `--html-originals` / case de la fenêtre principale (désactivée par défaut), de l'original pleine taille dans `gallery/originals/` (copié tel quel, sauf les RAW, convertis en JPEG : aucun RAW dans la galerie)** (noms uniques choisis par le processus principal, pas par les workers ; URL encodées ; repli sur la copie affichée si la copie échoue ; les originaux ne portent PAS le filigrane, d'où un avertissement CLI), panneau d'informations (résolution/taille/date, calculées par le worker en même temps que l'image), zoom 50-200 % en largeur/hauteur réelles, toujours centrée, déplaçable au glisser-déposer une fois zoomée (souris/tactile via Pointer Events, bornée pour ne jamais sortir complètement du cadre — voir §5, boutons, clavier, Ctrl/Alt+molette pour zoomer et molette seule pour déplacer, jamais `transform: scale()` pour le zoom, réinitialisé à chaque changement de photo) et bascule plein écran (`Fullscreen API`) ; pied de page avec mention développeur/licence ; **entièrement traduite** dans la langue active au moment de la génération (`<html lang="...">` compris), via `i18n.py` |
-| `csvindex.py` | Génère l'index CSV |
-| `utils.py` | `get_font()` (police embarquée, mise en cache), `apply_watermark()` (filigrane en mosaïque, **fonction unique** utilisée par les planches, le PDF et la galerie), `get_exif_date()` (date de prise de vue, RAW compris — **fonction unique** utilisée par le tri de `scanner.py` et les informations de la visionneuse de `htmlgallery.py`), `format_file_size()`, `setup_logging()` |
-| `i18n.py` | Internationalisation de **l'interface graphique, du CLI et de la galerie HTML générée** (voir §5) : `_()`, `set_language()`, `get_language()`, `detect_system_language()`. Dictionnaires Python (`locales/{fr,en,de,es}.py`), pas gettext/.po/.mo — aucune étape de compilation ni dépendance supplémentaire à empaqueter |
-| `portfolio.py` | Point d'entrée CLI (`argparse`), orchestre tout ce qui précède, affiche des lignes `PROGRESS:X/100 message` sur stdout (lues par l'interface graphique — préfixe volontairement jamais traduit, voir §5) ; `--language` résolu *avant* la construction du parser pour que `--help` s'affiche déjà dans la bonne langue ; `--profile fichier.json` applique un Profil réutilisable (`presentation/`) ; `--preview-output chemin.png` (usage interne par l'interface graphique, voir §2.3) génère une planche unique en PNG et s'arrête, sans jamais toucher au dossier de sortie réel ni générer PDF/CSV/galerie HTML |
-| `fonts/` | Police DejaVu Sans (normale + gras) embarquée avec le projet — licence Bitstream Vera, redistribution autorisée |
+| `config.py` | `Config` dataclass: all the parameters of a generation |
+| `scanner.py` | Folder scan (recursive or not), sorting by EXIF date or name (delegates to `utils.get_exif_date()`), excludes `planches/` and `gallery/` of the configured output folder to avoid re-scanning its own generated files (comparison by real file identity via `os.path.samefile()`, not by text — see §5) |
+| `rawloader.py` | Unified image/RAW loading: embedded JPEG preview first (fast), full demosaicing (`rawpy`) only if this preview is missing or too small; `get_original_dimensions()`: real original resolution (metadata only, EXIF/RAW orientation applied), used by the HTML gallery viewer; `load_full_resolution()`: image at the FULL resolution of the shot (embedded preview if it covers ≥ 98% of the sensor, otherwise demosaicing), for the "original" JPEG of a RAW in the gallery |
+| `thumbnail.py` | Parallel thumbnail generation (`ProcessPoolExecutor`, `spawn` context forced) |
+| `contactsheet.py` | Generates the contact sheets (header, thumbnail grid, 3-line footer: page number, credit, developer/license - positions and space reserved below the grid in `layout_engine.FOOTER_*`) |
+| `presentation/` | Common layout/captions/theme engine (`profile.py`: `Profile` dataclass + JSON; `layout_engine.py`: geometry of the grid/landscape/portrait/large thumbnails/free templates; `captions.py`: resolution of the EXIF captions, including their wrapping within a width in pixels (`layout_caption_lines()`); `themes.py`: Light/Dark/Neutral/System palettes). **Single source of truth**, used by both `contactsheet.py` (JPEG/PDF sheets) and `htmlgallery.py` (HTML gallery) — never a layout/caption/color rule duplicated between the two. The absence of a Profile (or a partial/invalid Profile) never changes the default behavior nor raises an exception (`default_profile()`); `Config.__post_init__()` backward-compatibly synchronizes the historical "simple" settings (`page_format`/`num_per_sheet`) into the Profile as long as it has not already customized them |
+| `pdfexport.py` | Assembles the sheets into a PDF (`reportlab`); top margin reduced independently of the other margins |
+| `htmlgallery.py` | Paginated HTML gallery; **a single decoding pass** per photo (the thumbnail is derived from the already-decoded full-size image, not a second decoding); `ImageOps.exif_transpose()` applied systematically to respect orientation (see §5); watermark applied **only once** on the full-size image, the thumbnail being derived by resizing this already-watermarked version (see §5, avoids a disproportionate/truncated pattern); full-screen viewer in vanilla JS built into each generated page (previous/next **crossing pages** with looping over the whole gallery (warning displayed at both ends, see §5), keyboard, mouse wheel, no external dependency) with page indicator, direct jump to a page, filename, download (via blob, see §5 — over `file://`, via a `.js` sidecar file per original) of the displayed copy (2000 px) **or, with the `Config.html_include_originals` option / `--html-originals` / main window checkbox (disabled by default), of the full-size original in `gallery/originals/` (copied as is, except RAW files, converted to JPEG: no RAW in the gallery)** (unique names chosen by the main process, not by the workers; encoded URLs; fallback to the displayed copy if the copy fails; the originals do NOT carry the watermark, hence a CLI warning), information panel (resolution/size/date, computed by the worker at the same time as the image), 50-200% zoom in real width/height, always centered, draggable by drag-and-drop once zoomed (mouse/touch via Pointer Events, bounded so as never to leave the frame completely — see §5, buttons, keyboard, Ctrl/Alt+wheel to zoom and wheel alone to move, never `transform: scale()` for the zoom, reset on each photo change) and full-screen toggle (`Fullscreen API`); footer with developer/license notice; **entirely translated** into the active language at generation time (`<html lang="...">` included), through `i18n.py` |
+| `csvindex.py` | Generates the CSV index |
+| `utils.py` | `get_font()` (bundled font, cached), `apply_watermark()` (tiled watermark, **single function** used by the sheets, the PDF and the gallery), `get_exif_date()` (shooting date, RAW included — **single function** used by the sorting in `scanner.py` and the viewer information in `htmlgallery.py`), `format_file_size()`, `setup_logging()` |
+| `i18n.py` | Internationalization of **the graphical interface, the CLI and the generated HTML gallery** (see §5): `_()`, `set_language()`, `get_language()`, `detect_system_language()`. Python dictionaries (`locales/{fr,en,de,es}.py`), not gettext/.po/.mo — no compilation step nor additional dependency to bundle |
+| `portfolio.py` | CLI entry point (`argparse`), orchestrates everything above, prints `PROGRESS:X/100 message` lines on stdout (read by the graphical interface — prefix deliberately never translated, see §5); `--language` resolved *before* the parser is built so that `--help` is already displayed in the right language; `--profile file.json` applies a reusable Profile (`presentation/`); `--preview-output path.png` (internal use by the graphical interface, see §2.3) generates a single sheet as a PNG and stops, without ever touching the real output folder nor generating PDF/CSV/HTML gallery |
+| `fonts/` | DejaVu Sans font (regular + bold) bundled with the project — Bitstream Vera license, redistribution allowed |
 
-### 2.3 L'interface graphique (`planche-contact-gtk.py`)
+### 2.3 The graphical interface (`planche-contact-gtk.py`)
 
-Un seul fichier, structuré autour de la classe `PlancheContactGTK(Gtk.Application)`.
+A single file, structured around the `PlancheContactGTK(Gtk.Application)` class.
 
-Composants principaux :
-- **Formulaire de génération** : titre/auteur, dossiers d'entrée/sortie,
-  images par planche, format de page, filigrane (texte, orientation,
-  curseur d'opacité), cases PDF/HTML/CSV, curseur d'images par page pour la
-  galerie HTML (12 à 64 par pas de 4, sur la même ligne que la case
-  "Générer Galerie HTML").
-- **Sélecteur de dossier personnalisé** (`_choose_folder`) : entièrement
-  construit à la main (`Gtk.DirectoryList` + `Gtk.FilterListModel` +
-  `Gtk.CustomFilter`), pas la boîte de dialogue native (peu fiable selon
-  les systèmes). Barre latérale (dossier personnel, signets GTK sur Linux,
-  liste des lecteurs sous Windows), fil d'Ariane cliquable, champ de
-  saisie directe de chemin (utile pour les partages réseau), panneau
-  d'aperçu avec pagination.
-- **`FolderPreviewController`** : classe réutilisable pour l'aperçu à
-  vignettes (bande horizontale dans la fenêtre principale, grille dans le
-  sélecteur de dossier), scan en arrière-plan (thread) + notification du
-  thread principal via `glib_idle_add()`.
-- **Génération** : construit une commande et la lance via
-  `subprocess.Popen`, lit stdout ligne à ligne pour la barre de
-  progression et le journal.
-- **Menu "Afficher les résultats"** : ouvre chaque livrable avec
-  l'application par défaut du système (`Gio.AppInfo` sur Linux/macOS,
-  `os.startfile()` sur Windows), avec fenêtre d'avertissement claire si
-  aucune application n'est configurée. Les planches contact ouvrent le
-  **dossier** `planches/` (gestionnaire de fichiers), pas un fichier
-  individuel — comportement identique quel que soit le nombre de planches
-  générées, contrairement à l'ancienne approche (visionneuse multi-images
-  avec repli sur la première planche seule).
-- **`glib_idle_add()`** : enveloppe autour de `GLib.idle_add()` tolérante à
-  deux conventions d'appel différentes selon la plateforme/le binding (voir
-  §6, bug PyGObject/Windows).
-- **Sélecteur de langue** : dans un dialogue **Préférences** (`_open_preferences()`), accessible via le bouton menu (icône hamburger,
-  `open-menu-symbolic`) de la barre de titre — **pas** dans l'onglet À
-  propos, qui reste volontairement purement informatif (version, licence,
-  crédits) ; un réglage n'a logiquement rien à y faire (retour du
-  mainteneur). Options : Langue système (par défaut,
-  repli sur l'anglais avec avertissement si non supportée), English,
-  Français, Deutsch, Español. Un changement ne prend effet qu'au
-  redémarrage — reconstruire tout l'arbre de widgets à la volée serait un
-  chantier bien plus lourd pour une préférence qu'on change rarement (voir
-  §5, `portfolio/i18n.py`). **Portée** : le CLI (`portfolio.py`, via
-  `--language`, transmis automatiquement par l'interface graphique lors
-  du lancement du sous-processus de génération) et la galerie HTML
-  générée sont traduits dans la même langue. Le manuel utilisateur
-  (`docs/planche-contact-manual.{en,de,es}.html`) l'est également —
-  l'onglet Aide ouvre la version correspondant à la langue active, avec
-  repli sur le français si le fichier de cette langue est absent.
-- **Section « avancée »** (`_build_advanced_section()`) : mise en
-  page/légendes/thème (`presentation/`), dans une **fenêtre modale à part**
-  (`_build_advanced_dialog()`, ouverte par le bouton « Réglages avancés… »
-  de la fenêtre principale ; ancien `Gtk.Expander`, qui agrandissait la
-  fenêtre principale de ~550 px et la rendait plus haute que l'écran),
-  bien à l'écart des réglages simples (nombre de photos/format, inchangés —
-  toujours seuls réglages actifs tant que cette fenêtre n'est pas ouverte).
-  Les widgets (`self.adv_content`) sont construits une fois au démarrage et
-  survivent à la fenêtre (`set_hide_on_close(True)` : fermer la masque, ne la
-  détruit pas) : `_profile_from_widgets()` marche donc même si elle n'a
-  jamais été ouverte. Contenu dans un `ScrolledWindow` dont la hauteur
-  maximale est 72 % de celle de l'écran (`_advanced_dialog_limits()`) et dont
-  la largeur naturelle (~990 px) tient sur un écran de 1366 px sans ascenseur
-  horizontal - ne pas y remettre de ligne de réglages à 4 colonnes ni de
-  `FlowBox` à plus de 4 champs par ligne : la
-  barre du bas (message d'état + « Fermer ») reste toujours visible. Tout
-  dialogue ouvert depuis cette fenêtre doit prendre `self._dialog_parent()`
-  comme parent (la fenêtre avancée étant modale, une fenêtre fille de la
-  principale serait bloquée), et tout message à l'utilisateur passe par
-  `_adv_notify()` (journal + barre d'état visible, le journal principal
-  étant masqué derrière la fenêtre modale). Modèle de mise en page, orientation,
-  ajustement, marges/espacements, colonnes/lignes (modèle libre), position/
-  zone/lignes/police/alignement des légendes, champs de légende (case à
-  cocher par champ, avertissement dédié sur le champ GPS), couleurs
-  personnalisées du thème. Le MODE de thème (Clair/Sombre/Neutre/Système)
-  n'est PAS dans cette fenêtre : c'est le menu `self.theme_mode_dd` de la
-  fenêtre principale (réglage courant, voir §6), seul widget du mode —
-  `_profile_from_widgets()`/`_apply_profile_to_widgets()` le lisent/écrivent. `_profile_from_widgets()`/
-  `_apply_profile_to_widgets()` font l'aller-retour avec un `Profile` ;
-  transmis au sous-processus CLI (`--profile`, fichier JSON temporaire) **
-  uniquement si différent du profil par défaut** (`!= default_profile()`),
-  pour ne jamais changer le comportement de qui n'ouvre jamais cette
-  section. Boutons Enregistrer/Charger un profil (`Gtk.FileChooserNative`,
-  référence gardée dans `self._active_file_dialog` tant que la boîte est
-  ouverte, pour éviter sa collecte prématurée par Python).
-- **Aperçu avant génération** (`_on_preview_clicked()`) : génère la
-  planche telle qu'elle sera réellement produite (même moteur, mêmes
-  réglages simples/avancés) sur les premières photos du dossier d'entrée,
-  affichée dans une fenêtre dédiée. **Toujours via un sous-processus CLI
-  séparé** (`portfolio.py --preview-output`), jamais par un appel direct
-  à `ContactSheetGenerator` dans un fil d'arrière-plan de cette
-  application — voir §6 pour la raison (bug de concurrence réel et
-  reproductible entre Pillow et Pango sur FreeType, découvert
-  empiriquement). Fichier PNG temporaire + Profil JSON temporaire
-  (réutilise le même mécanisme que `_on_generate`), tous deux supprimés
-  dès lecture du résultat, succès ou échec.
+Main components:
+- **Generation form**: title/author, input/output folders,
+  images per sheet, page format, watermark (text, orientation,
+  opacity slider), PDF/HTML/CSV checkboxes, images-per-page slider for the
+  HTML gallery (12 to 64 in steps of 4, on the same line as the
+  "Generate HTML Gallery" checkbox).
+- **Custom folder chooser** (`_choose_folder`): entirely
+  built by hand (`Gtk.DirectoryList` + `Gtk.FilterListModel` +
+  `Gtk.CustomFilter`), not the native dialog (unreliable depending on the
+  system). Sidebar (home folder, GTK bookmarks on Linux,
+  list of drives on Windows), clickable breadcrumb, direct path
+  entry field (useful for network shares), preview panel
+  with pagination.
+- **`FolderPreviewController`**: reusable class for the thumbnail
+  preview (horizontal strip in the main window, grid in the folder
+  chooser), background scan (thread) + notification of the main
+  thread via `glib_idle_add()`.
+- **Generation**: builds a command and launches it via
+  `subprocess.Popen`, reads stdout line by line for the progress bar
+  and the log.
+- **"View results" menu**: opens each deliverable with the system's
+  default application (`Gio.AppInfo` on Linux/macOS,
+  `os.startfile()` on Windows), with a clear warning window if
+  no application is configured. The contact sheets open the
+  `planches/` **folder** (file manager), not an individual file
+  — identical behavior whatever the number of sheets
+  generated, unlike the old approach (multi-image viewer
+  falling back to the first sheet alone).
+- **`glib_idle_add()`**: wrapper around `GLib.idle_add()` tolerant of
+  two different calling conventions depending on the platform/binding (see
+  §6, PyGObject/Windows bug).
+- **Language selector**: in a **Preferences** dialog (`_open_preferences()`), reachable via the menu button (hamburger icon,
+  `open-menu-symbolic`) of the title bar — **not** in the About
+  tab, which deliberately stays purely informative (version, license,
+  credits); a setting logically has no place there (maintainer's
+  feedback). Options: System language (default,
+  falling back to English with a warning if unsupported), English,
+  Français, Deutsch, Español. A change only takes effect on
+  restart — rebuilding the whole widget tree on the fly would be a much
+  heavier undertaking for a preference that is rarely changed (see
+  §5, `portfolio/i18n.py`). **Scope**: the CLI (`portfolio.py`, via
+  `--language`, passed automatically by the graphical interface when
+  launching the generation subprocess) and the generated HTML gallery
+  are translated into the same language. The user manual
+  (`docs/planche-contact-manual.{en,de,es}.html`) is too —
+  the Help tab opens the version matching the active language, falling
+  back to French if the file for that language is missing.
+- **"Advanced" section** (`_build_advanced_section()`): layout/captions/theme
+  (`presentation/`), in a **separate modal window**
+  (`_build_advanced_dialog()`, opened by the "Advanced settings…" button
+  of the main window; formerly a `Gtk.Expander`, which enlarged the main
+  window by ~550 px and made it taller than the screen),
+  well apart from the simple settings (number of photos/format, unchanged —
+  still the only active settings as long as this window has not been opened).
+  The widgets (`self.adv_content`) are built once at startup and
+  outlive the window (`set_hide_on_close(True)`: closing it hides it, does not
+  destroy it): `_profile_from_widgets()` therefore works even if it has
+  never been opened. Content in a `ScrolledWindow` whose maximum height
+  is 72% of the screen's (`_advanced_dialog_limits()`) and whose
+  natural width (~990 px) fits on a 1366 px screen without a horizontal
+  scrollbar - do not put back a 4-column settings row nor a
+  `FlowBox` with more than 4 fields per row: the
+  bottom bar (status message + "Close") always stays visible. Any
+  dialog opened from this window must take `self._dialog_parent()`
+  as its parent (the advanced window being modal, a child window of the
+  main one would be blocked), and any message to the user goes through
+  `_adv_notify()` (log + visible status bar, the main log
+  being hidden behind the modal window). Layout template, orientation,
+  fit, margins/spacings, columns/rows (free template), caption
+  position/area/lines/font/alignment, caption fields (checkbox
+  per field, dedicated warning on the GPS field), custom
+  theme colors. The theme MODE (Light/Dark/Neutral/System)
+  is NOT in this window: it is the `self.theme_mode_dd` menu of the
+  main window (everyday setting, see §6), the only widget for the mode —
+  `_profile_from_widgets()`/`_apply_profile_to_widgets()` read/write it. `_profile_from_widgets()`/
+  `_apply_profile_to_widgets()` do the round trip with a `Profile`;
+  passed to the CLI subprocess (`--profile`, temporary JSON file) **
+  only if different from the default profile** (`!= default_profile()`),
+  so as never to change the behavior of anyone who never opens this
+  section. Save/Load profile buttons (`Gtk.FileChooserNative`,
+  reference kept in `self._active_file_dialog` as long as the dialog is
+  open, to prevent its premature collection by Python).
+- **Preview before generation** (`_on_preview_clicked()`): generates the
+  sheet as it will actually be produced (same engine, same
+  simple/advanced settings) on the first photos of the input folder,
+  displayed in a dedicated window. **Always through a separate CLI
+  subprocess** (`portfolio.py --preview-output`), never through a direct call
+  to `ContactSheetGenerator` in a background thread of this
+  application — see §6 for the reason (real, reproducible race
+  between Pillow and Pango on FreeType, discovered
+  empirically). Temporary PNG file + temporary JSON Profile
+  (reuses the same mechanism as `_on_generate`), both deleted
+  as soon as the result is read, whether it succeeded or failed.
 
 ---
 
-## 3. Arborescence
+## 3. Directory layout
 
 ```
 planche-contact/
-├── planche-contact-gtk.py          # Interface GTK4 (commune Linux/Windows)
-├── planche-contact-gtk             # Wrapper de lancement (Linux)
-├── build-deb.sh                    # Build du paquet .deb (Linux)
-├── build-windows.ps1               # Relais racine -> windows/build-windows.ps1
+├── planche-contact-gtk.py          # GTK4 interface (shared Linux/Windows)
+├── planche-contact-gtk             # Launch wrapper (Linux)
+├── build-deb.sh                    # .deb package build (Linux)
+├── build-windows.ps1               # Root relay -> windows/build-windows.ps1
 │
-├── portfolio/                      # Moteur, 100 % partagé
+├── portfolio/                      # Engine, 100% shared
 │   ├── __init__.py
 │   ├── config.py
 │   ├── scanner.py
@@ -186,7 +188,7 @@ planche-contact/
 │   ├── htmlgallery.py
 │   ├── csvindex.py
 │   ├── utils.py
-│   ├── i18n.py                     # Traduction de l'interface graphique uniquement
+│   ├── i18n.py                     # Translation of the graphical interface only
 │   ├── locales/                    # fr.py (source), en.py, de.py, es.py
 │   ├── portfolio.py
 │   └── fonts/
@@ -194,457 +196,466 @@ planche-contact/
 │       ├── DejaVuSans-Bold.ttf
 │       └── LICENSE.txt
 │
-├── debian/                         # Empaquetage Linux (.deb) uniquement
+├── debian/                         # Linux (.deb) packaging only
 │   ├── control, compat, copyright, rules
-│   ├── postinst                    # Vérifie l'environnement Python embarqué à l'installation
+│   ├── postinst                    # Checks the bundled Python environment at installation
 │   └── postrm
 │
-├── windows/                        # Empaquetage Windows uniquement
-│   ├── build-windows.ps1           # Script de build réel
-│   ├── planche-contact.spec        # Config PyInstaller (embarque GTK4 + gi.overrides)
-│   ├── installer.nsi               # Script NSIS (installeur .exe)
-│   └── README.md                   # Prérequis, dépannage, détail du pipeline
+├── windows/                        # Windows packaging only
+│   ├── build-windows.ps1           # Actual build script
+│   ├── planche-contact.spec        # PyInstaller config (bundles GTK4 + gi.overrides)
+│   ├── installer.nsi               # NSIS script (.exe installer)
+│   ├── README.md                   # Prerequisites, troubleshooting, pipeline details
+│   └── README.fr.md                # French version of the above
 │
 ├── metainfo/
-│   └── planche-contact.metainfo.xml # Métadonnées AppStream (App Center, PackageKit)
+│   └── planche-contact.metainfo.xml # AppStream metadata (App Center, PackageKit)
 │
 ├── docs/
-│   ├── planche-contact-manual.html    # Manuel utilisateur complet (français, référence)
+│   ├── planche-contact-manual.html    # Complete user manual (French, reference)
 │   ├── planche-contact-manual.en.html
 │   ├── planche-contact-manual.de.html
 │   └── planche-contact-manual.es.html
 ├── screenshots/
-│   └── application-icon.png        # Source de l'icône (convertie par chaque script de build)
+│   └── application-icon.png        # Icon source (converted by each build script)
 │
 ├── requirements.txt
-├── VERSION                         # Numéro de version unique, partagé par les deux scripts de build
-├── README.md
-├── CHANGELOG.md
-├── CONTRIBUTING.md
+├── VERSION                         # Single version number, shared by the two build scripts
+├── README.md                       # English (default); French version: README.fr.md
+├── README.fr.md
+├── CHANGELOG.md                    # English (default); French version: CHANGELOG.fr.md
+├── CHANGELOG.fr.md
+├── CONTRIBUTING.md                 # English (default); French version: CONTRIBUTING.fr.md
+├── CONTRIBUTING.fr.md
 ├── LICENSE                         # GNU GPL v3
-└── PROJECT_CONTEXT.md              # Ce fichier
+├── PROJECT_CONTEXT.md              # This file (English)
+└── PROJECT_CONTEXT.fr.md           # French version of this file
 ```
 
-**Note** : `docs/screenshots/` n'existe plus depuis longtemps (retiré du
-dépôt), il ne faut plus le mentionner comme faisant partie de
-l'arborescence. `portfolio/Utilisation` a été corrigé (seul `--background`
-était réellement obsolète parmi ses arguments d'exemple ; `--thumb` existe
-bel et bien dans `portfolio.py` actuel).
+**Note**: `docs/screenshots/` has not existed for a long time (removed from the
+repository), it must no longer be mentioned as part of the
+directory layout. `portfolio/Utilisation` has been corrected (only `--background`
+was actually obsolete among its example arguments; `--thumb` does
+exist in the current `portfolio.py`).
 
 ---
 
-## 4. Dépendances
+## 4. Dependencies
 
-### 4.1 Communes (moteur, `requirements.txt`)
+### 4.1 Common (engine, `requirements.txt`)
 
-| Paquet | Version | Rôle |
+| Package | Version | Role |
 |---|---|---|
-| Pillow | ≥ 10.0 | Traitement d'image |
-| reportlab | ≥ 4.0 | Génération PDF |
-| rawpy | ≥ 2.24 | Décodage RAW (bundle LibRaw). Optionnel : sans lui, les RAW sont ignorés avec un avertissement |
-| exifread | ≥ 3.0 | Lecture EXIF des fichiers RAW (PIL ne le sait pas faire) |
-| PyGObject (`gi`) | — | Liaisons GTK4. Non installable de façon fiable via pip : paquet système sur Linux (`python3-gi`), roues gvsbuild sur Windows |
+| Pillow | ≥ 10.0 | Image processing |
+| reportlab | ≥ 4.0 | PDF generation |
+| rawpy | ≥ 2.24 | RAW decoding (bundles LibRaw). Optional: without it, RAW files are skipped with a warning |
+| exifread | ≥ 3.0 | EXIF reading of RAW files (PIL cannot do it) |
+| PyGObject (`gi`) | — | GTK4 bindings. Cannot be reliably installed through pip: system package on Linux (`python3-gi`), gvsbuild wheels on Windows |
 
-### 4.2 Spécifiques Linux
+### 4.2 Linux-specific
 
-- `python3-gi`, `gir1.2-gtk-4.0` (paquets système, prérequis avant d'utiliser l'interface graphique depuis les sources)
-- `fpm` (gem Ruby) pour la construction du `.deb`
-- `python3-exifread` (apt) + `rawpy` (pip) installés automatiquement dans le venv embarqué par `build-deb.sh`
-- `metainfo/planche-contact.metainfo.xml` (métadonnées AppStream), installé par `build-deb.sh` dans `/usr/share/metainfo/` — nécessaire pour qu'App Center (PackageKit + AppStream, depuis Ubuntu 26.04) reconnaisse pleinement le paquet (taille, description enrichie) au lieu de se limiter au `.desktop`
+- `python3-gi`, `gir1.2-gtk-4.0` (system packages, prerequisites before using the graphical interface from source)
+- `fpm` (Ruby gem) to build the `.deb`
+- `python3-exifread` (apt) + `rawpy` (pip) installed automatically into the bundled venv by `build-deb.sh`
+- `metainfo/planche-contact.metainfo.xml` (AppStream metadata), installed by `build-deb.sh` into `/usr/share/metainfo/` — needed for App Center (PackageKit + AppStream, since Ubuntu 26.04) to fully recognize the package (size, enriched description) instead of limiting itself to the `.desktop` file
 
-### 4.3 Spécifiques Windows
+### 4.3 Windows-specific
 
-- Python **doit correspondre exactement** à la version ciblée par la
-  dernière publication gvsbuild (actuellement Python 3.14 — voir §6, cette
-  contrainte évolue à chaque nouvelle publication de gvsbuild)
-- [gvsbuild](https://github.com/wingtk/gvsbuild) : pile GTK4 précompilée
-  pour Windows (téléchargée et installée automatiquement dans `C:\gtk` par
-  `build-windows.ps1` si absente)
-- PyInstaller (gèle l'application en `.exe`)
-- NSIS (génère l'installeur `.exe` — facultatif, sinon seule la version
-  portable `.zip` est produite)
-- winget (utilisé pour l'installation automatique de NSIS/Python si absents)
+- Python **must match exactly** the version targeted by the
+  latest gvsbuild release (currently Python 3.14 — see §6, this
+  constraint changes with each new gvsbuild release)
+- [gvsbuild](https://github.com/wingtk/gvsbuild): precompiled GTK4 stack
+  for Windows (downloaded and installed automatically into `C:\gtk` by
+  `build-windows.ps1` if missing)
+- PyInstaller (freezes the application into an `.exe`)
+- NSIS (generates the `.exe` installer — optional, otherwise only the
+  portable `.zip` version is produced)
+- winget (used for the automatic installation of NSIS/Python if missing)
 
 ---
 
-## 5. Conventions de codage
+## 5. Coding conventions
 
-- **Langue** : identifiants de code (variables, fonctions, classes) en
-  anglais ; commentaires et toutes les chaînes visibles par l'utilisateur
-  (interface, messages, documentation) en français.
-- **Commentaires explicatifs** : systématiquement utilisés pour documenter
-  le *pourquoi* d'un choix non évident (contournement spécifique à une
-  plateforme, bug d'un binding, etc.), pas seulement le *quoi*.
-- **`multiprocessing`** : toujours avec le contexte `spawn` explicite
-  (`multiprocessing.get_context("spawn")`), y compris sur Linux — jamais
-  `fork` (deadlock connu entre `rawpy`/OpenMP et `fork`).
-- **Chargement de police** : toujours via `utils.get_font()` (mise en
-  cache, police embarquée en priorité) — jamais de chemin de police codé
-  en dur ailleurs dans le code.
-- **Orientation EXIF** : toujours appliquer `ImageOps.exif_transpose()`
-  juste après `rawloader.load_image()`, avant tout traitement ultérieur
-  (redimensionnement, filigrane...) — y compris dans les chemins de
-  décodage optimisés/fusionnés (voir `CHANGELOG.md`, bug corrigé sur la
-  galerie HTML qui avait perdu cet appel lors du passage au décodage
-  unique).
-- **Filigrane sur une image ET sa vignette dérivée** : toujours filigraner
-  la version pleine taille en premier, puis dériver la vignette par
-  redimensionnement de cette version déjà filigranée — jamais appliquer
-  `apply_watermark()` séparément sur les deux tailles. La mosaïque utilise
-  une taille de police et un espacement fixes en pixels (voir `utils.py`),
-  pensés pour les grandes tailles (planches, PDF, images "pleine taille"
-  de la galerie) ; appliqués tels quels sur un canevas nettement plus
-  petit (ex : vignette 400px), le motif devient disproportionné et peut
-  se retrouver tronqué en bas selon la hauteur exacte de l'image (voir
-  `CHANGELOG.md`, bug corrigé sur la galerie HTML).
-- **`pip install` dans le venv embarqué (Linux, `build-deb.sh`)** :
-  toujours avec `--ignore-installed`. Le venv est créé avec
-  `--system-site-packages` ; sans ce flag, `pip` saute silencieusement la
-  copie locale d'un paquet déjà visible au niveau système sur la machine
-  de build, produisant un venv qui fonctionne par accident sur cette
-  machine mais est réellement incomplet une fois le `.deb` installé
-  ailleurs (voir `CHANGELOG.md`).
-- **Comparaison de chemins (exclusion de dossiers)** : toujours comparer
-  l'identité réelle du fichier via `os.path.samefile()`, jamais une
-  comparaison textuelle (`Path.resolve()` + `relative_to()`/`==`). Un même
-  dossier physique peut avoir plusieurs représentations textuelles
-  différentes selon le chemin emprunté — un lecteur réseau mappé
-  (`Z:\photos`) et son équivalent en chemin UNC
-  (`\\serveur\partage\photos`) sous Windows en sont l'exemple le plus
-  courant. `Path.resolve()` ne les unifie pas, contrairement à
-  `os.path.samefile()` (voir `CHANGELOG.md`, bug de récursivité sous
-  Windows). `os.path.samefile()` fait un appel système par comparaison :
-  toujours borner la remontée des dossiers parents (paramètre `boundary`
-  de `_is_within()` dans `scanner.py`) plutôt que de remonter jusqu'à la
-  racine du système de fichiers à chaque fichier — sensible sur un
-  partage réseau.
-- **Date EXIF (formats standards, non RAW)** : toujours passer par
-  `utils.get_exif_date()`, jamais par `Image.getexif().get()` direct pour
-  `DateTimeOriginal`/`DateTimeDigitized` (tags `0x9003`/`0x9004`). Ces
-  deux tags vivent dans un **sous-IFD Exif séparé** (pointé par le tag
-  `0x8769` de l'IFD0), jamais dans l'IFD0 principal : `exif.get(0x9003)`
-  renvoie toujours `None`, il faut passer par
-  `exif.get_ifd(0x8769).get(0x9003)`. Seul `DateTime` (`0x0132`, date de
-  *modification* du fichier, moins pertinente qu'une date de prise de
-  vue) vit dans l'IFD0 et reste accessible directement. Ce bug affectait
-  silencieusement le tri par date depuis le début (repli sur la date de
-  modification du fichier) - découvert en ajoutant l'affichage de la
-  date dans la visionneuse de la galerie HTML, qui l'a rendu visible
-  (voir `CHANGELOG.md`).
-- **Zoom de la visionneuse (galerie HTML) : jamais `transform: scale()`,
-  toujours de vraies largeur/hauteur en pixels** (`applyZoom()` dans
-  `htmlgallery.py`). Trois pièges rencontrés en le découvrant, dans
-  l'ordre où ils se révèlent :
-  1. **`transform` crée un nouveau contexte d'empilement.** Un élément
-     transformé (même juste `scale()`) est traité comme "positionné" pour
-     l'empilement visuel — il se met alors à passer devant les barres
-     `position: fixed` de la visionneuse (z-index auto, départagé par
-     l'ordre du DOM) au lieu de rester dessous. Confirmé avec
-     `document.elementFromPoint()` sur un vrai Chromium (Playwright).
-     Solution : `z-index` explicite sur chaque barre/bouton de la
-     visionneuse (10, ou 20 pour les panneaux qui doivent passer devant
-     même la barre du haut) plutôt que de compter sur l'ordre du DOM.
-  2. **`transform` ne change QUE le rendu visuel, jamais la taille de
-     mise en page.** Une image visuellement zoomée à 200 % via
-     `transform: scale(2)` ne fait grossir ni son `offsetWidth`, ni le
-     `scrollHeight` de son conteneur : rien ne "dépasse" au sens de
-     `overflow`, donc rien n'est réellement défilable même si l'écran
-     laisse penser le contraire. Solution : fixer `width`/`height` en
-     pixels calculés, jamais `transform`, pour que le débordement soit
-     réel et défilable.
-  3. **`max-width`/`max-height` plafonnent silencieusement toute
-     largeur/hauteur fixée par ailleurs**, y compris en style inline
-     JavaScript — la taille réellement rendue reste bornée à ces valeurs
-     quelle que soit la valeur de `width`/`height` demandée. Piège
-     découvert en corrigeant le point 2 : mettre `width: 1472px` en JS ne
-     servait à rien tant que `max-width: 92vw` (utilisé pour l'ajustement
-     à 100 %) restait actif. Solution : neutraliser explicitement
-     `max-width`/`max-height` (`style.maxWidth = 'none'`) dès que le zoom
-     dépasse 100 %, et les restaurer (`= ''`, pour laisser le CSS
-     reprendre la main) au retour à 100 %.
-- **Déplacement dans l'image zoomée (galerie HTML) : glisser-déposer via
-  `transform: translate()`, jamais de défilement natif du conteneur**
-  (`applyPan()`/`clampPan()` dans `htmlgallery.py`). Une première version
-  s'appuyait sur `overflow: auto` + un centrage flex basculé
-  dynamiquement en `flex-start` dès que le zoom dépassait 100 % : ça
-  laissait l'image plaquée en haut-à-gauche au lieu de rester centrée
-  (signalé par le mainteneur), et ne permettait de toute façon aucun
-  déplacement tactile ni glisser-déposer à la souris — seule la molette
-  fonctionnait, en s'appuyant sur le défilement natif du navigateur.
-  Approche actuelle, plus robuste : `.lightbox` reste `overflow: hidden`
-  (jamais de défilement natif, donc plus aucun piège de centrage ni de
-  chaînage de défilement vers la page en arrière-plan à gérer - les deux
-  problèmes disparaissent avec leur cause), l'image reste **toujours**
-  centrée par le flexbox parent quelle que soit sa taille, et
-  `panX`/`panY` (deux variables JS, appliquées via `transform:
-  translate(panX, panY)` sur l'image, **sans transition** pour un suivi
-  en temps réel) déplacent son rendu visuel indépendamment de sa
-  position de mise en page. Bornage dans `clampPan()` :
-  `maxPan = max(0, (tailleImage - tailleConteneur) / 2)` dans chaque
-  dimension, appliqué après tout changement de zoom ET après tout
-  déplacement, pour qu'il soit impossible de faire sortir l'image
-  entièrement du cadre. Déclenché par trois entrées, toutes réunies vers
-  les mêmes `panX`/`panY`/`clampPan()`/`applyPan()` : glisser-déposer
-  (Pointer Events - `pointerdown`/`pointermove`/`pointerup`, unifie
-  souris/tactile/stylet en une seule API, `setPointerCapture` pour ne
-  pas perdre le geste si le curseur sort de l'image en cours de
-  glissement), et la molette quand déjà zoomée (voir plus bas). Remis à
-  zéro (`panX = panY = 0`) à chaque retour à 100 % de zoom et à chaque
-  changement de photo.
-- **Molette de la souris dans la visionneuse** : un seul écouteur
-  `wheel` sur `.lightbox`, `{ passive: false }` obligatoire pour que
-  `preventDefault()` soit honoré. Ctrl/Alt/Cmd + molette = zoom (empêche
-  aussi le zoom natif de la page de se déclencher en plus) ; molette
-  seule = navigation précédent/suivant, sauf si déjà zoomé au-delà de
-  100 % (`currentZoom > 100`), où la molette déplace directement l'image
-  agrandie (`panX -= deltaX; panY -= deltaY;` puis `clampPan()` +
-  `applyPan()`, voir ci-dessus) plutôt que de changer de photo. Anti-
-  rebond (`WHEEL_THROTTLE_MS`) nécessaire sur le changement de photo
-  (pas sur le déplacement, qui doit rester fluide) : un simple geste sur
-  trackpad peut émettre des dizaines de micro-événements `wheel`, qui
-  feraient sinon défiler plusieurs photos ou paliers de zoom d'un coup.
-- **Navigation précédent/suivant qui franchit les pages (visionneuse
-  galerie HTML)** : chaque page générée étant un fichier statique séparé
-  avec son propre tableau `galleryImages` borné à ses seules photos,
-  `showDelta()` doit détecter le dépassement des bornes de ce tableau
-  (`newIndex < 0` ou `>= galleryImages.length`) et **naviguer vers le
-  fichier de la page suivante/précédente** (`window.location.href =
-  pageUrl(...)`) plutôt que boucler sur les photos de la page en cours -
-  sauf pour une galerie d'une seule page (`totalPages <= 1`), qui n'a
-  nulle part où aller et garde un simple bouclage local (évite de
-  recharger la page pour rien). Bouclage sur l'**ensemble** de la
-  galerie aux deux extrémités (dernière photo de la dernière page →
-  première photo de la première page, et inversement). La page de
-  destination ne sait pas d'elle-même quelle photo ouvrir : elle arrive
-  avec `?open=0` (venant d'une page précédente) ou `?open=last` (venant
-  d'une suivante) dans l'URL, lu par un bloc exécuté à la fin du script
-  de la page cible, qui ouvre la visionneuse à la bonne photo puis
-  nettoie l'URL (`history.replaceState`) pour qu'un rafraîchissement
-  manuel ne la rouvre pas involontairement. Un second paramètre,
-  `&wrap=fwd`/`&wrap=back`, distingue un franchissement normal (aucun
-  avertissement) d'un bouclage sur l'ensemble de la galerie (dernière
-  photo → première page ou l'inverse), pour afficher le bon message via
-  `showToast()` uniquement dans ce second cas - la page cible ne peut
-  pas déduire seule si son arrivée à l'index 0 ou dernier est un
-  bouclage ou un simple hasard de pagination, il faut que la page
-  source le précise explicitement. La grille de fond (derrière la
-  visionneuse) reflète déjà correctement la page cible après ce
-  changement, `window.location.href` étant une vraie navigation complète
-  — vérifié empiriquement (pagination du haut, vignettes affichées)
-  plutôt que supposé.
-- **Téléchargement d'image dans la visionneuse (galerie HTML)** : le
-  bouton passe par `fetch()` → `Blob` → `URL.createObjectURL()` plutôt
-  que le simple attribut HTML `download` sur le lien direct, peu fiable
-  une fois servi via HTTP(S) selon les navigateurs. **Limite fondamentale
-  et non contournable, testée empiriquement (Playwright/Chromium) avec
-  `CHANGELOG.md`** : quand la galerie est ouverte directement en `file://`
-  (double-clic sur `index.html`, sans serveur web), `fetch()`,
-  `XMLHttpRequest` ET la lecture d'un `<canvas>` ayant chargé l'image sont
-  tous les trois bloqués de façon identique par Firefox ET Chrome (chaque
-  fichier `file://` a une origine "opaque" depuis le correctif de
-  sécurité **CVE-2019-11730**) - aucune API JavaScript ne permet de
-  contourner ça. Le code détecte `location.protocol === 'file:'` en amont
-  et affiche un message explicatif (bouton toast) plutôt que d'échouer
-  silencieusement ; ne PAS retenter `fetch()`/XHR/`<canvas>` pour ce
-  cas précis sans avoir revérifié que cette restriction navigateur a
-  changé. **Contournement retenu pour les originaux** (option « originaux
-  pleine taille ») : chaque `originals/X.jpg` est doublé d'un fichier
-  annexe `originals/X.jpg.js` (`_write_download_script()`, base64 écrit
-  par blocs de 3 Mo, appel `pcOriginalLoaded(nom, base64)`). En `file://`,
-  le bouton (`downloadOriginalFromScript()`) injecte ce `<script src>`
-  voisin - les scripts voisins se chargent sans restriction, contrairement
-  à `fetch()`/XHR/`<canvas>` - reconstruit un `Blob` et le télécharge par
-  un lien `blob:` + `download` (toujours honoré, boîte d'enregistrement du
-  navigateur, vrai nom du fichier). Replis, dans l'ordre : script absent ou
-  en erreur → lien `<a download target="_blank">` vers l'image (jamais
-  `window.open()` : son résultat dépendait du TYPE du fichier - un RAW
-  déclenchait la boîte « Ouvrir/Enregistrer » de Firefox, un JPEG
-  s'affichait, d'où la « régression » signalée quand les RAW sont devenus
-  des JPEG) ; la copie affichée (2000 px, sans original) reste sur ce
-  lien. Chromium ignore `download` sur un lien `file://` (vérifié) :
-  ce lien s'y ouvre donc dans un nouvel onglet. Coût : annexes ≈ 133 % de
-  l'original ; inutiles (supprimables) via HTTP. Vérifié dans Chromium
-  (`file://`, HTTP, replis, original de 28 Mo) ; **Firefox : confirmé par
-  l'utilisateur en 140.17.0 ESR (64 bits)** (boîte d'enregistrement
-  visible en double-clic) ; pas de Firefox dans le bac à sable, donc
-  non testé ici. Ne pas « simplifier » en retirant les annexes sans avoir
-  revérifié qu'un navigateur peut lire un fichier voisin en `file://`.
-- **Filigrane** : toujours via `utils.apply_watermark()` — fonction
-  unique, jamais de logique de filigrane dupliquée localement.
-- **Compatibilité GTK/Windows** : pattern défensif systématique pour les
-  appels PyGObject sensibles à la plateforme :
+- **Language**: code identifiers (variables, functions, classes) in
+  English; code comments in French; strings visible to the user in the
+  interface and messages through `portfolio/locales/` (English, French,
+  German, Spanish — `en.py` must stay complete, since English is the
+  fallback language). The documentation (`.md` files) is bilingual: the
+  English version is the default file (`X.md`) and the French version sits
+  next to it (`X.fr.md`), with a link to each other at the top of each file;
+  when one is changed, the other must be updated too.
+- **Explanatory comments**: systematically used to document
+  the *why* of a non-obvious choice (platform-specific
+  workaround, binding bug, etc.), not only the *what*.
+- **`multiprocessing`**: always with the explicit `spawn` context
+  (`multiprocessing.get_context("spawn")`), including on Linux — never
+  `fork` (known deadlock between `rawpy`/OpenMP and `fork`).
+- **Font loading**: always through `utils.get_font()` (cached,
+  bundled font first) — never a hard-coded font path
+  elsewhere in the code.
+- **EXIF orientation**: always apply `ImageOps.exif_transpose()`
+  right after `rawloader.load_image()`, before any later processing
+  (resizing, watermark...) — including in the optimized/merged
+  decoding paths (see `CHANGELOG.md`, bug fixed on the
+  HTML gallery which had lost this call when switching to single
+  decoding).
+- **Watermark on an image AND its derived thumbnail**: always watermark
+  the full-size version first, then derive the thumbnail by
+  resizing this already-watermarked version — never apply
+  `apply_watermark()` separately on the two sizes. The tile pattern uses
+  a fixed font size and spacing in pixels (see `utils.py`),
+  designed for large sizes (sheets, PDF, "full-size" images
+  of the gallery); applied as is on a much smaller
+  canvas (e.g. 400px thumbnail), the pattern becomes disproportionate and may
+  end up truncated at the bottom depending on the exact height of the image (see
+  `CHANGELOG.md`, bug fixed on the HTML gallery).
+- **`pip install` in the bundled venv (Linux, `build-deb.sh`)**:
+  always with `--ignore-installed`. The venv is created with
+  `--system-site-packages`; without this flag, `pip` silently skips the
+  local copy of a package already visible at system level on the build
+  machine, producing a venv that works by accident on that
+  machine but is really incomplete once the `.deb` is installed
+  elsewhere (see `CHANGELOG.md`).
+- **Path comparison (folder exclusion)**: always compare
+  the real identity of the file via `os.path.samefile()`, never a
+  textual comparison (`Path.resolve()` + `relative_to()`/`==`). The same
+  physical folder can have several different textual representations
+  depending on the path taken — a mapped network drive
+  (`Z:\photos`) and its UNC path equivalent
+  (`\\server\share\photos`) under Windows are the most
+  common example. `Path.resolve()` does not unify them, unlike
+  `os.path.samefile()` (see `CHANGELOG.md`, recursion bug under
+  Windows). `os.path.samefile()` makes one system call per comparison:
+  always bound the climb through the parent folders (`boundary` parameter
+  of `_is_within()` in `scanner.py`) rather than climbing up to the
+  filesystem root for each file — noticeable on a network
+  share.
+- **EXIF date (standard formats, non-RAW)**: always go through
+  `utils.get_exif_date()`, never through a direct `Image.getexif().get()` for
+  `DateTimeOriginal`/`DateTimeDigitized` (tags `0x9003`/`0x9004`). These
+  two tags live in a **separate Exif sub-IFD** (pointed to by tag
+  `0x8769` of IFD0), never in the main IFD0: `exif.get(0x9003)`
+  always returns `None`, you have to go through
+  `exif.get_ifd(0x8769).get(0x9003)`. Only `DateTime` (`0x0132`, the file's
+  *modification* date, less relevant than a shooting
+  date) lives in IFD0 and remains directly accessible. This bug silently
+  affected date sorting from the start (fallback to the file's
+  modification date) - discovered while adding the date display in the
+  HTML gallery viewer, which made it visible
+  (see `CHANGELOG.md`).
+- **Viewer zoom (HTML gallery): never `transform: scale()`,
+  always real width/height in pixels** (`applyZoom()` in
+  `htmlgallery.py`). Three pitfalls encountered while discovering this, in
+  the order in which they show up:
+  1. **`transform` creates a new stacking context.** A transformed element
+     (even just `scale()`) is treated as "positioned" for visual
+     stacking — it then passes in front of the viewer's `position: fixed`
+     bars (auto z-index, decided by DOM order) instead of staying
+     below. Confirmed with
+     `document.elementFromPoint()` on a real Chromium (Playwright).
+     Solution: explicit `z-index` on each bar/button of the
+     viewer (10, or 20 for the panels that must go in front of
+     even the top bar) rather than counting on DOM order.
+  2. **`transform` changes ONLY the visual rendering, never the layout
+     size.** An image visually zoomed to 200% via
+     `transform: scale(2)` grows neither its `offsetWidth` nor the
+     `scrollHeight` of its container: nothing "overflows" in the sense of
+     `overflow`, so nothing is actually scrollable even if the screen
+     suggests otherwise. Solution: set `width`/`height` to
+     computed pixels, never `transform`, so that the overflow is
+     real and scrollable.
+  3. **`max-width`/`max-height` silently cap any
+     width/height set elsewhere**, including in inline JavaScript style
+     — the size actually rendered stays bounded to these values
+     whatever the requested `width`/`height`. Pitfall
+     discovered while fixing point 2: setting `width: 1472px` in JS
+     was pointless as long as `max-width: 92vw` (used for the fit
+     at 100%) remained active. Solution: explicitly neutralize
+     `max-width`/`max-height` (`style.maxWidth = 'none'`) as soon as the zoom
+     exceeds 100%, and restore them (`= ''`, to let the CSS
+     take over again) on returning to 100%.
+- **Moving around the zoomed image (HTML gallery): drag-and-drop via
+  `transform: translate()`, never native scrolling of the container**
+  (`applyPan()`/`clampPan()` in `htmlgallery.py`). A first version
+  relied on `overflow: auto` + a flex centering dynamically switched
+  to `flex-start` as soon as the zoom exceeded 100%: this
+  left the image stuck at the top left instead of staying centered
+  (reported by the maintainer), and in any case allowed no
+  touch movement nor mouse drag-and-drop — only the wheel
+  worked, relying on the browser's native scrolling.
+  Current approach, more robust: `.lightbox` stays `overflow: hidden`
+  (never native scrolling, hence no more centering pitfalls nor
+  scroll chaining to the background page to handle - both
+  problems disappear with their cause), the image stays **always**
+  centered by the parent flexbox whatever its size, and
+  `panX`/`panY` (two JS variables, applied via `transform:
+  translate(panX, panY)` on the image, **without transition** for real-time
+  tracking) move its visual rendering independently of its
+  layout position. Clamping in `clampPan()`:
+  `maxPan = max(0, (imageSize - containerSize) / 2)` in each
+  dimension, applied after any zoom change AND after any
+  movement, so that it is impossible to move the image
+  entirely out of the frame. Triggered by three inputs, all brought together into
+  the same `panX`/`panY`/`clampPan()`/`applyPan()`: drag-and-drop
+  (Pointer Events - `pointerdown`/`pointermove`/`pointerup`, unifies
+  mouse/touch/stylus into a single API, `setPointerCapture` so as not to
+  lose the gesture if the cursor leaves the image during
+  the drag), and the wheel when already zoomed (see below). Reset to
+  zero (`panX = panY = 0`) on each return to 100% zoom and on each
+  photo change.
+- **Mouse wheel in the viewer**: a single
+  `wheel` listener on `.lightbox`, `{ passive: false }` mandatory for
+  `preventDefault()` to be honored. Ctrl/Alt/Cmd + wheel = zoom (also prevents
+  the page's native zoom from triggering as well); wheel
+  alone = previous/next navigation, unless already zoomed beyond
+  100% (`currentZoom > 100`), where the wheel directly moves the enlarged
+  image (`panX -= deltaX; panY -= deltaY;` then `clampPan()` +
+  `applyPan()`, see above) rather than changing photo. Debounce
+  (`WHEEL_THROTTLE_MS`) needed on the photo change
+  (not on the movement, which must stay smooth): a single gesture on a
+  trackpad can emit dozens of `wheel` micro-events, which
+  would otherwise scroll through several photos or zoom steps at once.
+- **Previous/next navigation crossing pages (HTML gallery
+  viewer)**: each generated page being a separate static file
+  with its own `galleryImages` array bounded to its photos alone,
+  `showDelta()` must detect when the bounds of this array are exceeded
+  (`newIndex < 0` or `>= galleryImages.length`) and **navigate to the
+  file of the next/previous page** (`window.location.href =
+  pageUrl(...)`) rather than looping over the photos of the current page -
+  except for a single-page gallery (`totalPages <= 1`), which has
+  nowhere to go and keeps a simple local loop (avoids
+  reloading the page for nothing). Looping over the **whole**
+  gallery at both ends (last photo of the last page →
+  first photo of the first page, and vice versa). The
+  destination page does not know by itself which photo to open: it arrives
+  with `?open=0` (coming from a previous page) or `?open=last` (coming from
+  a next one) in the URL, read by a block run at the end of the script
+  of the target page, which opens the viewer at the right photo then
+  cleans the URL (`history.replaceState`) so that a manual
+  refresh does not reopen it unintentionally. A second parameter,
+  `&wrap=fwd`/`&wrap=back`, distinguishes a normal crossing (no
+  warning) from a loop over the whole gallery (last
+  photo → first page or the reverse), to display the right message through
+  `showToast()` only in this second case - the target page cannot
+  deduce by itself whether its arrival at index 0 or last is a
+  loop or a simple coincidence of pagination, the source page has to
+  state it explicitly. The background grid (behind the
+  viewer) already correctly reflects the target page after this
+  change, `window.location.href` being a real full navigation
+  — verified empirically (top pagination, thumbnails displayed)
+  rather than assumed.
+- **Image download in the viewer (HTML gallery)**: the
+  button goes through `fetch()` → `Blob` → `URL.createObjectURL()` rather than
+  the plain HTML `download` attribute on the direct link, unreliable
+  once served over HTTP(S) depending on the browsers. **Fundamental,
+  non-circumventable limitation, tested empirically (Playwright/Chromium) with
+  `CHANGELOG.md`**: when the gallery is opened directly over `file://`
+  (double-click on `index.html`, no web server), `fetch()`,
+  `XMLHttpRequest` AND reading a `<canvas>` that loaded the image are
+  all three blocked identically by Firefox AND Chrome (each
+  `file://` file has an "opaque" origin since the
+  **CVE-2019-11730** security fix) - no JavaScript API makes it possible to
+  work around that. The code detects `location.protocol === 'file:'` upstream
+  and displays an explanatory message (toast button) rather than failing
+  silently; do NOT retry `fetch()`/XHR/`<canvas>` for this
+  specific case without having rechecked that this browser restriction has
+  changed. **Workaround adopted for the originals** ("full-size
+  originals" option): each `originals/X.jpg` is doubled by a sidecar
+  file `originals/X.jpg.js` (`_write_download_script()`, base64 written
+  in 3 MB blocks, call `pcOriginalLoaded(name, base64)`). Over `file://`,
+  the button (`downloadOriginalFromScript()`) injects this neighboring
+  `<script src>` - neighboring scripts load without restriction, unlike
+  `fetch()`/XHR/`<canvas>` - rebuilds a `Blob` and downloads it through a
+  `blob:` + `download` link (always honored, browser save dialog,
+  real filename). Fallbacks, in order: script missing or
+  in error → `<a download target="_blank">` link to the image (never
+  `window.open()`: its result depended on the file TYPE - a RAW
+  triggered Firefox's "Open/Save" dialog, a JPEG
+  was displayed, hence the "regression" reported when RAW files became
+  JPEGs); the displayed copy (2000 px, no original) stays on this
+  link. Chromium ignores `download` on a `file://` link (verified):
+  this link therefore opens in a new tab there. Cost: sidecar files ≈ 133% of
+  the original; useless (deletable) over HTTP. Verified in Chromium
+  (`file://`, HTTP, fallbacks, 28 MB original); **Firefox: confirmed by
+  the user in 140.17.0 ESR (64-bit)** (save dialog
+  visible on double-click); no Firefox in the sandbox, hence
+  not tested here. Do not "simplify" by removing the sidecar files without having
+  rechecked that a browser can read a neighboring file over `file://`.
+- **Watermark**: always through `utils.apply_watermark()` — a single
+  function, never watermark logic duplicated locally.
+- **GTK/Windows compatibility**: systematic defensive pattern for
+  platform-sensitive PyGObject calls:
   ```python
   try:
-      GLib.idle_add(fonction, *args)          # forme pythonique attendue
+      GLib.idle_add(function, *args)           # expected pythonic form
   except TypeError:
-      GLib.idle_add(PRIORITE, fonction, *args) # repli signature C brute
+      GLib.idle_add(PRIORITY, function, *args) # fallback to the raw C signature
   ```
-- **Fichier `VERSION`** : source unique à la racine, lue et écrite par les
-  deux scripts de build. N'est mis à jour qu'après un build **réussi**
-  (jamais en cas d'échec, pour ne pas désynchroniser le numéro affiché du
-  contenu réellement publié). **Appartient exclusivement aux scripts de
-  build, jamais à Claude** : incrémenté en local par le mainteneur à
-  chaque build, indépendamment des sessions de travail avec Claude - sa
-  valeur sur GitHub peut donc avoir avancé depuis le dernier `git pull`
-  de Claude, y compris plusieurs fois de suite, sans aucun rapport avec
-  le fichier sur lequel Claude travaille. Règle stricte : **ne jamais
-  créer, modifier, ni livrer un fichier `VERSION`** de mémoire ou par
-  supposition - un `git pull`/`git fetch` juste avant toute livraison ne
-  suffit pas à lui seul s'il ne vérifie pas spécifiquement ce fichier,
-  car une modification portant sur d'autres fichiers pourrait laisser
-  croire que VERSION est à jour alors qu'il a changé entre deux pulls.
-  Si un besoin ponctuel exige de connaître la version actuelle (ex : la
-  citer dans une discussion), toujours relire `VERSION` fraîchement
-  depuis `origin/main` à ce moment précis plutôt que de se fier à une
-  valeur vue plus tôt dans la conversation - un oubli ici reviendrait à
-  faire régresser le numéro de version affiché.
-- **Livraison de code** : fichiers complets systématiquement, jamais de
-  diff/patch partiel (convention de travail établie avec le mainteneur).
-- **"Afficher les résultats" opérant sur ce qui existe déjà**
-  (`_check_existing_results()`) : n'est plus conditionné à une génération
-  réussie dans la session en cours. Se déclenche au changement du champ
-  dossier de sortie (saisie ou sélecteur, avec anti-rebond 400 ms comme
-  pour l'aperçu du dossier d'entrée) et une fois au démarrage si un
-  dossier de sortie était mémorisé. Vérifie l'existence réelle de chaque
-  artefact (`planches/` non vide, `portfolio.pdf`, `gallery/index.html`,
-  `index.csv`) et active chaque sous-élément indépendamment - **pas** de
-  condition sur ce qui a été demandé dans une éventuelle génération
-  passée (simplifié depuis une version antérieure qui recoupait
-  existence de fichier ET case cochée cette fois-ci ; l'existence seule
-  suffit désormais, cohérent avec la possibilité d'ouvrir des résultats
-  d'une session précédente sans relancer de génération). `_last_result`
-  n'est donc plus réservé à "la dernière génération de cette session" :
-  il reflète le dossier de sortie actuellement configuré, qu'il ait ou
-  non déclenché une génération. **Piège rencontré en testant** : la
-  branche "dossier absent" doit désactiver explicitement CHAQUE
-  sous-bouton, pas seulement le bouton principal - sinon un sous-bouton
-  précédemment activé (ex: PDF trouvé pour un dossier tapé juste avant)
-  reste actif après avoir tapé un dossier sans aucun résultat.
-- **Internationalisation de l'interface graphique** (`portfolio/i18n.py` +
-  `portfolio/locales/`) : dictionnaires Python par langue (`fr.py` est la
-  source ; `en.py`/`de.py`/`es.py` doivent toujours avoir exactement le
-  même jeu de clés — vérifié explicitement en test), pas gettext/.po/.mo
-  — choix délibéré pour éviter une étape de compilation et une dépendance
-  supplémentaire à empaqueter dans le `.deb`/l'installeur Windows.
-  Nouvelle chaîne visible par l'utilisateur = nouvelle clé dans les 4
-  fichiers de `locales/`, jamais de texte en dur dans
-  `planche-contact-gtk.py`. Un changement de langue ne prend effet qu'au
-  redémarrage (pas de reconstruction de l'arbre de widgets à la volée).
-  **Piège rencontré à surveiller** : certains menus déroulants affichent
-  un texte traduit à l'utilisateur mais doivent transmettre une valeur
-  interne fixe (française) au moteur — cas de l'orientation du filigrane,
-  comparée en dur en français dans `portfolio/config.py`. Toujours lire
-  l'**index** sélectionné (`combo.get_selected()`) et le faire pointer
-  vers une liste de valeurs internes séparée
-  (`self._orient_values[index]`), jamais le texte affiché
-  (`get_selected_item().get_string()`) pour ce genre de champ.
-  **Second piège rencontré, plus insidieux** : `PlancheContactGTK` garde
-  deux variables distinctes pour la langue — `self.language_preference`
-  (le choix brut sauvegardé, peut valoir `"system"`) et `self._language`
-  (le résultat déjà résolu par `set_language()`, jamais `"system"` -
-  c'est celle-ci qui part dans `--language` vers le sous-processus CLI).
-  Changer la langue dans le menu déroulant sans mettre à jour les
-  **deux** laisse `self._language` bloquée sur la langue de démarrage :
-  une génération lancée juste après un changement de langue (sans
-  redémarrer) repartirait alors avec l'ancienne langue - détecté en
-  testant explicitement ce scénario précis avec Xvfb, pas visible en
-  relisant le code.
-  **Troisième piège rencontré, le plus grave** (régression complète,
-  détectée par le mainteneur en test manuel, pas par Claude) : Python
-  traite `_` comme une variable **locale à toute la fonction** dès qu'on
-  lui assigne quoi que ce soit quelque part dans cette fonction - même
-  après l'appel qui utilise `_()`. `_choose_folder()` contenait
-  `uri, _, label = line.partition(" ")` (convention Python classique
-  pour une valeur jetable) dans le code de lecture des signets GTK, plus
-  bas dans la même méthode qui appelle `_("folder_picker.title_input")`
-  en tout début : ça levait `UnboundLocalError` **à chaque clic** sur
-  "Choisir...", empêchant purement et simplement le dialogue de
-  s'ouvrir - PyGObject avale l'exception au lieu de faire remonter un
-  traceback visible, donnant l'impression que "le bouton ne fait rien".
-  Ne plus jamais utiliser `_` comme nom de variable jetable dans un
-  fichier qui importe `_` de `i18n.py` - préférer `_sep`, `_unused`, ou
-  toute alternative explicite. Un contrôle statique simple (chercher, par
-  AST, une fonction qui à la fois assigne `_` et appelle `_(...)`)
-  permet de détecter ce genre de conflit sans avoir à cliquer sur
-  chaque bouton un par un.
-  **Portée** : le CLI (`portfolio.py`), la galerie HTML générée et le
-  manuel utilisateur sont également traduits dans la même langue que
-  l'interface (voir §2.2/§2.3). Internationalisation désormais complète
-  sur l'ensemble du projet.
+- **`VERSION` file**: single source at the root, read and written by the
+  two build scripts. Only updated after a **successful** build
+  (never on failure, so as not to desynchronize the displayed number from the
+  content actually published). **Belongs exclusively to the build
+  scripts, never to Claude**: incremented locally by the maintainer on
+  each build, independently of the working sessions with Claude - its
+  value on GitHub may therefore have moved on since Claude's last `git pull`,
+  even several times in a row, with no relation to
+  the file Claude is working on. Strict rule: **never
+  create, modify, nor deliver a `VERSION` file** from memory or by
+  assumption - a `git pull`/`git fetch` right before any delivery is not
+  enough on its own if it does not specifically check this file,
+  because a change concerning other files could suggest
+  that VERSION is up to date when it changed between two pulls.
+  If an occasional need requires knowing the current version (e.g. quoting
+  it in a discussion), always reread `VERSION` fresh
+  from `origin/main` at that precise moment rather than relying on a
+  value seen earlier in the conversation - an oversight here would amount to
+  making the displayed version number regress.
+- **Code delivery**: complete files systematically, never a partial
+  diff/patch (working convention established with the maintainer).
+- **"View results" working on what already exists**
+  (`_check_existing_results()`): no longer conditioned on a
+  successful generation in the current session. Triggered on a change of the
+  output folder field (typing or chooser, with a 400 ms debounce as
+  for the input folder preview) and once at startup if an
+  output folder was remembered. Checks the real existence of each
+  artifact (non-empty `planches/`, `portfolio.pdf`, `gallery/index.html`,
+  `index.csv`) and enables each sub-item independently - **no**
+  condition on what was requested in a possible past
+  generation (simplified from an earlier version that cross-checked
+  file existence AND checkbox ticked this time; existence alone
+  now suffices, consistent with the possibility of opening results
+  from a previous session without relaunching a generation). `_last_result`
+  is therefore no longer reserved for "the last generation of this session":
+  it reflects the currently configured output folder, whether or not it
+  triggered a generation. **Pitfall encountered while testing**: the
+  "folder missing" branch must explicitly disable EACH
+  sub-button, not only the main button - otherwise a sub-button
+  previously enabled (e.g. PDF found for a folder typed just before)
+  stays active after typing a folder with no results at all.
+- **Internationalization of the graphical interface** (`portfolio/i18n.py` +
+  `portfolio/locales/`): Python dictionaries per language (`fr.py` is the
+  source; `en.py`/`de.py`/`es.py` must always have exactly the
+  same set of keys — explicitly checked in a test), not gettext/.po/.mo
+  — a deliberate choice to avoid a compilation step and an additional
+  dependency to bundle in the `.deb`/Windows installer.
+  New user-visible string = new key in the 4
+  files of `locales/`, never hard-coded text in
+  `planche-contact-gtk.py`. A language change only takes effect on
+  restart (no on-the-fly rebuilding of the widget tree).
+  **Pitfall encountered, to watch out for**: some dropdown menus display
+  translated text to the user but must pass a fixed internal (French) value
+  to the engine — the case of the watermark orientation,
+  compared as hard-coded French in `portfolio/config.py`. Always read the selected
+  **index** (`combo.get_selected()`) and make it point
+  to a separate list of internal values
+  (`self._orient_values[index]`), never the displayed text
+  (`get_selected_item().get_string()`) for this kind of field.
+  **Second pitfall encountered, more insidious**: `PlancheContactGTK` keeps
+  two distinct variables for the language — `self.language_preference`
+  (the saved raw choice, may be `"system"`) and `self._language`
+  (the result already resolved by `set_language()`, never `"system"` -
+  this is the one that goes into `--language` to the CLI subprocess).
+  Changing the language in the dropdown without updating
+  **both** leaves `self._language` stuck on the startup language:
+  a generation launched right after a language change (without
+  restarting) would then start again with the old language - detected by
+  explicitly testing this precise scenario with Xvfb, not visible when
+  rereading the code.
+  **Third pitfall encountered, the most serious** (complete regression,
+  detected by the maintainer in manual testing, not by Claude): Python
+  treats `_` as a **local variable of the whole function** as soon as
+  anything is assigned to it anywhere in that function - even
+  after the call that uses `_()`. `_choose_folder()` contained
+  `uri, _, label = line.partition(" ")` (classic Python convention
+  for a throwaway value) in the GTK bookmarks reading code, further
+  down in the same method that calls `_("folder_picker.title_input")`
+  at the very beginning: this raised `UnboundLocalError` **on every click** on
+  "Choose...", simply preventing the dialog from
+  opening - PyGObject swallows the exception instead of surfacing a visible
+  traceback, giving the impression that "the button does nothing".
+  Never use `_` again as a throwaway variable name in a
+  file that imports `_` from `i18n.py` - prefer `_sep`, `_unused`, or
+  any explicit alternative. A simple static check (looking, through
+  AST, for a function that both assigns `_` and calls `_(...)`)
+  makes it possible to detect this kind of conflict without having to click on
+  each button one by one.
+  **Scope**: the CLI (`portfolio.py`), the generated HTML gallery and the
+  user manual are also translated into the same language as
+  the interface (see §2.2/§2.3). Internationalization is now complete
+  across the whole project.
 
 ---
 
-## 6. Décisions techniques prises
+## 6. Technical decisions made
 
-Décisions notables, avec leur justification (pour éviter de les remettre
-en cause sans en connaître la raison) :
+Notable decisions, with their rationale (to avoid questioning them
+without knowing the reason):
 
-| Décision | Pourquoi |
+| Decision | Why |
 |---|---|
-| Sélecteur de dossier 100 % maison, pas `Gtk.FileChooserDialog` | Le filtrage natif "dossiers uniquement" s'est avéré peu fiable selon les systèmes réels des utilisateurs |
-| Une seule fonction de filigrane (`utils.apply_watermark`) | Il en existait 3 versions différentes à l'origine (planches, galerie, une inutilisée), avec un vrai bug d'angle inversé entre deux d'entre elles |
-| Une seule passe de décodage pour la galerie HTML | La vignette et l'image "pleine taille" étaient auparavant décodées deux fois séparément — gain de performance significatif |
-| Aperçu RAW : miniature embarquée préférée au dématriçage complet | Le dématriçage complet est lent ; l'aperçu JPEG intégré par l'appareil photo suffit pour vignettes/aperçus |
-| Police embarquée avec le projet (`portfolio/fonts/`) | Dépendre d'un chemin système deviné (ex: `C:/Windows/Fonts/arial.ttf`) pouvait échouer silencieusement et retomber sur la police minuscule de Pillow |
-| Fenêtre principale : taille naturelle minimale, pas de taille forcée | Demande explicite : s'ouvrir aussi petite que possible tout en restant redimensionnable |
-| Portage Windows : même code source, pas de fork | Le moteur est déjà 100 % portable ; dupliquer aurait doublé la charge de maintenance pour un gain nul |
-| `--run-cli` : l'exe gelé se relance lui-même en mode CLI | Dans un exécutable gelé, `sys.executable` pointe vers l'exe lui-même, pas vers un interpréteur Python générique capable d'exécuter `portfolio.py` comme un script séparé |
-| `multiprocessing.freeze_support()` appelé **avant** `import gi` | Double effet : (1) empêche les workers de `ProcessPoolExecutor` de planter avec "Option inconnue --multiprocessing-fork", (2) leur évite de charger inutilement toute la pile GTK4 (gain de performance sur Windows) |
-| `gi.overrides` embarqué explicitement (`collect_submodules`) dans le `.spec` | PyInstaller ne détecte pas ces modules automatiquement (chargés dynamiquement par PyGObject, jamais par un `import` explicite visible) ; sans eux, plusieurs API GTK/GLib retombent sur leur signature C brute, plus stricte |
-| `contents_directory='.'` dans le `.spec` PyInstaller | PyInstaller 6+ place par défaut tout dans un sous-dossier `_internal/` ; le code de démarrage Windows s'attend à trouver les DLL/typelibs directement à côté de l'exécutable |
-| Dépôt renommé `planche-contact-linux` → `planche-contact` | Le projet n'est plus Linux-only depuis le portage Windows |
-| `windows/build-windows.ps1` + relais à la racine | Symétrie avec `build-deb.sh` (lancement depuis la racine) sans dupliquer la logique de build elle-même |
-| `fpm` (`build-deb.sh`) : scripts de maintenance via `--after-install`/`--after-remove`, jamais un dossier `DEBIAN/` dans les sources `-C` | Contrairement à `dpkg-deb --build` natif, `fpm` ne traite jamais spécialement un dossier nommé `DEBIAN/` parmi ses sources : un tel dossier finit comme contenu de données inerte (installé tel quel sur la machine cible), jamais reconnu comme scripts de maintenance ni exécuté par dpkg |
-| `IntFmt` NSIS : toujours le style printf (`"0x%X"`), jamais la syntaxe mnémonique (`"0xX"`) | `"0xX"` est documentée sur le wiki NSIS (valable en NSIS 2.x) mais ne convertit plus rien en NSIS 3.x — elle retourne la chaîne littérale inchangée, faisant silencieusement échouer tout `WriteRegDWORD` qui en dépend (ex : `EstimatedSize`, repli à 0) |
-| `makensis` + Wine installables via `apt` dans le bac à sable Linux de Claude | Permet de **compiler ET exécuter** un vrai installeur NSIS pour reproduire/valider un bug Windows sans accès à une machine Windows réelle. Nécessite `nsis` (paquet universe), et pour un installeur NSIS 32 bits par défaut : `dpkg --add-architecture i386` + `wine32:i386` (le simple `wine64` ne suffit pas). Les écritures registre sont vérifiables avec `wine reg query`. Ne remplace pas un vrai test utilisateur (thème visuel, UAC réel, etc.) mais permet de confirmer/infirmer un correctif de logique avant de le transmettre |
-| GTK4 + Xvfb installables via `apt` dans le bac à sable Linux de Claude | Permet d'**exécuter réellement** `planche-contact-gtk.py` (pas juste vérifier sa syntaxe) : `apt-get install gir1.2-gtk-4.0 python3-gi`, puis `Xvfb :99 & DISPLAY=:99 python3 script.py`. Piloter l'appli par introspection directe des widgets (`app.win`, `app.run_button.get_label()`, `dropdown.set_selected(i)`...) via `GLib.timeout_add()` après `app.connect("activate", ...)`, plutôt qu'un outil d'automatisation UI dédié. **Xvfb ne survit jamais entre deux appels d'outil séparés** (comme les serveurs HTTP de test) : démarrer Xvfb et lancer le script Python dans la **même** commande shell, jamais deux commandes séparées (`xvfb-run -a cmd...` gère ça automatiquement, préférable à un `Xvfb &` manuel) |
-| Environnement de test GTK4 : `python3.12` + `gir1.2-gtk-4.0` spécifiquement, pas le `python3` par défaut du bac à sable | L'extension compilée de PyGObject (`_gi.cpython-312-*.so`) ne correspond qu'à Python 3.12 dans cet environnement (le `python3` par défaut est 3.13 → `ImportError` sur `gi`) ; et le typelib `Gtk-4.0` nécessite le paquet `gir1.2-gtk-4.0` en plus de `libgtk-4-1` (sinon `ValueError: Namespace Gtk not available`). Installer aussi les dépendances du moteur pour cet interpréteur spécifique (`python3.12 -m pip install --break-system-packages Pillow reportlab exifread numpy pytest`) |
-| Tout script de test qui pilote `planche-contact-gtk.py` doit lui-même garder TOUT code à effet de bord (instanciation de `Gtk.Application`, création de fichiers...) sous `if __name__ == "__main__":` | `ThumbnailGenerator.generate_parallel()` utilise `multiprocessing` en contexte `spawn`, qui **réexécute le script lanceur entier** dans chaque processus worker (sous le nom de module `__mp_main__`, pas `__main__` — donc un `if __name__ == "__main__":` correctement placé protège bien le code qu'il entoure). Un script de test dont le code de préparation (ex: `app = PlancheContactGTK()`, création de photos de test) est en dehors de ce garde se retrouve réexécuté par chaque worker, provoquant des blocages/une récursion en cascade (observé : un script de test provoquant un blocage de plusieurs minutes, diagnostiqué comme ce bug de harnais de test, pas un bug produit) |
-| Prévisualisation de planche (interface graphique) générée par un **sous-processus CLI séparé** (`portfolio.py --preview-output`), jamais par un appel direct à `ContactSheetGenerator` dans un fil d'arrière-plan de l'application GTK | Constaté empiriquement (tests sous GTK4 réel, `xvfb-run`) : un appel direct dans un fil d'arrière-plan plaçait le rendu de texte Pillow (titre/numéro de page, via FreeType) en concurrence avec Pango (texte de l'interface GTK elle-même, dont la boucle principale reste active pendant ce temps) sur la bibliothèque FreeType **partagée par les deux** dans le même processus — pouvant corrompre le calcul de la taille d'un masque de glyphe au point de lever une `PIL.Image.DecompressionBombError` et faire échouer l'aperçu. Reproduit à plusieurs reprises, avec une taille de masque différente à chaque fois (signature d'une vraie concurrence, pas d'un bug déterministe) ; un pré-chauffage du rendu Pillow au démarrage, avant toute activité GTK, a été essayé et s'est révélé **insuffisant** (la corruption peut survenir sur n'importe quel appel, pas seulement le premier). Un sous-processus séparé, dépourvu de toute fenêtre/boucle GTK, élimine cette concurrence structurellement plutôt que de tenter de la fiabiliser — **ne jamais revenir à un appel direct en thread pour ce besoin** |
-| `pkill -f <motif>` dans une commande shell lancée par Claude : toujours entourer le motif d'un caractère de classe (`pkill -9 -f "[s]moke_test"` plutôt que `"smoke_test"`) | `pkill -f` compare au texte complet de la ligne de commande de CHAQUE processus, y compris celle du shell qui exécute la commande `pkill` elle-même : si le motif cherché apparaît littéralement dans la commande `pkill` tapée (ex: `pkill -9 -f smoke_test`), elle se retrouve tuer son propre shell parent, interrompant silencieusement le reste de la commande composée (piège rencontré et diagnostiqué dans cette session). La classe de caractères (`[s]moke_test`) casse ce faux positif sans changer le motif recherché dans les VRAIS processus cibles |
-| Tout texte traduit (`_()`) exécuté dans un worker `ProcessPoolExecutor(mp_context=spawn)` doit recevoir explicitement la langue active via l'`initializer` (voir `htmlgallery._init_worker_logging(log_path, language)`, qui appelle `set_language(language)`) | `spawn` démarre un interpréteur Python neuf par worker, qui n'hérite d'AUCUN état du processus parent (contrairement à `fork`) : `set_language()`, appelé une seule fois au démarrage du CLI dans le processus principal, n'a jamais eu lieu dans ces workers, et `portfolio.i18n._(...)` y retombe silencieusement sur sa langue de repli (anglais) quelle que soit `--language`. Bug trouvé concrètement lors d'un test de charge (`utils.format_file_size()`, appelé depuis le worker de génération de la galerie HTML, affichait "92.4 KB" dans une galerie générée en français). Corrigé en propageant la langue déjà résolue (`get_language()`) dans `initargs`, même mécanisme déjà utilisé pour reconfigurer le logging dans ces workers. `contactsheet.py`/`thumbnail.py` ne sont aujourd'hui PAS concernés (tout leur texte traduit s'exécute dans le processus principal) — mais tout futur texte traduit ajouté à du code exécuté par un worker `spawn` devra appliquer la même règle |
-| Toute zone de texte dessinée en pixels fixes (planches JPEG/PDF, `contactsheet.py`) doit être **activement bornée** (passée à la ligne en largeur, zone réservée agrandie en conséquence en hauteur, ellipsis seulement en tout dernier recours) à l'espace qui lui est réservé - ne jamais supposer que le contenu "tiendra" | Contrairement au HTML (qui enveloppe naturellement un texte trop long dans son conteneur), un canevas Pillow ne limite jamais de lui-même la zone où `ImageDraw.text()` dessine : `_draw_caption()` dessinait un texte de largeur quelconque sans jamais le contraindre à la largeur de la cellule. Avec plusieurs champs de légende joints sur une même ligne (réglage par défaut `lines=1`, cas très courant), le texte dépassait largement la vignette et débordait dans les colonnes voisines - signalé par l'utilisateur ("les légendes se chevauchent et sont illisibles"), non détecté par les tests existants (qui ne combinaient jamais plusieurs champs sur une ligne). De la même façon, la hauteur réservée pour une légende "below"/"above" suivait uniquement `layout.caption_area_mm`, indépendamment de `captions.lines`/`captions.font_size` : augmenter ces derniers sans agrandir manuellement `caption_area_mm` faisait déborder les dernières lignes dans la photo de la rangée suivante. Corrigé par (1) `layout_engine._reserve_caption_px()` qui réserve désormais le MAXIMUM entre `caption_area_mm` et la hauteur réellement nécessaire pour le nombre de lignes/`font_size` - jamais la valeur configurée seule - et (2) un retour à la ligne des légendes dans la largeur d'une vignette (`presentation.captions.layout_caption_lines()`, qui reçoit une fonction `measure(texte) -> largeur` fournie par `contactsheet.py` pour rester indépendant de PIL). Le nombre de lignes réellement nécessaire dépend du texte, donc de la largeur de vignette, donc de la hauteur réservée : `ContactSheetGenerator._plan_page()` itère (mesure -> `compute_page_layout(..., caption_lines=n)` -> remesure) jusqu'à stabilité, plafonné à `MAX_AUTO_CAPTION_LINES` ; chaque planche ajuste donc la hauteur de légende à ses propres photos. `_draw_caption()` garde deux filets de sécurité (mot isolé trop large, lignes au-delà de la hauteur réservée -> « … »). Une première version de ce correctif se contentait de tronquer avec « … » : plus aucun chevauchement, mais l'utilisateur voyait l'information coupée sous les photos - une troncature seule n'est PAS un correctif acceptable pour du texte que l'utilisateur a explicitement demandé d'afficher. Le PDF embarquant directement les mêmes JPEG que les planches, il est corrigé automatiquement avec elles. Leçon generalisable : toute future zone de texte à taille fixe dans ce module doit appliquer le même principe (borner activement, jamais supposer) |
-| Un réglage que l'utilisateur modifie couramment (ex : le MODE de thème) va dans la **fenêtre principale**, jamais seulement dans la fenêtre des réglages avancés | Signalé par l'utilisateur ("je ne vois pas de choix de thème") : le menu Clair/Sombre/Neutre/Système avait été rangé dans l'expander « Réglages avancés » au nom du principe « avancé séparé du simple », mais un réglage visuel de premier plan n'est pas « avancé » au sens du cahier des charges (qui visait les réglages rares/techniques : marges, colonnes, champs de légende...). Seules les couleurs personnalisées y sont restées. Un réglage = un widget : le menu principal alimente directement le Profil, pas de doublon « avancé » à synchroniser. Autre piège relevé au passage : le mode « Système » ne peut PAS suivre le thème de l'OS pour une planche JPEG/PDF (image fixe, `resolve_theme()` appelée sans `prefer_dark`, donc claire) - seule la galerie HTML le fait (media query CSS) ; la documentation affirmait le contraire |
-| Ne jamais ajouter de contenu de hauteur variable (section dépliable, grille de réglages qui grandit) à la **fenêtre principale** : tout ce qui est volumineux et secondaire va dans une fenêtre à part, au contenu défilant et plafonné à la hauteur de l'écran | Signalé par l'utilisateur : la section avancée, dépliée dans un `Gtk.Expander`, portait la fenêtre principale d'environ 1060 px à 1610 px de haut - plus qu'un écran - et envoyait les boutons « Lancer »/« Quitter » hors de vue (la fenêtre n'a volontairement pas de taille par défaut, elle prend celle de son contenu). Rendre TOUTE la page défilante n'aurait pas aidé non plus : les boutons d'action seraient restés sous la ligne de flottaison - l'onglet Génération est donc coupé en deux, un formulaire défilant (`self.form_scroll`, plafonné par `_apply_form_scroll_limits()`) et un bas toujours visible (boutons, état, progression, journal). Piège GTK4 : un ascenseur classique à la demande (`overlay_scrolling` faux, politique `AUTOMATIC`) prend de la largeur au contenu et fait apparaître un ascenseur HORIZONTAL parasite ; la politique verticale `ALWAYS` fait réserver cette largeur (voir `_configure_scroll_area()`, appliquée uniquement si le contenu dépasse réellement le plafond). Mesurer plutôt la taille réelle de la fenêtre (`get_height()` sous Xvfb) avant/après, sur un petit écran aussi (1280×600) |
-| Une vignette ne remplit PAS sa cellule carrée : `PageLayout`/`CellLayout` donnent la cellule (`photo_w` x `photo_h` = `thumb_size` x `thumb_size`), mais l'image collée garde ses proportions (`Image.thumbnail`, ex : 4:3) et peut être plus petite - ne jamais supposer que la photo touche les bords de sa cellule | Une légende placée sous la CELLULE était donc séparée d'une photo en paysage par un vide d'un quart de vignette (signalé par l'utilisateur). Corrigé au dessin, pas dans le moteur de mise en page (qui ne connaît pas les proportions réelles des images, uniquement des nombres) : `contactsheet._thumb_offset()` décale la vignette dans sa cellule (posée sur sa légende pour « below », collée sous elle pour « above », contre elle pour « right » ; horizontalement selon l'alignement du texte) ; SANS légende dessinée, la photo est centrée dans sa cellule (elle était collée en haut à gauche, d'où un ensemble de photos décalé - voir la ligne sur le centrage). L'écart photo/légende voulu (`CAPTION_PHOTO_GAP_PX`) est lui réservé par le moteur, en plus de la zone de texte - `cell.caption_w`/`caption_h` restent la zone de texte seule, jamais écart compris |
-| La grille de photos doit être **centrée** sur la page, jamais collée à la marge gauche/en haut : vérifier le centrage sur des rendus réels, sur de nombreuses combinaisons de réglages, en mesurant l'emprise des pixels de photo (marges gauche/droite et haut/bas), pas seulement les coordonnées calculées | Signalé par l'utilisateur (« l'ensemble des photos n'est pas centré »). Deux causes qui se cumulaient : (1) la taille de vignette est limitée par la largeur OU la hauteur, donc la grille laisse presque toujours un vide d'un seul côté (209 combinaisons sur 384 décentrées, jusqu'à ~12 cm) - le moteur répartit désormais le vide à parts égales (`PageLayout.grid_w`/`grid_h`, centrage horizontal dans `compute_page_layout()`, vertical dans `create_contact_sheet()` qui connaît la vraie hauteur d'en-tête) ; (2) sans légende, la photo était collée en haut à gauche de sa cellule carrée (`_thumb_offset()` renvoyait `(0, 0)`, présenté comme « comportement d'origine ») - elle est centrée. Le centrage se calcule sur la grille d'une page PLEINE pour que la dernière page, incomplète, garde les mêmes positions. Piège de mesure : sur un test à une seule configuration (A4 portrait, 12 photos, sans légende) le défaut était invisible - la grille y est déjà quasi centrée |
-| Toute préférence que la galerie HTML mémorise côté visiteur (`localStorage`) doit être **propre à la génération** (clé suffixée, voir `HTMLGalleryGenerator._theme_storage_key`), jamais une clé fixe ; et le bouton de bascule doit pouvoir **revenir au réglage demandé**, pas seulement alterner | Signalé par l'utilisateur (« la galerie HTML ne prend pas en compte le thème demandé ») alors que le thème était correctement écrit dans le CSS : un clic sur ◐ mémorisait `light`/`dark` sous une clé unique, lue AVANT le CSS, et partagée par toutes les galeries de la même origine (Chrome : un seul `localStorage` pour tous les `file://`) - toute galerie suivante, même régénérée avec un autre thème, l'ignorait. Et depuis « Neutre », deux clics ne permettaient plus de retrouver « Neutre ». Piège de diagnostic : générer puis mesurer le CSS ne suffit pas, il faut aussi **mesurer le rendu dans un vrai navigateur avec un état `localStorage` préexistant**. Seconde cause du même symptôme (« Clair » demandé, page sombre) : une page qui ne déclare pas son thème est noircie par le mode sombre automatique du navigateur → toujours émettre `color-scheme` (`_COLOR_SCHEME` dans `htmlgallery.py` ; `only light`, pas `light` seul) ; limite connue : un « forcer le mode sombre » inconditionnel avec préférence claire reste inévitable |
-| Tout fichier écrit dans la galerie sous un nom dérivé de la photo source doit avoir un **nom unique et une URL encodée** (`quote`) | Deux photos de même nom dans deux sous-dossiers (`-r`) ou une paire RAW + JPEG s'écrasent, et un `#` dans un nom coupe l'URL (fragment) : constaté en testant `originals/` avec de vraies photos, alors que `images/` souffrait déjà du même défaut. Pour un ORIGINAL, perdre un fichier en silence serait grave, d'où `_unique_file_name()` (appliquée aussi aux copies affichées `images/`, où une paire RAW + JPEG `IMG_1.CR2`/`IMG_1.jpg` donne deux fois `IMG_1.jpg`) ; l'attribution du nom se fait dans le processus principal (les workers `spawn` tournent en parallèle et ne peuvent pas se coordonner) |
-| Aucun fichier RAW ne doit jamais être écrit dans le dossier de la galerie HTML (`originals/` compris) : un RAW est converti en JPEG (`rawloader.load_full_resolution()`, qualité 95, 4:4:4), jamais copié, même en cas d'échec de la conversion | Un visiteur de la galerie ne sait pas ouvrir un `.CR2`/`.NEF`/`.DNG` ; signalé par l'utilisateur après une première version qui copiait les RAW « tels quels » pour les originaux. Un test de bout en bout avec un vrai DNG (`tests/data/mini_raw.dng`, 160 x 120, ignoré si `rawpy` est absent) vérifie qu'aucun fichier d'extension RAW ne subsiste dans la galerie. Les workers `spawn` ne sont pas monkeypatchables : les tests qui simulent le décodage RAW substituent `htmlgallery.ProcessPoolExecutor` par un exécuteur en-processus |
-| Ne jamais compter sur une boîte de dialogue « Ouvrir / Enregistrer » produite par le NAVIGATEUR (ex : `window.open()` sur un type de fichier qu'il ne sait pas afficher) pour un téléchargement : la déclencher explicitement, par un `Blob` + lien `download` | Signalé par l'utilisateur : la boîte de dialogue du bouton de téléchargement en `file://` a disparu quand les RAW sont devenus des JPEG - elle n'avait jamais été fournie par l'application, seulement par Firefox face à un RAW qu'il ne sait pas afficher. Piège de diagnostic : une fonctionnalité qui « marche » grâce à un effet de bord (ici le type de fichier) se casse dès que l'effet de bord change. En `file://`, `fetch()`/XHR/`<canvas>` sont bloqués et Chromium ignore `download` sur un lien `file://` ; ce qui marche (vérifié en Chromium) : un `<script src>` voisin (`originals/X.jpg.js`, `_write_download_script()`) qui livre les octets en base64, puis `Blob` + `a[download]` sur un `blob:`. Firefox non testable dans le bac à sable : toute affirmation sur son comportement doit rester marquée « non vérifiée » tant que l'utilisateur ne l'a pas confirmée (ici : confirmé en Firefox 140 ESR) |
-| Tout réglage du Profil exposé à l'utilisateur doit avoir un test de **rendu de bout en bout** prouvant qu'il change la sortie - pas seulement un test de sérialisation/aller-retour du Profil | `LayoutSettings.fit_mode` (« Remplir ») était défini, validé, enregistré en JSON, affiché dans l'interface et décrit dans le manuel, mais **jamais lu** par le moteur de rendu : tous les tests existants passaient (ils ne vérifiaient que le Profil) alors que l'option ne faisait rien. Câblé maintenant (`thumbnail.fit_thumbnail_image()`, transmis aux workers `spawn` via les arguments des tâches). Contrôle utile à refaire avant de documenter un nouveau champ : chercher où `.nom_du_champ` est lu hors de `profile.py`. Même défaut trouvé ensuite sur `title_position`, `author_position` et `page_numbering`, câblés à leur tour (`ContactSheetGenerator._draw_header()`/`_draw_page_number()`, en-tête de `htmlgallery._generate_page()`). Vérification faite champ par champ (recherche de `.nom_du_champ` hors de `profile.py`) : plus aucun champ du Profil n'est ignoré par le rendu - `show_gps` passe par `CaptionSettings.effective_fields()`, `separator` et `format_overrides` restent réglables uniquement via le JSON (pas de contrôle dans l'interface) |
-| Toute ligne ajoutée au pied de page des planches (`ContactSheetGenerator._draw_page_number()`) doit prendre sa position dans `layout_engine.FOOTER_*_OFFSET_PX`, et `FOOTER_RESERVED_PX` en dérive | Le pied de page est dessiné en pixels fixes depuis le bas de la planche, hors du moteur de mise en page : sans réservation, une marge basse plus petite que lui laisse les photos descendre sous le texte. Une mention (crédit, licence) ajoutée à un seul des trois sorties (planches, PDF, galerie HTML) crée un écart que l'utilisateur finit par remarquer : « Développé par... GPL v3 » n'existait que dans la galerie ; texte et nom de l'auteur sont désormais communs (`sheet.footer_credit`/`gallery.footer_credit`, `utils.AUTHOR_NAME`, test de parité). Le PDF ne dessine aucun texte : il reprend celui des planches |
-
+| 100% custom folder chooser, not `Gtk.FileChooserDialog` | The native "folders only" filtering proved unreliable on the users' real systems |
+| A single watermark function (`utils.apply_watermark`) | There were originally 3 different versions (sheets, gallery, an unused one), with a real inverted-angle bug between two of them |
+| A single decoding pass for the HTML gallery | The thumbnail and the "full-size" image were previously decoded twice separately — significant performance gain |
+| RAW preview: embedded thumbnail preferred over full demosaicing | Full demosaicing is slow; the JPEG preview embedded by the camera is enough for thumbnails/previews |
+| Font bundled with the project (`portfolio/fonts/`) | Depending on a guessed system path (e.g. `C:/Windows/Fonts/arial.ttf`) could fail silently and fall back to Pillow's tiny font |
+| Main window: natural minimum size, no forced size | Explicit request: open as small as possible while remaining resizable |
+| Windows port: same source code, no fork | The engine is already 100% portable; duplicating would have doubled the maintenance load for no gain |
+| `--run-cli`: the frozen exe relaunches itself in CLI mode | In a frozen executable, `sys.executable` points to the exe itself, not to a generic Python interpreter able to run `portfolio.py` as a separate script |
+| `multiprocessing.freeze_support()` called **before** `import gi` | Double effect: (1) prevents the `ProcessPoolExecutor` workers from crashing with "Unknown option --multiprocessing-fork", (2) spares them from needlessly loading the whole GTK4 stack (performance gain on Windows) |
+| `gi.overrides` explicitly bundled (`collect_submodules`) in the `.spec` | PyInstaller does not detect these modules automatically (loaded dynamically by PyGObject, never by a visible explicit `import`); without them, several GTK/GLib APIs fall back to their stricter raw C signature |
+| `contents_directory='.'` in the PyInstaller `.spec` | PyInstaller 6+ places everything in an `_internal/` subfolder by default; the Windows startup code expects to find the DLLs/typelibs directly next to the executable |
+| Repository renamed `planche-contact-linux` → `planche-contact` | The project has no longer been Linux-only since the Windows port |
+| `windows/build-windows.ps1` + relay at the root | Symmetry with `build-deb.sh` (launched from the root) without duplicating the build logic itself |
+| `fpm` (`build-deb.sh`): maintenance scripts through `--after-install`/`--after-remove`, never a `DEBIAN/` folder in the `-C` sources | Unlike native `dpkg-deb --build`, `fpm` never treats a folder named `DEBIAN/` among its sources specially: such a folder ends up as inert data content (installed as is on the target machine), never recognized as maintenance scripts nor run by dpkg |
+| NSIS `IntFmt`: always the printf style (`"0x%X"`), never the mnemonic syntax (`"0xX"`) | `"0xX"` is documented on the NSIS wiki (valid in NSIS 2.x) but no longer converts anything in NSIS 3.x — it returns the literal string unchanged, silently making any `WriteRegDWORD` that depends on it fail (e.g. `EstimatedSize`, fallback to 0) |
+| `makensis` + Wine installable via `apt` in Claude's Linux sandbox | Makes it possible to **compile AND run** a real NSIS installer to reproduce/validate a Windows bug without access to a real Windows machine. Requires `nsis` (universe package), and for a 32-bit NSIS installer by default: `dpkg --add-architecture i386` + `wine32:i386` (`wine64` alone is not enough). Registry writes can be checked with `wine reg query`. Does not replace a real user test (visual theme, real UAC, etc.) but makes it possible to confirm/refute a logic fix before handing it over |
+| GTK4 + Xvfb installable via `apt` in Claude's Linux sandbox | Makes it possible to **actually run** `planche-contact-gtk.py` (not just check its syntax): `apt-get install gir1.2-gtk-4.0 python3-gi`, then `Xvfb :99 & DISPLAY=:99 python3 script.py`. Drive the app by direct introspection of the widgets (`app.win`, `app.run_button.get_label()`, `dropdown.set_selected(i)`...) via `GLib.timeout_add()` after `app.connect("activate", ...)`, rather than a dedicated UI automation tool. **Xvfb never survives between two separate tool calls** (like test HTTP servers): start Xvfb and launch the Python script in the **same** shell command, never two separate commands (`xvfb-run -a cmd...` handles this automatically, preferable to a manual `Xvfb &`) |
+| GTK4 test environment: `python3.12` + `gir1.2-gtk-4.0` specifically, not the sandbox's default `python3` | PyGObject's compiled extension (`_gi.cpython-312-*.so`) only matches Python 3.12 in this environment (the default `python3` is 3.13 → `ImportError` on `gi`); and the `Gtk-4.0` typelib requires the `gir1.2-gtk-4.0` package in addition to `libgtk-4-1` (otherwise `ValueError: Namespace Gtk not available`). Also install the engine's dependencies for this specific interpreter (`python3.12 -m pip install --break-system-packages Pillow reportlab exifread numpy pytest`) |
+| Any test script that drives `planche-contact-gtk.py` must itself keep ALL side-effect code (instantiating `Gtk.Application`, creating files...) under `if __name__ == "__main__":` | `ThumbnailGenerator.generate_parallel()` uses `multiprocessing` in `spawn` context, which **re-runs the entire launcher script** in each worker process (under the module name `__mp_main__`, not `__main__` — so a correctly placed `if __name__ == "__main__":` does protect the code it surrounds). A test script whose preparation code (e.g. `app = PlancheContactGTK()`, creating test photos) is outside this guard ends up re-run by each worker, causing hangs/cascading recursion (observed: a test script causing a hang of several minutes, diagnosed as this test harness bug, not a product bug) |
+| Sheet preview (graphical interface) generated by a **separate CLI subprocess** (`portfolio.py --preview-output`), never by a direct call to `ContactSheetGenerator` in a background thread of the GTK application | Found empirically (tests under real GTK4, `xvfb-run`): a direct call in a background thread put Pillow's text rendering (title/page number, via FreeType) in a race with Pango (text of the GTK interface itself, whose main loop stays active in the meantime) on the FreeType library **shared by both** in the same process — which could corrupt the computation of a glyph mask's size to the point of raising a `PIL.Image.DecompressionBombError` and making the preview fail. Reproduced several times, with a different mask size each time (the signature of a real race, not a deterministic bug); a warm-up of Pillow rendering at startup, before any GTK activity, was tried and proved **insufficient** (the corruption can occur on any call, not only the first). A separate subprocess, free of any GTK window/loop, eliminates this race structurally rather than trying to make it reliable — **never go back to a direct call in a thread for this need** |
+| `pkill -f <pattern>` in a shell command launched by Claude: always wrap the pattern with a character class (`pkill -9 -f "[s]moke_test"` rather than `"smoke_test"`) | `pkill -f` matches against the full command-line text of EVERY process, including that of the shell running the `pkill` command itself: if the searched pattern appears literally in the typed `pkill` command (e.g. `pkill -9 -f smoke_test`), it ends up killing its own parent shell, silently interrupting the rest of the compound command (pitfall encountered and diagnosed in this session). The character class (`[s]moke_test`) breaks this false positive without changing the pattern sought in the REAL target processes |
+| Any translated text (`_()`) executed in a `ProcessPoolExecutor(mp_context=spawn)` worker must explicitly receive the active language through the `initializer` (see `htmlgallery._init_worker_logging(log_path, language)`, which calls `set_language(language)`) | `spawn` starts a fresh Python interpreter per worker, which inherits NO state from the parent process (unlike `fork`): `set_language()`, called only once at CLI startup in the main process, never took place in these workers, and `portfolio.i18n._(...)` silently falls back there to its fallback language (English) whatever `--language` is. Bug found concretely during a load test (`utils.format_file_size()`, called from the HTML gallery generation worker, displayed "92.4 KB" in a gallery generated in French). Fixed by propagating the already-resolved language (`get_language()`) in `initargs`, the same mechanism already used to reconfigure logging in these workers. `contactsheet.py`/`thumbnail.py` are today NOT concerned (all their translated text runs in the main process) — but any future translated text added to code run by a `spawn` worker will have to apply the same rule |
+| Any text area drawn in fixed pixels (JPEG/PDF sheets, `contactsheet.py`) must be **actively bounded** (wrapped to the width, reserved area enlarged accordingly in height, ellipsis only as a very last resort) to the space reserved for it - never assume that the content "will fit" | Unlike HTML (which naturally wraps text that is too long inside its container), a Pillow canvas never limits by itself the area where `ImageDraw.text()` draws: `_draw_caption()` drew text of any width without ever constraining it to the width of the cell. With several caption fields joined on the same line (default setting `lines=1`, a very common case), the text went well beyond the thumbnail and overflowed into the neighboring columns - reported by the user ("captions overlap and are unreadable"), not detected by the existing tests (which never combined several fields on one line). In the same way, the height reserved for a "below"/"above" caption only followed `layout.caption_area_mm`, independently of `captions.lines`/`captions.font_size`: increasing the latter without manually enlarging `caption_area_mm` made the last lines overflow into the photo of the next row. Fixed by (1) `layout_engine._reserve_caption_px()` which now reserves the MAXIMUM between `caption_area_mm` and the height actually needed for the number of lines/`font_size` - never the configured value alone - and (2) wrapping the captions within the width of a thumbnail (`presentation.captions.layout_caption_lines()`, which receives a `measure(text) -> width` function supplied by `contactsheet.py` to stay independent of PIL). The number of lines actually needed depends on the text, hence on the thumbnail width, hence on the reserved height: `ContactSheetGenerator._plan_page()` iterates (measure -> `compute_page_layout(..., caption_lines=n)` -> measure again) until stable, capped at `MAX_AUTO_CAPTION_LINES`; each sheet therefore adjusts the caption height to its own photos. `_draw_caption()` keeps two safety nets (single word too wide, lines beyond the reserved height -> "…"). A first version of this fix merely truncated with "…": no more overlap, but the user saw the information cut off below the photos - truncation alone is NOT an acceptable fix for text the user explicitly asked to display. Since the PDF directly embeds the same JPEGs as the sheets, it is fixed automatically along with them. Generalizable lesson: any future fixed-size text area in this module must apply the same principle (bound actively, never assume) |
+| A setting that the user changes routinely (e.g. the theme MODE) goes in the **main window**, never only in the advanced settings window | Reported by the user ("I can't see a theme choice"): the Light/Dark/Neutral/System menu had been put in the "Advanced settings" expander in the name of the "advanced separate from simple" principle, but a top-level visual setting is not "advanced" in the sense of the specification (which targeted rare/technical settings: margins, columns, caption fields...). Only the custom colors stayed there. One setting = one widget: the main menu feeds the Profile directly, no "advanced" duplicate to keep in sync. Another pitfall noted in passing: the "System" mode can NOT follow the OS theme for a JPEG/PDF sheet (still image, `resolve_theme()` called without `prefer_dark`, hence light) - only the HTML gallery does (CSS media query); the documentation claimed the opposite |
+| Never add variable-height content (collapsible section, growing settings grid) to the **main window**: anything bulky and secondary goes in a separate window, with scrolling content capped at the height of the screen | Reported by the user: the advanced section, unfolded in a `Gtk.Expander`, took the main window from about 1060 px to 1610 px in height - more than a screen - and sent the "Start generation"/"Quit" buttons out of view (the window deliberately has no default size, it takes that of its content). Making the WHOLE page scrollable would not have helped either: the action buttons would have stayed below the fold - the Generation tab is therefore split in two, a scrolling form (`self.form_scroll`, capped by `_apply_form_scroll_limits()`) and an always-visible bottom (buttons, status, progress, log). GTK4 pitfall: a classic on-demand scrollbar (`overlay_scrolling` false, `AUTOMATIC` policy) takes width from the content and makes a spurious HORIZONTAL scrollbar appear; the `ALWAYS` vertical policy makes it reserve this width (see `_configure_scroll_area()`, applied only if the content really exceeds the cap). Better to measure the actual window size (`get_height()` under Xvfb) before/after, on a small screen too (1280×600) |
+| A thumbnail does NOT fill its square cell: `PageLayout`/`CellLayout` give the cell (`photo_w` x `photo_h` = `thumb_size` x `thumb_size`), but the pasted image keeps its proportions (`Image.thumbnail`, e.g. 4:3) and may be smaller - never assume that the photo touches the edges of its cell | A caption placed below the CELL was therefore separated from a landscape photo by a gap of a quarter of a thumbnail (reported by the user). Fixed at drawing time, not in the layout engine (which does not know the real proportions of the images, only numbers): `contactsheet._thumb_offset()` shifts the thumbnail within its cell (placed against its caption for "below", stuck beneath it for "above", against it for "right"; horizontally according to the text alignment); with NO caption drawn, the photo is centered in its cell (it was stuck at the top left, hence a set of photos that looked shifted - see the line on centering). The deliberate photo/caption gap (`CAPTION_PHOTO_GAP_PX`) is, for its part, reserved by the engine, in addition to the text area - `cell.caption_w`/`caption_h` remain the text area alone, never gap included |
+| The photo grid must be **centered** on the page, never stuck to the left/top margin: check the centering on real renderings, over many combinations of settings, by measuring the footprint of the photo pixels (left/right and top/bottom margins), not only the computed coordinates | Reported by the user ("the set of photos is not centered"). Two causes that added up: (1) the thumbnail size is limited by the width OR the height, so the grid almost always leaves an empty space on one side only (209 combinations out of 384 off-center, up to ~12 cm) - the engine now splits the empty space in equal parts (`PageLayout.grid_w`/`grid_h`, horizontal centering in `compute_page_layout()`, vertical in `create_contact_sheet()` which knows the real header height); (2) with no caption, the photo was stuck at the top left of its square cell (`_thumb_offset()` returned `(0, 0)`, presented as "original behavior") - it is centered. The centering is computed on the grid of a FULL page so that the last, incomplete page keeps the same positions. Measurement pitfall: on a single-configuration test (A4 portrait, 12 photos, no caption) the defect was invisible - the grid is already almost centered there |
+| Any preference that the HTML gallery stores on the visitor side (`localStorage`) must be **specific to the generation** (suffixed key, see `HTMLGalleryGenerator._theme_storage_key`), never a fixed key; and the toggle button must be able to **return to the requested setting**, not only alternate | Reported by the user ("the HTML gallery does not take the requested theme into account") although the theme was correctly written into the CSS: a click on ◐ stored `light`/`dark` under a single key, read BEFORE the CSS, and shared by all the galleries of the same origin (Chrome: a single `localStorage` for all `file://`) - every following gallery, even one regenerated with another theme, ignored it. And from "Neutral", two clicks no longer made it possible to get "Neutral" back. Diagnostic pitfall: generating then measuring the CSS is not enough, you also have to **measure the rendering in a real browser with a pre-existing `localStorage` state**. Second cause of the same symptom ("Light" requested, dark page): a page that does not declare its theme is darkened by the browser's automatic dark mode → always emit `color-scheme` (`_COLOR_SCHEME` in `htmlgallery.py`; `only light`, not `light` alone); known limitation: an unconditional "force dark mode" with a light preference remains unavoidable |
+| Any file written into the gallery under a name derived from the source photo must have a **unique name and an encoded URL** (`quote`) | Two photos with the same name in two subfolders (`-r`) or a RAW + JPEG pair overwrite each other, and a `#` in a name cuts the URL (fragment): found while testing `originals/` with real photos, whereas `images/` already suffered from the same defect. For an ORIGINAL, silently losing a file would be serious, hence `_unique_file_name()` (also applied to the displayed copies in `images/`, where a RAW + JPEG pair `IMG_1.CR2`/`IMG_1.jpg` gives `IMG_1.jpg` twice); the name is assigned in the main process (the `spawn` workers run in parallel and cannot coordinate) |
+| No RAW file must ever be written into the HTML gallery folder (`originals/` included): a RAW is converted to JPEG (`rawloader.load_full_resolution()`, quality 95, 4:4:4), never copied, even if the conversion fails | A gallery visitor cannot open a `.CR2`/`.NEF`/`.DNG`; reported by the user after a first version that copied the RAW files "as is" for the originals. An end-to-end test with a real DNG (`tests/data/mini_raw.dng`, 160 x 120, skipped if `rawpy` is missing) checks that no file with a RAW extension remains in the gallery. `spawn` workers cannot be monkeypatched: the tests that simulate RAW decoding replace `htmlgallery.ProcessPoolExecutor` with an in-process executor |
+| Never rely on an "Open / Save" dialog produced by the BROWSER (e.g. `window.open()` on a file type it cannot display) for a download: trigger it explicitly, through a `Blob` + `download` link | Reported by the user: the dialog of the download button over `file://` disappeared when RAW files became JPEGs - it had never been provided by the application, only by Firefox facing a RAW it cannot display. Diagnostic pitfall: a feature that "works" thanks to a side effect (here the file type) breaks as soon as the side effect changes. Over `file://`, `fetch()`/XHR/`<canvas>` are blocked and Chromium ignores `download` on a `file://` link; what works (verified in Chromium): a neighboring `<script src>` (`originals/X.jpg.js`, `_write_download_script()`) that delivers the bytes in base64, then `Blob` + `a[download]` on a `blob:`. Firefox cannot be tested in the sandbox: any claim about its behavior must remain marked "unverified" until the user has confirmed it (here: confirmed in Firefox 140 ESR) |
+| Any Profile setting exposed to the user must have an **end-to-end rendering** test proving that it changes the output - not only a Profile serialization/round-trip test | `LayoutSettings.fit_mode` ("Fill") was defined, validated, saved in JSON, displayed in the interface and described in the manual, but **never read** by the rendering engine: all the existing tests passed (they only checked the Profile) while the option did nothing. Now wired (`thumbnail.fit_thumbnail_image()`, passed to the `spawn` workers through the task arguments). Useful check to redo before documenting a new field: look for where `.field_name` is read outside `profile.py`. The same defect was then found on `title_position`, `author_position` and `page_numbering`, wired in turn (`ContactSheetGenerator._draw_header()`/`_draw_page_number()`, header of `htmlgallery._generate_page()`). Verification done field by field (search for `.field_name` outside `profile.py`): no Profile field is ignored by the rendering anymore - `show_gps` goes through `CaptionSettings.effective_fields()`, `separator` and `format_overrides` remain adjustable only through the JSON (no control in the interface) |
+| Any line added to the footer of the sheets (`ContactSheetGenerator._draw_page_number()`) must take its position from `layout_engine.FOOTER_*_OFFSET_PX`, and `FOOTER_RESERVED_PX` derives from them | The footer is drawn in fixed pixels from the bottom of the sheet, outside the layout engine: without a reservation, a bottom margin smaller than it lets the photos go down under the text. A notice (credit, license) added to only one of the three outputs (sheets, PDF, HTML gallery) creates a gap that the user ends up noticing: "Developed by... GPL v3" only existed in the gallery; the text and the author's name are now common (`sheet.footer_credit`/`gallery.footer_credit`, `utils.AUTHOR_NAME`, parity test). The PDF draws no text: it reuses that of the sheets |
 
 ---
 
-## 7. Bugs connus / limitations
+## 7. Known bugs / limitations
 
-| Sujet | État |
+| Subject | Status |
 |---|---|
-| Couleurs GTK4 différentes du thème Windows choisi | **Limitation inhérente**, pas un bug : GTK4 utilise son propre système de thème (Adwaita), indépendant du thème natif de l'OS. Aucune correction simple possible sans un chantier de theming dédié (interroger l'API/le registre Windows et générer du CSS GTK dynamiquement) |
-| Avertissement SmartScreen ("Windows a protégé votre PC") à l'installation | **Pas de correctif de code possible** : nécessite un certificat de signature de code payant (~100-500 €/an) ou l'accumulation naturelle de réputation avec le temps. La procédure de contournement (« Informations complémentaires » puis « Exécuter quand même ») est documentée pour l'utilisateur final dans `windows/README.md`, le manuel utilisateur et le `README.md` principal |
-| Version Python Windows figée sur celle de la dernière publication gvsbuild | Contrainte externe, pas un bug : si gvsbuild publie une nouvelle version ciblant une autre version de Python, il faudra installer cette nouvelle version (le script la détecte et propose de l'installer automatiquement) |
-| Build Windows non testable directement par Claude sur machine réelle | Aucun accès direct à une machine Windows — reste vrai pour tout futur correctif. Cela dit, `makensis` + Wine (voir §6) permettent de compiler et d'exécuter un vrai installeur NSIS dans le bac à sable Linux pour reproduire/valider un correctif de logique avant transmission — plusieurs bugs (voir historique dans `CHANGELOG.md`) ont ainsi été confirmés puis corrigés avec certitude plutôt que par déduction. Le portage a depuis été **validé sur machine Windows réelle par le mainteneur, sans bug apparent**, et publié comme release officielle |
-| Message console « Le module 'rawpy' n'est pas installé... » (`rawloader.py`) toujours en français, quelle que soit `--language` | Trouvé lors du même test de charge que les trois textes corrigés ci-dessus (§6), mais volontairement laissé de côté pour l'instant : message d'avertissement console (pas un fichier livré au client final comme les planches/CSV/galerie), affiché seulement en l'absence du module optionnel `rawpy`. Même nature de correctif que les trois autres (raccorder à `portfolio.i18n`) si traité un jour |
+| GTK4 colors different from the chosen Windows theme | **Inherent limitation**, not a bug: GTK4 uses its own theming system (Adwaita), independent of the OS's native theme. No simple fix is possible without a dedicated theming effort (querying the Windows API/registry and generating GTK CSS dynamically) |
+| SmartScreen warning ("Windows protected your PC") at installation | **No code fix possible**: requires a paid code-signing certificate (~€100-500/year) or the natural accumulation of reputation over time. The workaround procedure ("More info" then "Run anyway") is documented for the end user in `windows/README.md`, the user manual and the main `README.md` |
+| Windows Python version pinned to that of the latest gvsbuild release | External constraint, not a bug: if gvsbuild publishes a new version targeting another Python version, that new version will have to be installed (the script detects it and offers to install it automatically) |
+| Windows build not directly testable by Claude on a real machine | No direct access to a Windows machine — remains true for any future fix. That said, `makensis` + Wine (see §6) make it possible to compile and run a real NSIS installer in the Linux sandbox to reproduce/validate a logic fix before handing it over — several bugs (see history in `CHANGELOG.md`) were thus confirmed then fixed with certainty rather than by deduction. The port has since been **validated on a real Windows machine by the maintainer, with no apparent bug**, and published as an official release |
+| Console message "Le module 'rawpy' n'est pas installé..." (`rawloader.py`) always in French, whatever `--language` | Found during the same load test as the three texts fixed above (§6), but deliberately left aside for now: a console warning message (not a file delivered to the end client like the sheets/CSV/gallery), displayed only in the absence of the optional `rawpy` module. Same kind of fix as the other three (connect to `portfolio.i18n`) if handled one day |
 
 ---
 
 ## 8. Roadmap
 
-- Internationalisation (i18n) : **fait**, sur l'ensemble du projet —
-  interface graphique, CLI, galerie HTML générée et manuel utilisateur
-  (anglais, français, allemand, espagnol — voir §2.2/§2.3/§5).
-- Modèles de planches contact personnalisables : **fait** — légendes EXIF
-  personnalisables, modèles de mise en page (grille/paysage/portrait/
-  grandes vignettes/libre) enregistrables en profils JSON réutilisables,
-  thèmes graphiques (Clair/Sombre/Neutre/Système, couleurs personnalisées)
-  et véritable aperçu avant génération, le tout partagé par les planches
-  JPEG/PDF et la galerie HTML (voir §2.2 `presentation/`, §2.3 section
-  avancée de l'interface graphique).
-- Formats d'export supplémentaires.
-- Personnalisation PDF plus poussée.
-- *(Optionnel, si budget)* Certificat de signature de code pour supprimer
-  l'avertissement SmartScreen sous Windows.
-- *(Optionnel, chantier important)* Intégration du thème natif
-  Windows/couleur d'accent dans le rendu GTK4.
+- Internationalization (i18n): **done**, across the whole project —
+  graphical interface, CLI, generated HTML gallery and user manual
+  (English, French, German, Spanish — see §2.2/§2.3/§5).
+- Customizable contact sheet templates: **done** — customizable EXIF
+  captions, layout templates (grid/landscape/portrait/
+  large thumbnails/free) savable as reusable JSON profiles,
+  graphic themes (Light/Dark/Neutral/System, custom colors)
+  and real preview before generation, all shared by the JPEG/PDF
+  sheets and the HTML gallery (see §2.2 `presentation/`, §2.3 advanced
+  section of the graphical interface).
+- Additional export formats.
+- More advanced PDF customization.
+- *(Optional, if budget allows)* Code-signing certificate to remove the
+  SmartScreen warning under Windows.
+- *(Optional, major effort)* Integration of the native Windows
+  theme/accent color into the GTK4 rendering.

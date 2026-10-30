@@ -5,6 +5,10 @@
 <h1 align="center">Planche-Contact</h1>
 
 <p align="center">
+🇫🇷 <a href="README.fr.md">Version française</a>
+</p>
+
+<p align="center">
 <strong>Professional Contact Sheets from JPEG and RAW Images</strong>
 </p>
 
@@ -410,11 +414,12 @@ and troubleshooting.
 
 | File | Description |
 |------|-------------|
-| README.md | Project overview |
-| [docs/planche-contact-manual.html](docs/planche-contact-manual.html) | Full user manual (also opened by the app's "Aide" tab) |
-| [windows/README.md](windows/README.md) | Windows build instructions, requirements, troubleshooting |
-| CHANGELOG.md | Release history |
-| CONTRIBUTING.md | Contribution guidelines |
+| [README.md](README.md) · [🇫🇷](README.fr.md) | Project overview |
+| User manual — [English](docs/planche-contact-manual.en.html) · [Français](docs/planche-contact-manual.html) · [Deutsch](docs/planche-contact-manual.de.html) · [Español](docs/planche-contact-manual.es.html) | Full user manual (also opened by the app's "Help" tab) |
+| [windows/README.md](windows/README.md) · [🇫🇷](windows/README.fr.md) | Windows build instructions, requirements, troubleshooting |
+| [CHANGELOG.md](CHANGELOG.md) · [🇫🇷](CHANGELOG.fr.md) | Release history |
+| [CONTRIBUTING.md](CONTRIBUTING.md) · [🇫🇷](CONTRIBUTING.fr.md) | Contribution guidelines |
+| [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) · [🇫🇷](PROJECT_CONTEXT.fr.md) | Developer notes: architecture, conventions, technical decisions |
 | CODE_OF_CONDUCT.md | Community rules |
 | LICENSE | GNU GPL v3 |
 
@@ -423,7 +428,7 @@ and troubleshooting.
 # Roadmap
 
 - ~~Internationalization (i18n)~~ — **done**: GUI, CLI, generated HTML gallery and user manual (English, French, German, Spanish).
-- ~~Custom contact sheet templates~~ — **done**: customizable EXIF captions (filename, date, camera, lens, focal length, aperture, shutter speed, ISO, dimensions, GPS), layout templates (grid, landscape, portrait, large thumbnails, free), light/dark/neutral/system themes with optional custom colors, and a live preview before generation — all shared across JPEG/PDF contact sheets and the HTML gallery, and savable as reusable JSON profiles. See the [user manual](docs/planche-contact-manual.html) or the "Advanced" section in the app for details.
+- ~~Custom contact sheet templates~~ — **done**: customizable EXIF captions (filename, date, camera, lens, focal length, aperture, shutter speed, ISO, dimensions, GPS), layout templates (grid, landscape, portrait, large thumbnails, free), light/dark/neutral/system themes with optional custom colors, and a live preview before generation — all shared across JPEG/PDF contact sheets and the HTML gallery, and savable as reusable JSON profiles. See the [user manual](docs/planche-contact-manual.en.html) or the "Advanced" section in the app for details.
 - Additional export formats
 - Improved PDF customization
 
@@ -435,7 +440,7 @@ Contributions are welcome.
 
 Whether you want to report a bug, suggest a feature, improve the documentation or submit code, your help is appreciated.
 
-Please read **CONTRIBUTING.md** before opening an Issue or a Pull Request.
+Please read **[CONTRIBUTING.md](CONTRIBUTING.md)** before opening an Issue or a Pull Request.
 
 ---
 

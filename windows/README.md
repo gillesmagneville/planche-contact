@@ -1,175 +1,176 @@
-# Planche-Contact — Portage Windows
+# Planche-Contact — Windows Port
 
-Ce dossier contient tout ce qui est nécessaire pour construire un paquet
-Windows (version portable `.zip` et installeur `.exe`) à partir du même
-code source que la version Linux (`portfolio/` et `planche-contact-gtk.py`
-à la racine du dépôt ne sont **pas** dupliqués — ce sont les mêmes fichiers).
+🇫🇷 [Version française](README.fr.md)
 
-✅ **Portage validé sur machine Windows réelle, sans bug apparent — release
-officielle.** Plusieurs problèmes rencontrés lors des tests réels ont été
-corrigés au fil de l'eau (voir `CHANGELOG.md`).
+This folder contains everything needed to build a Windows package
+(portable `.zip` version and `.exe` installer) from the same source code as
+the Linux version (`portfolio/` and `planche-contact-gtk.py` at the root of
+the repository are **not** duplicated — they are the same files).
 
-## Utilisation
+✅ **Port validated on a real Windows machine, with no apparent bug — official
+release.** Several problems encountered during real-world testing were
+fixed along the way (see `CHANGELOG.md`).
 
-⚠️ **Premier lancement** : par défaut, Windows bloque l'exécution des
-scripts PowerShell locaux (erreur du type *"l'exécution de scripts est
-désactivée sur ce système"*). Autorisez-la, pour la session en cours
-uniquement (ne change rien de façon permanente) :
+## Usage
+
+⚠️ **First launch**: by default, Windows blocks the execution of local
+PowerShell scripts (error such as *"running scripts is disabled on this
+system"*). Allow it, for the current session only (it changes nothing
+permanently):
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
-Puis, depuis une invite PowerShell, **à la racine du dépôt** (pas besoin
-d'entrer dans `windows\`, un script relais `build-windows.ps1` y est
-disponible, symétrique à `build-deb.sh`) :
+Then, from a PowerShell prompt, **at the root of the repository** (no need
+to enter `windows\`, a relay script `build-windows.ps1` is available there,
+symmetrical to `build-deb.sh`):
 
 ```powershell
 .\build-windows.ps1
 ```
 
-Options identiques à `build-deb.sh` :
+Options identical to `build-deb.sh`:
 
 ```powershell
 .\build-windows.ps1 -Major              # 1.2.3 -> 2.0.0
 .\build-windows.ps1 -Minor              # 1.2.3 -> 1.3.0
 .\build-windows.ps1 -Patch              # 1.2.3 -> 1.2.4
-.\build-windows.ps1 -NoVersionChange    # reconstruit sans changer la version
-.\build-windows.ps1 -Clean              # nettoie le dossier de build
-.\build-windows.ps1 -Help               # aide
+.\build-windows.ps1 -NoVersionChange    # rebuilds without changing the version
+.\build-windows.ps1 -Clean              # cleans the build folder
+.\build-windows.ps1 -Help               # help
 ```
 
-Le script vérifie automatiquement les prérequis et propose de les installer
-s'ils manquent (voir ci-dessous). À la fin, deux fichiers apparaissent à la
-racine du dépôt :
+The script automatically checks the prerequisites and offers to install them
+if they are missing (see below). At the end, two files appear at the root of
+the repository:
 
-- `planche-contact_X.Y.Z_windows-portable.zip` — dossier autonome à
-  décompresser et lancer sans installation.
-- `planche-contact_X.Y.Z_windows-setup.exe` — installeur classique
-  (raccourcis menu Démarrer, désinstalleur), si NSIS est disponible.
+- `planche-contact_X.Y.Z_windows-portable.zip` — standalone folder to
+  unzip and launch without installation.
+- `planche-contact_X.Y.Z_windows-setup.exe` — classic installer
+  (Start menu shortcuts, uninstaller), if NSIS is available.
 
-## Avertissement SmartScreen à l'installation
+## SmartScreen warning at installation
 
-⚠️ **À prévenir auprès des utilisateurs finaux** : au premier lancement de
-`planche-contact_X.Y.Z_windows-setup.exe` (ou de l'exécutable portable),
-Windows affiche très probablement un écran bleu **« Windows a protégé
-votre PC »** (SmartScreen). C'est normal et attendu — l'installeur n'est
-pas signé numériquement (voir §7 de `PROJECT_CONTEXT.md`), pas un signe de
-logiciel malveillant.
+⚠️ **To warn end users about**: on the first launch of
+`planche-contact_X.Y.Z_windows-setup.exe` (or of the portable executable),
+Windows will very likely display a blue **"Windows protected your PC"**
+screen (SmartScreen). This is normal and expected — the installer is
+not digitally signed (see §7 of `PROJECT_CONTEXT.md`), it is not a sign of
+malicious software.
 
-Pour continuer :
+To continue:
 
-1. Cliquer sur **Informations complémentaires**.
-2. Cliquer sur **Exécuter quand même**.
+1. Click **More info**.
+2. Click **Run anyway**.
 
-Cet avertissement s'atténue naturellement avec le temps, à mesure que
-l'installeur accumule de la réputation auprès du service SmartScreen de
-Microsoft (téléchargements, absence de signalement), ou disparaît
-immédiatement avec un certificat de signature de code payant (~100-500
-€/an — voir la Roadmap de `PROJECT_CONTEXT.md`). Aucun correctif de code
-ne peut le supprimer.
+This warning naturally fades over time, as the installer accumulates
+reputation with Microsoft's SmartScreen service (downloads, absence of
+reports), or disappears immediately with a paid code-signing certificate
+(~€100-500/year — see the Roadmap in `PROJECT_CONTEXT.md`). No code fix
+can remove it.
 
-## Prérequis (vérifiés et proposés à l'installation automatiquement)
+## Prerequisites (checked and offered for installation automatically)
 
-⚠️ **Windows 64 bits (x64) exclusivement.** gvsbuild ne publie pas de build
-32 bits de GTK4, et le script vérifie que le Python détecté est bien en 64
-bits avant de continuer (sinon, arrêt avec message clair). Windows 10/11
-en 32 bits est de toute façon extrêmement rare aujourd'hui.
+⚠️ **64-bit Windows (x64) only.** gvsbuild does not publish a 32-bit build
+of GTK4, and the script checks that the detected Python is indeed 64-bit
+before continuing (otherwise, it stops with a clear message). 32-bit
+Windows 10/11 is extremely rare today anyway.
 
-| Outil | Rôle | Installation automatique |
+| Tool | Role | Automatic installation |
 |---|---|---|
-| Python 3.10+ | Interpréteur | Non — le script s'arrête avec un lien si absent |
-| [gvsbuild](https://github.com/wingtk/gvsbuild) | Pile GTK4 précompilée pour Windows | Oui, si vous acceptez (téléchargement ~300 Mo depuis les Releases GitHub, extrait dans `C:\gtk`) |
-| PyInstaller | Gèle l'application Python en `.exe` | Oui, via pip dans l'environnement virtuel du build |
-| [NSIS](https://nsis.sourceforge.io/) | Génère l'installeur `.exe` (facultatif) | Oui, via `winget`, si vous acceptez |
+| Python 3.10+ | Interpreter | No — the script stops with a link if it is missing |
+| [gvsbuild](https://github.com/wingtk/gvsbuild) | Precompiled GTK4 stack for Windows | Yes, if you accept (~300 MB download from the GitHub Releases, extracted into `C:\gtk`) |
+| PyInstaller | Freezes the Python application into an `.exe` | Yes, through pip in the build's virtual environment |
+| [NSIS](https://nsis.sourceforge.io/) | Generates the `.exe` installer (optional) | Yes, through `winget`, if you accept |
 
-Sans NSIS, seule la version portable `.zip` est produite (le script continue
-normalement, ce n'est pas bloquant).
+Without NSIS, only the portable `.zip` version is produced (the script
+continues normally, it is not blocking).
 
-## Fichiers de ce dossier
+## Files in this folder
 
-| Fichier | Rôle |
+| File | Role |
 |---|---|
-| `build-windows.ps1` | Script principal, équivalent Windows de `build-deb.sh` |
-| `planche-contact.spec` | Fichier de configuration PyInstaller (embarque GTK4) |
-| `installer.nsi` | Script NSIS générant l'installeur `.exe` |
+| `build-windows.ps1` | Main script, Windows equivalent of `build-deb.sh` |
+| `planche-contact.spec` | PyInstaller configuration file (bundles GTK4) |
+| `installer.nsi` | NSIS script generating the `.exe` installer |
 
-Un second `build-windows.ps1`, minuscule, existe **à la racine du dépôt** :
-il ne fait que relayer vers celui-ci (symétrique à `build-deb.sh`, qui se
-lance aussi depuis la racine) — c'est celui-là qu'on lance en pratique.
+A second, tiny `build-windows.ps1` exists **at the root of the repository**:
+it only relays to this one (symmetrical to `build-deb.sh`, which is also
+launched from the root) — that is the one you run in practice.
 
-## Comment ça marche (pour comprendre ou dépanner)
+## How it works (to understand or troubleshoot)
 
-1. Un environnement virtuel Python est créé, avec les mêmes dépendances que
-   la version Linux (Pillow, reportlab, rawpy, exifread) + PyInstaller.
-2. Les roues PyGObject/pycairo fournies par gvsbuild (`C:\gtk\wheels\`) sont
-   installées dans ce même environnement — ce sont des roues compilées
-   spécifiquement pour être liées à cette pile GTK4, pas les versions
-   génériques de PyPI.
-3. PyInstaller gèle `planche-contact-gtk.py` en exécutable, en embarquant
-   dans le même dossier :
-   - toutes les DLL de `C:\gtk\bin\` (GTK4 et ses dépendances) ;
-   - les typelibs GObject-Introspection (`C:\gtk\lib\girepository-1.0\`),
-     dans un sous-dossier `gi_typelibs\` ;
-   - les données partagées GTK (icônes, schémas...) depuis `C:\gtk\share\`.
-4. `planche-contact-gtk.py` contient un petit bloc de démarrage (actif
-   uniquement sous Windows, dans un exécutable gelé) qui indique à
-   PyGObject où trouver ces typelibs et DLL embarqués, avant le tout premier
+1. A Python virtual environment is created, with the same dependencies as
+   the Linux version (Pillow, reportlab, rawpy, exifread) + PyInstaller.
+2. The PyGObject/pycairo wheels provided by gvsbuild (`C:\gtk\wheels\`) are
+   installed in this same environment — they are wheels compiled
+   specifically to be linked to this GTK4 stack, not the generic PyPI
+   versions.
+3. PyInstaller freezes `planche-contact-gtk.py` into an executable, bundling
+   in the same folder:
+   - all the DLLs from `C:\gtk\bin\` (GTK4 and its dependencies);
+   - the GObject-Introspection typelibs (`C:\gtk\lib\girepository-1.0\`),
+     in a `gi_typelibs\` subfolder;
+   - the shared GTK data (icons, schemas...) from `C:\gtk\share\`.
+4. `planche-contact-gtk.py` contains a small startup block (active
+   only under Windows, in a frozen executable) that tells
+   PyGObject where to find these bundled typelibs and DLLs, before the very first
    `import gi`.
-5. Le dossier résultant est zippé tel quel (version portable), et/ou
-   embarqué dans un installeur NSIS.
+5. The resulting folder is zipped as is (portable version), and/or
+   bundled into an NSIS installer.
 
-## Dépannage
+## Troubleshooting
 
-**"Namespace Gtk not Available" au lancement de l'exécutable gelé**
-Signale que les typelibs ou les DLL GTK4 n'ont pas été trouvés au runtime.
-Vérifiez que `gi_typelibs\` existe bien à côté de `planche-contact-gtk.exe`
-dans le dossier de sortie, et que le bloc de démarrage en tête de
-`planche-contact-gtk.py` s'exécute bien avant `import gi` (c'est le cas par
-défaut, mais vérifiez qu'aucun outil de minification/obfuscation ne l'ait
-déplacé).
+**"Namespace Gtk not Available" when launching the frozen executable**
+Indicates that the typelibs or the GTK4 DLLs were not found at runtime.
+Check that `gi_typelibs\` does exist next to `planche-contact-gtk.exe`
+in the output folder, and that the startup block at the top of
+`planche-contact-gtk.py` does run before `import gi` (this is the case by
+default, but check that no minification/obfuscation tool has moved
+it).
 
-**PyInstaller échoue avec une erreur liée à `libgtk-4-1.dll` introuvable**
-Vérifiez que `C:\gtk\bin\` contient bien les DLL (une installation gvsbuild
-correcte doit en contenir plusieurs centaines). Si `C:\gtk` est incomplet,
-supprimez-le et relancez `build-windows.ps1` pour le retélécharger.
+**PyInstaller fails with an error related to `libgtk-4-1.dll` not found**
+Check that `C:\gtk\bin\` does contain the DLLs (a correct gvsbuild
+installation should contain several hundred). If `C:\gtk` is incomplete,
+delete it and rerun `build-windows.ps1` to download it again.
 
-**`makensis` échoue sur `!getenv`**
-Certaines versions anciennes de NSIS ne supportent pas `!getenv` nativement
-sans le plugin `EnvVarUpdate` ou équivalent. Si c'est le cas, mettez NSIS à
-jour vers une version récente (3.x), ou remplacez les lignes `!getenv` en
-tête de `installer.nsi` par des valeurs codées en dur pour un test rapide.
+**`makensis` fails on `!getenv`**
+Some older versions of NSIS do not support `!getenv` natively
+without the `EnvVarUpdate` plugin or equivalent. If that is the case, update NSIS
+to a recent version (3.x), or replace the `!getenv` lines at the top of
+`installer.nsi` with hard-coded values for a quick test.
 
-**Application gelée, mais fenêtre GTK invisible ou plantage silencieux**
-Essayez de lancer l'exécutable depuis une invite de commandes plutôt qu'en
-double-cliquant, pour voir les éventuels messages d'erreur (le `.spec`
-utilise `console=False` pour un lancement silencieux en usage normal ;
-passez temporairement `console=True` dans `planche-contact.spec` pour du
-débogage, puis relancez `pyinstaller` manuellement).
+**Frozen application, but GTK window invisible or silent crash**
+Try launching the executable from a command prompt rather than by
+double-clicking, to see any error messages (the `.spec`
+uses `console=False` for a silent launch in normal use;
+temporarily set `console=True` in `planche-contact.spec` for
+debugging, then rerun `pyinstaller` manually).
 
-**Icône manquante sur l'exécutable ou dans l'installeur**
-Vérifiez que `screenshots/application-icon.png` existe bien à la racine du
-dépôt, et que la conversion `.png` → `.ico` (faite par `build-windows.ps1`
-via Pillow) s'est bien déroulée sans erreur dans la sortie du script.
+**Missing icon on the executable or in the installer**
+Check that `screenshots/application-icon.png` does exist at the root of the
+repository, and that the `.png` → `.ico` conversion (done by `build-windows.ps1`
+via Pillow) went through without any error in the script's output.
 
-**Taille de l'application absente dans *Paramètres > Applications***
-Corrigé (voir `CHANGELOG.md`) : `installer.nsi` utilisait `IntFmt $0
-"0xX" $0`, une syntaxe documentée sur le wiki NSIS mais non fonctionnelle
-en NSIS 3.x (ne convertit rien, renvoie la chaîne littérale inchangée),
-faisant retomber `EstimatedSize` à 0 silencieusement. Si ce symptôme
-réapparaît après une modification de ce bloc, vérifier que la conversion
-utilise bien le style printf (`"0x%X"`). Ce correctif a été validé en
-compilant et en **exécutant** réellement l'installeur via `makensis` +
-Wine dans un environnement Linux (voir §6 de `PROJECT_CONTEXT.md`),
-sans nécessiter de machine Windows.
+**Application size missing in *Settings > Apps***
+Fixed (see `CHANGELOG.md`): `installer.nsi` used `IntFmt $0
+"0xX" $0`, a syntax documented on the NSIS wiki but non-functional
+in NSIS 3.x (it converts nothing, returns the literal string unchanged),
+silently making `EstimatedSize` fall back to 0. If this symptom
+reappears after a change to this block, check that the conversion
+does use the printf style (`"0x%X"`). This fix was validated by
+actually compiling and **running** the installer via `makensis` +
+Wine in a Linux environment (see §6 of `PROJECT_CONTEXT.md`),
+without needing a Windows machine.
 
-## Ce qui est partagé avec la version Linux (aucune duplication)
+## What is shared with the Linux version (no duplication)
 
-- `portfolio/` — moteur complet (scan, vignettes, planches, PDF, galerie,
-  CSV) : 100 % identique, aucune adaptation nécessaire.
-- `planche-contact-gtk.py` — interface graphique : identique, à l'exception
-  du petit bloc de démarrage Windows décrit ci-dessus (sans effet sur
+- `portfolio/` — the complete engine (scan, thumbnails, sheets, PDF, gallery,
+  CSV): 100% identical, no adaptation needed.
+- `planche-contact-gtk.py` — graphical interface: identical, except for the
+  small Windows startup block described above (no effect on
   Linux/macOS).
 
-Tout correctif apporté à ces fichiers pour la version Linux profite donc
-automatiquement à la version Windows, et inversement.
+Any fix made to these files for the Linux version therefore benefits the
+Windows version automatically, and vice versa.

@@ -1,5 +1,7 @@
 # Contributing to Planche-Contact
 
+🇫🇷 [Version française](CONTRIBUTING.fr.md)
+
 Thank you for your interest in contributing to **Planche-Contact**.
 
 Contributions of all kinds are welcome, including bug reports, feature requests, documentation improvements, translations and code contributions.
@@ -58,11 +60,15 @@ This includes:
 - examples;
 - screenshots.
 
+The project documentation (`README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `PROJECT_CONTEXT.md` and `windows/README.md`) is bilingual: the English version is the default file (`X.md`) and the French version sits next to it (`X.fr.md`). When you change one of them, please update the other too, or say so in your Pull Request so that the maintainer can update it.
+
 ## Translations
 
-The current interface is developed in French.
+The interface is available in English, French, German and Spanish. The strings live in `portfolio/locales/` (one file per language: `en.py`, `fr.py`, `de.py`, `es.py`); `en.py` must always stay complete, because English is the fallback language.
 
-Translations into other languages are welcome and may be integrated after review and testing.
+Corrections to existing translations and translations into other languages are welcome and may be integrated after review and testing.
+
+The user manual (`docs/planche-contact-manual*.html`) exists in the same four languages.
 
 ## Questions
 
