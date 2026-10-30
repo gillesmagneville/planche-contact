@@ -64,6 +64,10 @@ SHA-256 :
 76c8617f00b610a79d04a48572c840658fc653d303e0d3efe81e2fcf9ccb9acb
 ```
 
+**Toutes distributions Linux — AppImage**
+
+Un seul fichier exécutable qui embarque Python, GTK 4 et toutes les bibliothèques nécessaires à Planche-Contact : rien à installer. Il est construit par `./build-appimage.sh` et destiné à être joint aux releases avec son fichier `.sha256`. Pas encore publié : voir [AppImage](#appimage-toutes-distributions-linux) pour le construire vous-même.
+
 ### Windows
 
 **Windows 10 / 11 — Installeur**
@@ -117,13 +121,15 @@ Planche-Contact s'adresse aux photographes et aux collections d'images qui ont b
 
 Générez des planches contact de haute qualité à partir de dossiers d'images complets, avec des mises en page, des légendes, des thèmes et des options de présentation personnalisables.
 
+Traitez toute une arborescence ou **choisissez les sous-dossiers à inclure**.
+
 ### Prise en charge du RAW
 
 Traitez directement les fichiers RAW grâce à **LibRaw**, compatible avec les appareils de la plupart des grands fabricants.
 
 ### Légendes EXIF personnalisées
 
-Affichez les métadonnées qui comptent pour vous, notamment :
+Affichez les métadonnées qui comptent pour vous (le nom du fichier s'affiche par défaut sous chaque photo), notamment :
 
 - Nom de fichier
 - Date
@@ -147,6 +153,8 @@ Prévisualisez la planche contact avant de générer les documents finaux.
 ### Export PDF
 
 Générez des documents PDF haute résolution adaptés à l'impression, à l'archivage ou au partage.
+
+Les légendes, titres et numéros de page sont aussi posés sur chaque page sous forme de texte invisible : les noms de fichiers peuvent être **sélectionnés, copiés et recherchés** dans n'importe quel lecteur PDF.
 
 ### Galeries HTML
 
@@ -357,6 +365,47 @@ Téléchargez le dernier paquet **.deb** depuis la page **Releases**.
 ```bash
 sudo apt install ./planche-contact_<version>_amd64.deb
 ```
+
+## AppImage (toutes distributions Linux)
+
+Un seul fichier autonome qui embarque Python, GTK 4 et toutes les bibliothèques nécessaires à Planche-Contact, y compris la bibliothèque C : il ne dépend ni des paquets, ni de la version de la distribution qui l'exécute.
+
+```bash
+chmod +x Planche-Contact-<version>-x86_64.AppImage
+./Planche-Contact-<version>-x86_64.AppImage
+```
+
+Vérifiez le fichier téléchargé avec le fichier `.sha256` publié à côté :
+
+```bash
+sha256sum -c Planche-Contact-<version>-x86_64.AppImage.sha256
+```
+
+Le même fichier donne accès à la ligne de commande :
+
+```bash
+./Planche-Contact-<version>-x86_64.AppImage portfolio -i ~/Photos -o ~/Planches --pdf
+```
+
+Si votre système ne sait pas monter les AppImage (pas de FUSE), laissez le fichier se décompresser lui-même le temps de l'exécution :
+
+```bash
+APPIMAGE_EXTRACT_AND_RUN=1 ./Planche-Contact-<version>-x86_64.AppImage
+```
+
+**Le construire vous-même** (Debian / Ubuntu) :
+
+```bash
+sudo apt install python3 python3-venv python3-gi gir1.2-gtk-4.0 patchelf binutils curl strace
+cd planche-contact
+./build-appimage.sh --test
+```
+
+Cela produit `Planche-Contact-<version>-<arch>.AppImage` et son `.sha256` à la racine du projet (`--test` lance ensuite une vraie génération de PDF et démarre l'interface sous un affichage virtuel ; ajoutez `xvfb` aux paquets ci-dessus pour cette dernière étape). Le script télécharge `quick-sharun` depuis le projet [Anylinux-AppImages](https://github.com/pkgforge-dev/Anylinux-AppImages) et **vérifie son empreinte SHA-256 avant de l'exécuter** : si le script amont a changé, la construction s'arrête au lieu d'exécuter un code que personne n'a relu.
+
+- L'interface est dessinée par le rendu logiciel de GTK (Cairo) : ni OpenGL, ni Vulkan, ni pilote graphique n'est nécessaire, et les bibliothèques graphiques de la machine ne sont pas chargées.
+- L'AppImage est construite pour l'architecture de la machine qui la construit (`x86_64`, `aarch64`...).
+- État : construite et testée uniquement sur Ubuntu 24.04 (x86_64), sous un affichage X virtuel. Les autres distributions, Wayland et un vrai matériel graphique n'ont pas encore été testés — les retours sont les bienvenus.
 
 ---
 

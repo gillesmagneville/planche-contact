@@ -334,6 +334,22 @@ def default_profile() -> Profile:
     return Profile()
 
 
+def interface_default_profile() -> Profile:
+    """Profil que l'INTERFACE GRAPHIQUE présente au démarrage et à
+    « Réinitialiser » : celui de default_profile() avec, en plus, le nom du
+    fichier sous chaque photo (légende « Nom du fichier » cochée).
+
+    Volontairement distinct de default_profile(), qui reste ce que la ligne
+    de commande applique sans --profile (aucune légende : rendu strictement
+    identique à celui d'avant les légendes, dont dépendent les scripts
+    existants) - l'interface, elle, transmet toujours son profil au CLI dès
+    qu'il diffère de default_profile() (voir planche-contact-gtk.py)."""
+    return Profile(
+        layout=LayoutSettings(caption_position="below"),
+        captions=CaptionSettings(fields=["filename"]),
+    )
+
+
 def load_profile(path: "str | Path") -> Profile:
     """Charge un profil depuis un fichier JSON. Jamais d'exception : un
     fichier absent, illisible, mal formé, ou partiellement reconnu (champs

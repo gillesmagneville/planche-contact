@@ -8,6 +8,7 @@ from .presentation import (
     FOOTER_PAGE_NUMBER_OFFSET_PX, FOOTER_CREDIT_OFFSET_PX, FOOTER_LICENSE_OFFSET_PX,
 )
 from .i18n import _
+from .textlayer import TextRun
 
 #: Nombre maximal de lignes de légende que la mise en page ajoute d'elle-même
 #: quand le texte, une fois passé à la ligne dans la largeur d'une vignette,
@@ -124,6 +125,27 @@ def _fit_header_text(draw, text, size, bold, max_width, min_size):
     return font, _fit_text_to_width(draw, text, font, max_width)
 
 
+def _text_run(draw, xy, text, font, bold=False, copy_text=None):
+    """`TextRun` décrivant un texte que `draw.text(xy, text, font=font)` vient
+    de dessiner (ancre PIL par défaut : bord gauche, haut de la ligne), pour
+    la couche de texte invisible du PDF (voir textlayer.py). Renvoie None si
+    la police ne permet pas de mesurer le texte : la planche est alors
+    dessinée normalement, simplement sans texte sélectionnable pour cette
+    ligne."""
+    if not text:
+        return None
+    try:
+        ascent = font.getmetrics()[0]
+        width = float(draw.textlength(text, font=font))
+        size = float(font.size)
+    except Exception:
+        return None
+    return TextRun(
+        text=copy_text or text, x=float(xy[0]), baseline=float(xy[1]) + ascent,
+        size=size, width=width, bold=bold,
+    )
+
+
 def _header_x(position, canvas_w, margin_px, text_w):
     """Abscisse du texte d'en-tête selon HEADER_POSITIONS : aligné sur la
     marge de page à gauche/à droite, centré sinon (formule d'origine,
@@ -150,11 +172,25 @@ class ContactSheetGenerator:
         self.author = getattr(config, 'author', None)
         self.input_dir = getattr(config, 'input_dir', None)
         self.num_per_sheet = self.profile.layout.per_page
+        #: Textes dessinés sur la DERNIÈRE planche créée (liste de TextRun,
+        #: dans l'ordre de lecture : en-tête, légendes, pied de page) : le
+        #: PDF s'en sert pour poser un texte sélectionnable sur l'image.
+        self.last_text_runs = []
+
+    def _put_text(self, draw, xy, text, fill, font, bold=False, copy_text=None):
+        """`draw.text()` + enregistrement du texte dans `last_text_runs`.
+        `copy_text` : texte à copier depuis le PDF quand il diffère de celui
+        affiché (ligne tronquée par « … » : le PDF garde la version complète)."""
+        draw.text(xy, text, fill=fill, font=font)
+        run = _text_run(draw, xy, text, font, bold=bold, copy_text=copy_text)
+        if run is not None:
+            self.last_text_runs.append(run)
 
     def _get_canvas_size(self):
         return canvas_size_px(self.profile.layout.page_format, self.profile.layout.orientation)
 
     def create_contact_sheet(self, images, page_num, total_pages):
+        self.last_text_runs = []
         if not images:
             return None
 
@@ -362,7 +398,8 @@ class ContactSheetGenerator:
             bbox = draw.textbbox((0, 0), text, font=font_title)
             text_w = bbox[2] - bbox[0]
             x = _header_x(layout.title_position, canvas_w, margin_px, text_w)
-            draw.text((x, y), text, fill=palette.text, font=font_title)
+            self._put_text(draw, (x, y), text, palette.text, font_title, bold=True,
+                           copy_text=display_title if text != display_title else None)
             y += 58
 
         if self.author and layout.author_position != "none":
@@ -370,7 +407,8 @@ class ContactSheetGenerator:
             bbox = draw.textbbox((0, 0), text, font=font_author)
             text_w = bbox[2] - bbox[0]
             x = _header_x(layout.author_position, canvas_w, margin_px, text_w)
-            draw.text((x, y), text, fill=palette.text, font=font_author)
+            self._put_text(draw, (x, y), text, palette.text, font_author, bold=True,
+                           copy_text=self.author if text != self.author else None)
             y += 42
 
         return y
@@ -406,7 +444,12 @@ class ContactSheetGenerator:
         line_height = font_px + CAPTION_LINE_SPACING_PX
 
         max_lines = max(1, height // line_height)
+        # Texte complet de chaque ligne pour le PDF (couche de texte
+        # invisible, voir textlayer.py) : les lignes supprimées faute de place
+        # sont recopiées à la suite de la dernière ligne visible.
+        full_lines = list(lines)
         if len(lines) > max_lines:
+            full_lines = list(lines[:max_lines - 1]) + [" ".join(lines[max_lines - 1:])]
             lines = list(lines[:max_lines])
             lines[-1] = lines[-1] + "…"
 
@@ -420,7 +463,11 @@ class ContactSheetGenerator:
                 text_x = x + width - text_w
             else:
                 text_x = x + (width - text_w) / 2
-            draw.text((text_x, y + i * line_height), line, fill=palette.text, font=font)
+            if line:
+                self._put_text(
+                    draw, (text_x, y + i * line_height), line, palette.text, font,
+                    copy_text=full_lines[i] if full_lines[i] != line else None,
+                )
 
     def _draw_page_number(self, draw, canvas_w, canvas_h, page_num, total_pages, palette,
                           show_page_number=True):
@@ -449,4 +496,4 @@ class ContactSheetGenerator:
         for text, offset_px, line_font, color in lines:
             bbox = draw.textbbox((0, 0), text, font=line_font)
             text_w = bbox[2] - bbox[0]
-            draw.text(((canvas_w - text_w) / 2, canvas_h - offset_px), text, fill=color, font=line_font)
+            self._put_text(draw, ((canvas_w - text_w) / 2, canvas_h - offset_px), text, color, line_font)

@@ -65,15 +65,15 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent))
 
 from portfolio.config import Config
-from portfolio.scanner import ImageScanner
+from portfolio.scanner import ImageScanner, list_image_folders
 from portfolio.rawloader import load_image
 from portfolio.utils import AUTHOR_NAME
 from portfolio.i18n import _, set_language, get_language, AVAILABLE_LANGUAGES, detect_system_language
 from portfolio.presentation import (
     Profile, LayoutSettings, CaptionSettings, ThemeSettings, ThemeCustomColors,
     CAPTION_FIELDS, LAYOUT_TEMPLATES, FIT_MODES, ORIENTATIONS, CAPTION_POSITIONS,
-    CAPTION_ALIGNMENTS, THEME_MODES, HEADER_POSITIONS, default_profile, load_profile,
-    save_profile, compute_effective_per_page,
+    CAPTION_ALIGNMENTS, THEME_MODES, HEADER_POSITIONS, default_profile,
+    interface_default_profile, load_profile, save_profile, compute_effective_per_page,
 )
 
 
@@ -352,6 +352,13 @@ class PlancheContactGTK(Gtk.Application):
         self.language_preference = "system"
         self._preview_debounce_id = None
         self._output_debounce_id = None
+        # Sous-dossiers choisis par l'utilisateur (voir « Choisir les
+        # sous-dossiers... ») : None = tous les dossiers ; sinon tuple de
+        # chemins relatifs POSIX au dossier d'entrée ("." = le dossier
+        # lui-même), le nombre total de dossiers proposés servant à
+        # l'affichage « N sur M ».
+        self._subfolder_selection = None
+        self._subfolder_total = 0
         self._last_result = None
         self._pending_result = None
         # Référence conservée tant qu'une boîte de dialogue Gtk.FileChooserNative
@@ -628,8 +635,19 @@ class PlancheContactGTK(Gtk.Application):
 
         # Options
         grid = Gtk.Grid(column_spacing=10, row_spacing=6)
+        recursive_box = Gtk.Box(spacing=10)
         self.recursive_check = Gtk.CheckButton(label=_("gen.recursive"))
-        grid.attach(self.recursive_check, 0, 0, 8, 1)
+        recursive_box.append(self.recursive_check)
+        self.subfolders_btn = Gtk.Button(label=_("gen.subfolders_button"))
+        self.subfolders_btn.set_tooltip_text(_("gen.subfolders_tooltip"))
+        self.subfolders_btn.connect("clicked", self._on_choose_subfolders)
+        recursive_box.append(self.subfolders_btn)
+        self.subfolders_label = Gtk.Label(label="")
+        self.subfolders_label.add_css_class("dim-label")
+        recursive_box.append(self.subfolders_label)
+        self.recursive_check.connect("toggled", self._on_recursive_toggled)
+        self._update_subfolder_widgets()
+        grid.attach(recursive_box, 0, 0, 8, 1)
 
         grid.attach(Gtk.Label(label=_("gen.images_per_sheet")), 0, 1, 1, 1)
         num_model = Gtk.StringList()
@@ -791,7 +809,11 @@ class PlancheContactGTK(Gtk.Application):
         self.adv_open_btn = Gtk.Button(label=_("adv.open_button"))
         self.adv_open_btn.set_tooltip_text(_("adv.open_button_tooltip"))
         self.adv_open_btn.connect("clicked", self._open_advanced_dialog)
-        self._apply_profile_to_widgets(default_profile())
+        # Au démarrage : le nom du fichier sous chaque photo (voir
+        # interface_default_profile()). La ligne de commande, elle, ne met
+        # aucune légende sans --profile ; l'interface transmet son profil
+        # dès qu'il diffère de default_profile() - donc ici toujours.
+        self._apply_profile_to_widgets(interface_default_profile())
 
         # Boutons
         hbox = Gtk.Box(spacing=10)
@@ -1498,7 +1520,12 @@ class PlancheContactGTK(Gtk.Application):
             self._adv_notify(_("gen.select_input_first"))
             return
 
-        if not self.input_preview._files:
+        recursive = self.recursive_check.get_active()
+        include_dirs = self._include_dirs_for_cli()
+        # En recherche récursive les photos peuvent n'être que dans des
+        # sous-dossiers : l'aperçu du dossier d'entrée (non récursif) ne
+        # dit alors rien, c'est le sous-processus qui scanne.
+        if not recursive and not self.input_preview._files:
             self._show_no_viewer_dialog(_("adv.preview_title"), _("adv.preview_no_photos"))
             return
 
@@ -1521,10 +1548,14 @@ class PlancheContactGTK(Gtk.Application):
             num_per_sheet=num_per_sheet, page_format=page_format,
             profile=advanced_profile,
         )
-        shown_count = min(
-            len(self.input_preview._files),
-            compute_effective_per_page(config_for_count.profile),
-        )
+        per_page = compute_effective_per_page(config_for_count.profile)
+        if recursive:
+            # Compté en arrière-plan (parcours de l'arborescence) : voir
+            # _generate_preview().
+            def shown_count():
+                return min(per_page, self._count_photos(input_dir, include_dirs))
+        else:
+            shown_count = min(len(self.input_preview._files), per_page)
 
         if getattr(sys, "frozen", False):
             cmd = [sys.executable, "--run-cli"]
@@ -1550,8 +1581,11 @@ class PlancheContactGTK(Gtk.Application):
             cmd.extend(["--watermark", watermark])
             cmd.extend(["--watermark-orientation", orientation])
             cmd.extend(["--watermark-opacity", str(opacity)])
-        if self.recursive_check.get_active():
+        if recursive:
             cmd.append("-r")
+        include_file = self._write_include_dirs_file(include_dirs)
+        if include_file:
+            cmd.extend(["--include-dirs-file", include_file])
 
         profile_path = None
         if advanced_profile != default_profile():
@@ -1566,7 +1600,8 @@ class PlancheContactGTK(Gtk.Application):
 
         threading.Thread(
             target=self._generate_preview,
-            args=(cmd, preview_png_path, profile_path, picture, status_label, shown_count),
+            args=(cmd, preview_png_path, profile_path, picture, status_label, shown_count,
+                  (include_file,)),
             daemon=True,
         ).start()
 
@@ -1608,7 +1643,8 @@ class PlancheContactGTK(Gtk.Application):
 
         return dialog, picture, status_label
 
-    def _generate_preview(self, cmd, preview_png_path, profile_path, picture, status_label, shown_count):
+    def _generate_preview(self, cmd, preview_png_path, profile_path, picture, status_label, shown_count,
+                          extra_cleanup=()):
         """Exécuté en arrière-plan : lance et attend le sous-processus CLI
         (potentiellement coûteux - décodage/filigrane/dessin réels, voir
         ContactSheetGenerator) - voir le commentaire au-dessus de
@@ -1621,11 +1657,13 @@ class PlancheContactGTK(Gtk.Application):
                 raise RuntimeError(result.stderr.strip() or _("adv.preview_empty_result"))
             with open(preview_png_path, "rb") as f:
                 data = f.read()
+            if callable(shown_count):
+                shown_count = shown_count()
         except Exception as e:
             glib_idle_add(status_label.set_text, _("adv.preview_error", error=e))
             return
         finally:
-            for path in (preview_png_path, profile_path):
+            for path in (preview_png_path, profile_path, *extra_cleanup):
                 if path:
                     try:
                         os.remove(path)
@@ -1668,7 +1706,8 @@ class PlancheContactGTK(Gtk.Application):
         self.html_check.set_active(True)
         self.html_originals_check.set_active(False)
         self.csv_check.set_active(True)
-        self._apply_profile_to_widgets(default_profile())
+        self._apply_profile_to_widgets(interface_default_profile())
+        self._reset_subfolder_selection()
         self.log_buffer.set_text("")
         self.status_label.set_text("")
         self.progress.set_fraction(0.0)
@@ -1991,9 +2030,199 @@ class PlancheContactGTK(Gtk.Application):
 
         dialog.present()
 
+    # ====================== CHOIX DES SOUS-DOSSIERS ======================
+    # Avec la recherche récursive, le dossier principal peut contenir de
+    # nombreux sous-dossiers dont on ne veut qu'une partie. Le bouton
+    # « Choisir les sous-dossiers... » ouvre la liste des dossiers qui
+    # contiennent des photos (scanner.list_image_folders) ; le choix est
+    # transmis au CLI par un fichier temporaire (--include-dirs-file : pas de
+    # limite de longueur de ligne de commande, accents sans souci).
+
+    def _reset_subfolder_selection(self):
+        self._subfolder_selection = None
+        self._subfolder_total = 0
+        self._update_subfolder_widgets()
+
+    def _on_recursive_toggled(self, check):
+        if not check.get_active():
+            self._subfolder_selection = None
+            self._subfolder_total = 0
+        self._update_subfolder_widgets()
+
+    def _update_subfolder_widgets(self):
+        """Bouton actif seulement avec la recherche récursive ET un dossier
+        d'entrée valide ; l'étiquette dit ce qui sera traité."""
+        button = getattr(self, "subfolders_btn", None)
+        label = getattr(self, "subfolders_label", None)
+        if button is None or label is None:
+            return
+        recursive = self.recursive_check.get_active()
+        input_dir = self.input_entry.get_text().strip() if hasattr(self, "input_entry") else ""
+        button.set_sensitive(bool(recursive and input_dir and Path(input_dir).is_dir()))
+        if not recursive:
+            label.set_text("")
+        elif self._subfolder_selection is None:
+            label.set_text(_("gen.subfolders_all"))
+        else:
+            label.set_text(_(
+                "gen.subfolders_selected",
+                selected=len(self._subfolder_selection), total=self._subfolder_total,
+            ))
+
+    def _include_dirs_for_cli(self):
+        """Sous-dossiers à transmettre au CLI (tuple), ou None = tout."""
+        if not self.recursive_check.get_active():
+            return None
+        return self._subfolder_selection
+
+    def _write_include_dirs_file(self, include_dirs):
+        """Écrit la liste dans un fichier temporaire UTF-8 (un dossier par
+        ligne) et renvoie son chemin, ou None s'il n'y a pas de choix. Le
+        fichier est supprimé par l'appelant une fois le CLI terminé."""
+        if include_dirs is None:
+            return None
+        fd, path = tempfile.mkstemp(suffix=".txt", prefix="planche-contact-dirs-")
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write("".join(f"{name}\n" for name in include_dirs))
+        return path
+
+    def _count_photos(self, input_dir, include_dirs):
+        """Nombre de photos retenues (parcours des noms de fichiers
+        uniquement) - pour la note sous l'aperçu en recherche récursive.
+        Même exclusion de planches/ et gallery/ que l'aperçu lui-même
+        (dossier de sortie = dossier d'entrée dans ce mode)."""
+        folders = list_image_folders(Path(input_dir), Path(input_dir))
+        if include_dirs is not None:
+            wanted = set(include_dirs)
+            folders = [item for item in folders if item[0] in wanted]
+        return sum(count for _name, count in folders)
+
+    def _on_choose_subfolders(self, button):
+        input_dir = self.input_entry.get_text().strip()
+        if not input_dir or not Path(input_dir).is_dir():
+            self._log(_("gen.select_input_first"))
+            return
+        output_text = self.output_entry.get_text().strip()
+        output_dir = Path(output_text) if output_text else Path(input_dir) / "Portfolio"
+
+        dialog = Gtk.Window(transient_for=self._dialog_parent(), modal=True)
+        dialog.set_title(_("subfolders.title"))
+        dialog.set_default_size(620, 520)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        box.set_margin_top(14)
+        box.set_margin_bottom(14)
+        box.set_margin_start(14)
+        box.set_margin_end(14)
+        dialog.set_child(box)
+
+        intro = Gtk.Label(label=_("subfolders.intro"))
+        intro.set_xalign(0)
+        intro.set_wrap(True)
+        box.append(intro)
+
+        status = Gtk.Label(label=_("subfolders.scanning"))
+        status.set_xalign(0)
+        status.add_css_class("dim-label")
+        box.append(status)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_min_content_height(280)
+        list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        list_box.set_margin_top(6)
+        list_box.set_margin_bottom(6)
+        list_box.set_margin_start(6)
+        list_box.set_margin_end(6)
+        scroll.set_child(list_box)
+        box.append(scroll)
+
+        tick_box = Gtk.Box(spacing=10)
+        all_btn = Gtk.Button(label=_("subfolders.select_all"))
+        none_btn = Gtk.Button(label=_("subfolders.select_none"))
+        tick_box.append(all_btn)
+        tick_box.append(none_btn)
+        summary = Gtk.Label(label="")
+        summary.set_xalign(1)
+        summary.set_hexpand(True)
+        summary.add_css_class("dim-label")
+        tick_box.append(summary)
+        box.append(tick_box)
+
+        action_box = Gtk.Box(spacing=10)
+        action_box.set_halign(Gtk.Align.END)
+        cancel_btn = Gtk.Button(label=_("subfolders.cancel"))
+        ok_btn = Gtk.Button(label=_("subfolders.ok"))
+        ok_btn.add_css_class("suggested-action")
+        ok_btn.set_sensitive(False)
+        action_box.append(cancel_btn)
+        action_box.append(ok_btn)
+        box.append(action_box)
+
+        entries = []          # [(chemin relatif, nombre de photos, case à cocher)]
+        state = {"closed": False}
+
+        def refresh_summary(*_args):
+            ticked = [item for item in entries if item[2].get_active()]
+            summary.set_text(_(
+                "subfolders.summary", selected=len(ticked), total=len(entries),
+                photos=sum(item[1] for item in ticked),
+            ))
+            ok_btn.set_sensitive(bool(ticked))
+
+        def populate(folders):
+            if state["closed"]:
+                return False
+            status.set_text("" if folders else _("subfolders.none_found"))
+            current = self._subfolder_selection
+            for relative, count in folders:
+                name = _("subfolders.root_label") if relative == "." else relative
+                counted = _("subfolders.photo_count", count=count)
+                check = Gtk.CheckButton(label=f"{name}  ({counted})")
+                check.set_active(current is None or relative in current)
+                check.connect("toggled", refresh_summary)
+                list_box.append(check)
+                entries.append((relative, count, check))
+            refresh_summary()
+            return False
+
+        def scan_folders():
+            try:
+                folders = list_image_folders(Path(input_dir), output_dir)
+            except Exception:
+                folders = []
+            glib_idle_add(populate, folders)
+
+        def set_all(active):
+            for _relative, _count, check in entries:
+                check.set_active(active)
+
+        def on_ok(_button):
+            chosen = tuple(relative for relative, _count, check in entries if check.get_active())
+            # Tout coché = pas de restriction (même résultat qu'avant ce choix).
+            self._subfolder_selection = None if len(chosen) == len(entries) else chosen
+            self._subfolder_total = len(entries)
+            self._update_subfolder_widgets()
+            dialog.destroy()
+
+        def on_close(_window):
+            state["closed"] = True
+            return False
+
+        all_btn.connect("clicked", lambda b: set_all(True))
+        none_btn.connect("clicked", lambda b: set_all(False))
+        ok_btn.connect("clicked", on_ok)
+        cancel_btn.connect("clicked", lambda b: dialog.destroy())
+        dialog.connect("close-request", on_close)
+
+        dialog.present()
+        threading.Thread(target=scan_folders, daemon=True).start()
+
     # ====================== APERÇU DU DOSSIER D'ENTRÉE ======================
 
     def _on_input_entry_changed(self, entry):
+        # Un autre dossier d'entrée : le choix de sous-dossiers ne vaut plus.
+        self._reset_subfolder_selection()
         # Anti-rebond : on évite de relancer un scan à chaque frappe.
         if self._preview_debounce_id is not None:
             GLib.source_remove(self._preview_debounce_id)
@@ -2117,6 +2346,9 @@ class PlancheContactGTK(Gtk.Application):
             cmd.extend(["--watermark-opacity", str(opacity)])
         if self.recursive_check.get_active():
             cmd.append("-r")
+        include_file = self._write_include_dirs_file(self._include_dirs_for_cli())
+        if include_file:
+            cmd.extend(["--include-dirs-file", include_file])
         if self.pdf_check.get_active():
             cmd.append("--pdf")
         if self.html_check.get_active():
@@ -2132,6 +2364,7 @@ class PlancheContactGTK(Gtk.Application):
         # comportement par défaut (voir Config.__post_init__, déjà
         # strictement rétrocompatible sans profil explicite).
         advanced_profile = self._profile_from_widgets()
+        profile_path = None
         if advanced_profile != default_profile():
             fd, profile_path = tempfile.mkstemp(suffix=".json", prefix="planche-contact-profile-")
             os.close(fd)
@@ -2152,9 +2385,11 @@ class PlancheContactGTK(Gtk.Application):
             "output_dir": Path(output_dir),
         }
 
-        threading.Thread(target=self._run_cli, args=(cmd,), daemon=True).start()
+        threading.Thread(
+            target=self._run_cli, args=(cmd, (profile_path, include_file)), daemon=True,
+        ).start()
 
-    def _run_cli(self, cmd):
+    def _run_cli(self, cmd, cleanup_paths=()):
         try:
             process = subprocess.Popen(
                 cmd,
@@ -2194,6 +2429,13 @@ class PlancheContactGTK(Gtk.Application):
             glib_idle_add(self._log, _("gen.error_log_exception", error=e))
             glib_idle_add(self.status_label.set_text, _("gen.error_status_generic"))
         finally:
+            # Fichiers temporaires passés au CLI (profil, liste de dossiers).
+            for path in cleanup_paths:
+                if path:
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
             glib_idle_add(self.run_button.set_sensitive, True)
 
     def _log(self, message):

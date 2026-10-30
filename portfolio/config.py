@@ -12,6 +12,13 @@ class Config:
 
     # Scan options
     recursive: bool = False
+    # Sous-dossiers à traiter (chemins relatifs POSIX par rapport à
+    # input_dir, "." = le dossier d'entrée lui-même) : seules les photos
+    # situées DIRECTEMENT dans ces dossiers sont retenues. None (défaut) =
+    # toutes les photos, comportement historique. Choisir des sous-dossiers
+    # impose une recherche récursive (voir ImageScanner.scan()). La liste
+    # des dossiers possibles vient de scanner.list_image_folders().
+    include_dirs: Optional[tuple] = None
     sort_by: str = "date"
 
     # Generation options

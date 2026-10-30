@@ -64,6 +64,10 @@ SHA-256:
 76c8617f00b610a79d04a48572c840658fc653d303e0d3efe81e2fcf9ccb9acb
 ```
 
+**Any Linux distribution — AppImage**
+
+A single executable file that bundles Python, GTK 4 and every library Planche-Contact needs: nothing to install. It is built by `./build-appimage.sh` and is meant to be attached to the releases together with its `.sha256` file. Not published yet: see [AppImage](#appimage-any-linux-distribution) to build it yourself.
+
 ### Windows
 
 **Windows 10 / 11 — Installer**
@@ -117,13 +121,15 @@ Planche-Contact is designed for photographers and image collections that need a 
 
 Generate high-quality contact sheets from complete image folders with customizable layouts, captions, themes and presentation options.
 
+Process a whole folder tree or **choose which subfolders to include**.
+
 ### RAW Support
 
 Process RAW files directly through **LibRaw**, supporting cameras from most major manufacturers.
 
 ### Custom EXIF Captions
 
-Display the metadata that matters to you, including:
+Display the metadata that matters to you (the file name is shown under each photo by default), including:
 
 - Filename
 - Date
@@ -147,6 +153,8 @@ Preview the contact sheet before generating the final documents.
 ### PDF Export
 
 Generate high-resolution PDF documents suitable for printing, archiving or sharing.
+
+Captions, titles and page numbers are also laid over each page as invisible text: file names can be **selected, copied and searched** in any PDF viewer.
 
 ### HTML Galleries
 
@@ -357,6 +365,47 @@ Download the latest **.deb** package from the **Releases** page.
 ```bash
 sudo apt install ./planche-contact_<version>_amd64.deb
 ```
+
+## AppImage (any Linux distribution)
+
+A single self-contained file that bundles Python, GTK 4 and all the libraries Planche-Contact needs, including the C library: it does not depend on the packages — or the version — of the distribution it runs on.
+
+```bash
+chmod +x Planche-Contact-<version>-x86_64.AppImage
+./Planche-Contact-<version>-x86_64.AppImage
+```
+
+Check the download against the `.sha256` file published next to it:
+
+```bash
+sha256sum -c Planche-Contact-<version>-x86_64.AppImage.sha256
+```
+
+The same file gives access to the command line interface:
+
+```bash
+./Planche-Contact-<version>-x86_64.AppImage portfolio -i ~/Photos -o ~/Contact-sheets --pdf
+```
+
+If your system cannot mount AppImages (no FUSE), let the file unpack itself for the run:
+
+```bash
+APPIMAGE_EXTRACT_AND_RUN=1 ./Planche-Contact-<version>-x86_64.AppImage
+```
+
+**Build it yourself** (Debian / Ubuntu):
+
+```bash
+sudo apt install python3 python3-venv python3-gi gir1.2-gtk-4.0 patchelf binutils curl strace
+cd planche-contact
+./build-appimage.sh --test
+```
+
+This produces `Planche-Contact-<version>-<arch>.AppImage` and its `.sha256` at the root of the project (`--test` then runs a real PDF generation and starts the interface under a virtual display; add `xvfb` to the packages above for that last step). The script downloads `quick-sharun` from the [Anylinux-AppImages](https://github.com/pkgforge-dev/Anylinux-AppImages) project and **checks its SHA-256 before running it**: if the upstream script has changed, the build stops instead of running code nobody has read.
+
+- The interface is drawn with GTK's software renderer (Cairo): no OpenGL, Vulkan or graphics driver is needed, and the graphics libraries of the host are not loaded.
+- The AppImage is built for the architecture of the machine that builds it (`x86_64`, `aarch64`...).
+- Status: built and tested on Ubuntu 24.04 (x86_64) under a virtual X display only. Other distributions, Wayland and real graphics hardware have not been tested yet — feedback is welcome.
 
 ---
 

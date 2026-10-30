@@ -1,13 +1,24 @@
 import logging
 from pathlib import Path
+from typing import Optional
 
 from reportlab.pdfgen import canvas
 from PIL import Image as PILImage
 from .i18n import _
+from .textlayer import draw_text_layer
 
 
 class PDFExporter:
-    def create_pdf(self, planche_files: list[Path], output_path: Path) -> None:
+    def create_pdf(self, planche_files: list[Path], output_path: Path,
+                   text_runs: Optional[dict] = None) -> None:
+        """Assemble les planches en un PDF (une planche par page).
+
+        `text_runs` : `{chemin de planche: [TextRun, ...]}` (voir
+        textlayer.py, ContactSheetGenerator.last_text_runs). Quand il est
+        fourni, le texte de chaque planche (titre, légendes, pied de page)
+        est posé en INVISIBLE par-dessus l'image : la page est visuellement
+        identique, mais son texte est sélectionnable, copiable et
+        recherchable. Sans lui, le PDF ne contient que les images."""
         if not planche_files:
             logging.warning("Aucune planche à exporter en PDF.")
             return
@@ -40,6 +51,16 @@ class PDFExporter:
                     width=img_w,
                     height=img_h
                 )
+                runs = (text_runs or {}).get(planche)
+                if runs:
+                    try:
+                        with PILImage.open(planche) as sheet_img:
+                            sheet_h = sheet_img.size[1]
+                        draw_text_layer(c, runs, sheet_h, pdf_margin)
+                    except Exception as e:
+                        # Le texte sélectionnable est un plus : sa
+                        # défaillance ne doit jamais coûter la page.
+                        logger.warning(f"Texte sélectionnable ignoré pour {planche.name} : {e}")
                 c.showPage()
 
             except Exception as e:

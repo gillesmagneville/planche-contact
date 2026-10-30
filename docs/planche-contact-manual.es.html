@@ -63,7 +63,7 @@
 <p>A partir de la misma carpeta de fotos, la herramienta puede producir simultáneamente:</p>
 <ul>
     <li><strong>hojas de contacto</strong> en formato JPEG (una o varias páginas);</li>
-    <li>un <strong>PDF</strong> que reúne todas las hojas;</li>
+    <li>un <strong>PDF</strong> que reúne todas las hojas (las leyendas, el título y los números de página se pueden seleccionar, copiar y buscar en cualquier lector de PDF);</li>
     <li>una <strong>galería HTML</strong> paginada y autónoma, con miniaturas en las que se puede hacer clic para abrir cada foto en un visor a pantalla completa: nombre del archivo y número de página mostrados, navegación entre las fotos de la página (teclado o flechas ‹ ›), salto directo a otra página, zoom del 50 % al 200 %, descarga de la foto mostrada (o del original a tamaño completo, con la opción «Originales a tamaño completo en la galería»), información técnica (resolución original, tamaño, fecha de captura) y cambio a pantalla completa;</li>
     <li>un <strong>índice CSV</strong> que lista cada foto con su número.</li>
 </ul>
@@ -96,6 +96,7 @@ El soporte de archivos RAW se basa en la biblioteca <code>rawpy</code>, instalad
 <tr><td><strong>Carpeta de entrada</strong></td><td>Carpeta que contiene las fotografías a procesar (obligatoria). Muestra automáticamente una vista previa de las fotos de la carpeta (véase §3.5).</td></tr>
 <tr><td><strong>Carpeta de salida</strong></td><td>Carpeta donde se crearán los resultados. Por defecto: <code>Portfolio/</code> dentro de la carpeta de origen. Se crea automáticamente si aún no existe.</td></tr>
 <tr><td><strong>Búsqueda recursiva</strong></td><td>Si está marcada, también analiza todas las subcarpetas.</td></tr>
+<tr><td><strong>Elegir subcarpetas...</strong></td><td>Disponible cuando «Búsqueda recursiva» está marcada: abre una ventana que lista todas las carpetas que contienen fotos («Carpeta principal» primero, después las subcarpetas, cada una con su número de fotos). Marque solo las carpetas que desea incluir («Marcar todo» / «Desmarcar todo»): solo se procesan las fotos situadas <em>directamente</em> en una carpeta marcada, de modo que marcar <code>Paris</code> no marca <code>Paris/Louvre</code>. Las hojas, el PDF, la galería HTML, el índice CSV y la vista previa siguen todos la selección, que se muestra junto al botón («3 de 5 carpeta(s)»). La elección se restablece cuando cambia la carpeta de entrada o cuando se desmarca «Búsqueda recursiva».</td></tr>
 <tr><td><strong>Imágenes por hoja</strong></td><td>Número de miniaturas por página (de 8 a 48, en pasos de 4). En la misma línea que los tres campos siguientes.</td></tr>
 <tr><td><strong>Formato de la hoja</strong></td><td>Formato de papel: A5, A4, A3, A2 o Letter.</td></tr>
 <tr><td><strong>Marca de agua (texto)</strong></td><td>Texto repetido en mosaico sobre todas las imágenes (hojas, PDF y galería HTML) — se añade automáticamente un «©» si no está presente.</td></tr>
@@ -116,7 +117,7 @@ El soporte de archivos RAW se basa en la biblioteca <code>rawpy</code>, instalad
 <p>Si ninguno de los campos Título / Autor / Marca de agua está rellenado, el encabezado de las hojas muestra por defecto el nombre de la carpeta de entrada (sin su ruta completa), para evitar una hoja completamente anónima.</p>
 
 <h3>3.3 Diseño, leyendas y tema (ajustes avanzados)</h3>
-<p>El botón «Ajustes avanzados…» de la ventana principal abre una ventana aparte que permite personalizar con detalle el diseño, las leyendas y los colores del tema gráfico de las hojas de contacto (el tema en sí se elige en la ventana principal, véase §3.2) — sin cambiar en nada el comportamiento por defecto mientras no se toque. Esta ventana se cierra con el botón «Cerrar» o con la tecla Esc; los ajustes se conservan entre dos aperturas. En una pantalla pequeña su contenido se desplaza (barra de desplazamiento) y el botón «Cerrar» siempre permanece visible.</p>
+<p>El botón «Ajustes avanzados…» de la ventana principal abre una ventana aparte que permite personalizar con detalle el diseño, las leyendas y los colores del tema gráfico de las hojas de contacto (el tema en sí se elige en la ventana principal, véase §3.2) — mientras no se toque, las hojas muestran el nombre del archivo bajo cada foto (ajuste por defecto, que se puede desactivar aquí). Esta ventana se cierra con el botón «Cerrar» o con la tecla Esc; los ajustes se conservan entre dos aperturas. En una pantalla pequeña su contenido se desplaza (barra de desplazamiento) y el botón «Cerrar» siempre permanece visible.</p>
 
 <p><strong>Diseño</strong></p>
 <table>
@@ -201,6 +202,8 @@ Un cambio de idioma solo tiene efecto tras reiniciar la aplicación. El idioma e
 <tr><td><code>--html</code></td><td>Generar una galería HTML</td><td></td></tr>
 <tr><td><code>--csv</code></td><td>Generar un índice CSV</td><td></td></tr>
 <tr><td><code>-r, --recursive</code></td><td>Análisis recursivo de las subcarpetas</td><td></td></tr>
+<tr><td><code>--include-dir</code></td><td>Procesar solo las fotos situadas directamente en esta subcarpeta (ruta relativa a la carpeta de entrada, <code>.</code> para la propia carpeta de entrada). Se puede repetir; implica la búsqueda recursiva. Sin esta opción se procesan todas las fotos.</td><td><code>--include-dir Paris --include-dir "Verano 2026"</code></td></tr>
+<tr><td><code>--include-dirs-file</code></td><td>Archivo de texto (UTF-8) con las subcarpetas a procesar, una por línea (equivale a varios <code>--include-dir</code>)</td><td><code>--include-dirs-file carpetas.txt</code></td></tr>
 <tr><td><code>--sort</code></td><td>Orden de las fotos: <code>date</code> (EXIF) o <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Número de imágenes por página en la galería HTML (por defecto: 48)</td><td><code>--html-per-page 60</code></td></tr>
 <tr><td><code>--html-originals</code></td><td>Añadir a la galería HTML los originales a tamaño completo (el botón de descarga los entrega; los archivos RAW se convierten a JPEG, ningún RAW se coloca en la galería; la galería pesa mucho más, y los originales no llevan la marca de agua)</td><td><code>--html --html-originals</code></td></tr>
