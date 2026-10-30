@@ -5,7 +5,8 @@ Fichier .spec PyInstaller pour Planche-Contact (Windows).
 Ce fichier est lu par build-windows.ps1 (via `pyinstaller planche-contact.spec`),
 qui positionne au préalable trois variables d'environnement :
   - PLANCHE_WORK_DIR : dossier contenant planche-contact-gtk.py, portfolio/,
-    VERSION, docs/, LICENSE (copie de travail préparée par le script PowerShell)
+    VERSION, docs/, LICENSE, README et CHANGELOG en deux langues (copie de travail
+    préparée par le script PowerShell)
   - PLANCHE_GTK_DIR  : dossier de la pile GTK4 gvsbuild (C:\\gtk par défaut),
     dont on embarque bin/, lib/girepository-1.0/ et share/
   - PLANCHE_ICON     : chemin vers l'icône .ico de l'application
@@ -67,6 +68,11 @@ if (work_dir / "docs").is_dir():
     datas.append((str(work_dir / "docs"), "docs"))
 if (work_dir / "LICENSE").is_file():
     datas.append((str(work_dir / "LICENSE"), "."))
+# La documentation du projet, dans les deux langues (anglais par défaut, français
+# en .fr.md), à côté de l'exécutable.
+for doc_name in ("README.md", "README.fr.md", "CHANGELOG.md", "CHANGELOG.fr.md"):
+    if (work_dir / doc_name).is_file():
+        datas.append((str(work_dir / doc_name), "."))
 
 datas += gtk_share
 datas += gtk_typelibs

@@ -212,9 +212,31 @@ cp -r "$PROJECT_DIR/portfolio" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
 # (voir plus bas).
 echo "$NEW_VERSION" > "$BUILD_DIR/usr/share/$PACKAGE_NAME/VERSION"
 
+# Les quatre manuels (français : planche-contact-manual.html ; anglais,
+# allemand, espagnol : planche-contact-manual.<langue>.html). L'onglet « Aide »
+# ouvre celui de la langue de l'interface et retombe sur le manuel français
+# s'il manque : il faut donc tous les embarquer.
 mkdir -p "$BUILD_DIR/usr/share/$PACKAGE_NAME/docs"
-[ -f "$PROJECT_DIR/docs/planche-contact-manual.html" ] && cp "$PROJECT_DIR/docs/planche-contact-manual.html" "$BUILD_DIR/usr/share/$PACKAGE_NAME/docs/"
+MANUALS=0
+for manual in "$PROJECT_DIR"/docs/planche-contact-manual*.html; do
+    if [ -f "$manual" ]; then
+        cp "$manual" "$BUILD_DIR/usr/share/$PACKAGE_NAME/docs/"
+        MANUALS=$((MANUALS + 1))
+    fi
+done
+if [ "$MANUALS" -eq 0 ]; then
+    echo "Attention : aucun manuel (docs/planche-contact-manual*.html) trouvé - le paquet sera construit sans manuel." >&2
+fi
 [ -f "$PROJECT_DIR/LICENSE" ] && cp "$PROJECT_DIR/LICENSE" "$BUILD_DIR/usr/share/$PACKAGE_NAME/"
+
+# La documentation du projet, dans les deux langues : l'anglais par défaut
+# (README.md, CHANGELOG.md) et le français (README.fr.md, CHANGELOG.fr.md).
+mkdir -p "$BUILD_DIR/usr/share/doc/$PACKAGE_NAME"
+for doc in README.md README.fr.md CHANGELOG.md CHANGELOG.fr.md LICENSE; do
+    if [ -f "$PROJECT_DIR/$doc" ]; then
+        cp "$PROJECT_DIR/$doc" "$BUILD_DIR/usr/share/doc/$PACKAGE_NAME/"
+    fi
+done
 
 # Métadonnées AppStream : nécessaires pour qu'App Center (PackageKit +
 # AppStream, depuis Ubuntu 26.04) reconnaisse pleinement le paquet - taille

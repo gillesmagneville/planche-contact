@@ -489,12 +489,28 @@ if (-not $pygobjectWheel -or -not $pycairoWheel) {
 Write-Host ">>> Copie des fichiers du projet..."
 Copy-Item "$ProjectDir\planche-contact-gtk.py" "$WorkDir\" -Force
 Copy-Item "$ProjectDir\portfolio" "$WorkDir\portfolio" -Recurse -Force
+# Les quatre manuels (francais : planche-contact-manual.html ; anglais,
+# allemand, espagnol : planche-contact-manual.<langue>.html). L'onglet "Aide"
+# ouvre celui de la langue de l'interface et retombe sur le manuel francais
+# s'il manque : il faut donc tous les embarquer.
 New-Item -ItemType Directory -Path "$WorkDir\docs" -Force | Out-Null
-if (Test-Path "$ProjectDir\docs\planche-contact-manual.html") {
-    Copy-Item "$ProjectDir\docs\planche-contact-manual.html" "$WorkDir\docs\" -Force
+$manuals = @(Get-ChildItem "$ProjectDir\docs\planche-contact-manual*.html" -File -ErrorAction SilentlyContinue)
+if ($manuals.Count -eq 0) {
+    Write-Host "Attention : aucun manuel (docs\planche-contact-manual*.html) trouve - build sans manuel." -ForegroundColor Yellow
+} else {
+    foreach ($manual in $manuals) {
+        Copy-Item $manual.FullName "$WorkDir\docs\" -Force
+    }
 }
 if (Test-Path "$ProjectDir\LICENSE") {
     Copy-Item "$ProjectDir\LICENSE" "$WorkDir\" -Force
+}
+# La documentation du projet, dans les deux langues : l'anglais par defaut
+# (README.md, CHANGELOG.md) et le francais (README.fr.md, CHANGELOG.fr.md).
+foreach ($doc in @("README.md", "README.fr.md", "CHANGELOG.md", "CHANGELOG.fr.md")) {
+    if (Test-Path "$ProjectDir\$doc") {
+        Copy-Item "$ProjectDir\$doc" "$WorkDir\" -Force
+    }
 }
 Set-Content -Path "$WorkDir\VERSION" -Value $NewVersion -NoNewline
 
