@@ -87,6 +87,13 @@ def parse_args():
     # ou écrit/modifié à la main. Voir la note de précédence avec
     # --format/--num ci-dessous (Config.__post_init__).
     parser.add_argument("--profile", type=Path, default=None, help=_("cli.help_profile"))
+    # Choix des sous-dossiers à traiter (la liste des dossiers qui
+    # contiennent des photos est proposée par l'interface graphique, voir
+    # scanner.list_image_folders()). Implique une recherche récursive.
+    parser.add_argument("--include-dir", action="append", default=None, metavar="DIR",
+                        help=_("cli.help_include_dir"))
+    parser.add_argument("--include-dirs-file", type=Path, default=None, metavar="FILE",
+                        help=_("cli.help_include_dirs_file"))
 
     # Mode prévisualisation (cahier des charges §3), réservé à un usage
     # interne par l'interface graphique (planche-contact-gtk.py,
@@ -100,6 +107,27 @@ def parse_args():
     parser.add_argument("--preview-output", type=Path, default=None, help=_("cli.help_preview_output"))
 
     return parser.parse_args()
+
+
+def _include_dirs_from_args(args):
+    """Sous-dossiers demandés par --include-dir (répétable) et/ou
+    --include-dirs-file (un dossier par ligne, UTF-8 ; l'interface graphique
+    l'utilise pour ne pas dépasser la longueur maximale d'une ligne de
+    commande avec de nombreux dossiers), ou None si aucune des deux options
+    n'est donnée (toutes les photos). Un fichier vide = aucun dossier
+    retenu, donc aucune photo."""
+    if not args.include_dir and args.include_dirs_file is None:
+        return None
+    dirs = list(args.include_dir or [])
+    if args.include_dirs_file is not None:
+        try:
+            text = Path(args.include_dirs_file).read_text(encoding="utf-8-sig")
+        except (OSError, UnicodeDecodeError) as exc:
+            print(_("cli.error_include_dirs_file", path=args.include_dirs_file, error=exc),
+                  file=sys.stderr)
+            sys.exit(2)
+        dirs.extend(line for line in text.splitlines() if line.strip())
+    return tuple(dirs)
 
 
 def _generate_preview_sheet(args, profile_kwargs):
@@ -163,9 +191,14 @@ def main():
     args = parse_args()
     start = time.time()
 
+    # Arguments de Config qui ne viennent pas des options « simples » :
+    # le profil (--profile) et les sous-dossiers retenus (--include-dir...).
     profile_kwargs = {}
     if args.profile is not None:
         profile_kwargs["profile"] = load_profile(args.profile)
+    include_dirs = _include_dirs_from_args(args)
+    if include_dirs is not None:
+        profile_kwargs["include_dirs"] = include_dirs
 
     if args.preview_output is not None:
         # Mode prévisualisation : voir _generate_preview_sheet() - un
@@ -263,6 +296,8 @@ def main():
         pdf_path.unlink()
 
     planche_files = []
+    # Textes dessinés sur chaque planche, pour le texte sélectionnable du PDF.
+    text_runs = {}
 
     # Phase 2: Contact sheets
     print(f"PROGRESS:15/100 {_('cli.progress_sheets')}", flush=True)
@@ -276,6 +311,7 @@ def main():
                 p = planches_dir / f"planche_{page_num:03d}.jpg"
                 sheet.save(p, "JPEG", quality=95)
                 planche_files.append(p)
+                text_runs[p] = list(cs_gen.last_text_runs)
                 progress = 15 + int(55 * (page_num / total_pages))
                 # "PROGRESS:X/100" est le seul marqueur lu par l'interface
                 # graphique (voir planche-contact-gtk.py, _run_cli) :
@@ -291,7 +327,7 @@ def main():
     # Phase 3: PDF
     if config.generate_pdf and planche_files:
         print(f"PROGRESS:75/100 {_('cli.progress_pdf')}", flush=True)
-        PDFExporter().create_pdf(planche_files, output_dir / "portfolio.pdf")
+        PDFExporter().create_pdf(planche_files, output_dir / "portfolio.pdf", text_runs=text_runs)
         print(f"PROGRESS:80/100 {_('cli.progress_pdf_done')}", flush=True)
 
     # Phase 4: CSV

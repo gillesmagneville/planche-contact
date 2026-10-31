@@ -45,3 +45,7 @@ planches/
 gallery/
 *.pdf
 *.csv
+
+# AppImage générée par build-appimage.sh (à publier avec les releases)
+*.AppImage
+*.AppImage.sha256

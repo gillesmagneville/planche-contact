@@ -63,7 +63,7 @@
 <p>From the same folder of photos, the tool can produce simultaneously:</p>
 <ul>
     <li><strong>contact sheets</strong> in JPEG format (one or several pages);</li>
-    <li>a <strong>PDF</strong> assembling all the sheets;</li>
+    <li>a <strong>PDF</strong> assembling all the sheets (captions, title and page numbers can be selected, copied and searched in any PDF viewer);</li>
     <li>a paginated, self-contained <strong>HTML gallery</strong> with clickable thumbnails opening each photo in a full-screen viewer: filename and page number shown, navigation between the photos on the page (keyboard or ‹ › arrows), direct jump to another page, 50% to 200% zoom, download of the displayed photo (or of the full-size original, with the "Full-size originals in the gallery" option), technical information (original resolution, size, capture date) and fullscreen toggle;</li>
     <li>a <strong>CSV index</strong> listing every photo with its number.</li>
 </ul>
@@ -96,6 +96,7 @@ RAW support relies on the <code>rawpy</code> library, installed automatically in
 <tr><td><strong>Input folder</strong></td><td>Folder containing the photographs to process (required). Automatically shows a preview of the photos in the folder (see §3.5).</td></tr>
 <tr><td><strong>Output folder</strong></td><td>Folder where the results will be created. Default: <code>Portfolio/</code> inside the source folder. Created automatically if it doesn't exist yet.</td></tr>
 <tr><td><strong>Recursive search</strong></td><td>If checked, also scans all subfolders.</td></tr>
+<tr><td><strong>Choose subfolders...</strong></td><td>Available once "Recursive search" is checked: opens a window listing every folder that contains photos ("Main folder" first, then the subfolders, each with its number of photos). Tick only the folders to include ("Select all" / "Select none"): only the photos placed <em>directly</em> in a ticked folder are processed, so ticking <code>Paris</code> does not tick <code>Paris/Louvre</code>. The sheets, the PDF, the HTML gallery, the CSV index and the preview all follow the selection, shown next to the button ("3 of 5 folder(s)"). The choice is reset when the input folder changes or when "Recursive search" is unchecked.</td></tr>
 <tr><td><strong>Images per sheet</strong></td><td>Number of thumbnails per page (8 to 48, in steps of 4). On the same line as the next three fields.</td></tr>
 <tr><td><strong>Sheet format</strong></td><td>Paper format: A5, A4, A3, A2 or Letter.</td></tr>
 <tr><td><strong>Watermark (text)</strong></td><td>Text repeated in a mosaic pattern over all images (sheets, PDF and HTML gallery) — a "©" is added automatically if missing.</td></tr>
@@ -116,7 +117,7 @@ RAW support relies on the <code>rawpy</code> library, installed automatically in
 <p>If none of the Title / Author / Watermark fields is filled in, the sheet header defaults to showing the input folder's name (without its full path), to avoid a completely anonymous sheet.</p>
 
 <h3>3.3 Layout, captions and theme (advanced settings)</h3>
-<p>The "Advanced settings…" button in the main window opens a separate window that lets you fine-tune the layout, captions and graphical theme colors of the contact sheets (the theme itself is chosen in the main window, see §3.2) — without changing the default behavior at all as long as you leave it alone. This window closes with the "Close" button or the Escape key; your settings are kept between two openings. On a small screen its content scrolls (scrollbar) and the "Close" button always stays visible.</p>
+<p>The "Advanced settings…" button in the main window opens a separate window that lets you fine-tune the layout, captions and graphical theme colors of the contact sheets (the theme itself is chosen in the main window, see §3.2) — as long as you leave it alone, the sheets show the file name under each photo (the default; it can be switched off here). This window closes with the "Close" button or the Escape key; your settings are kept between two openings. On a small screen its content scrolls (scrollbar) and the "Close" button always stays visible.</p>
 
 <p><strong>Layout</strong></p>
 <table>
@@ -201,6 +202,8 @@ Changing the language takes effect after restarting the application. The chosen 
 <tr><td><code>--html</code></td><td>Generate an HTML gallery</td><td></td></tr>
 <tr><td><code>--csv</code></td><td>Generate a CSV index</td><td></td></tr>
 <tr><td><code>-r, --recursive</code></td><td>Recursively scan subfolders</td><td></td></tr>
+<tr><td><code>--include-dir</code></td><td>Process only the photos placed directly in this subfolder (path relative to the input folder, <code>.</code> for the input folder itself). Repeatable; implies a recursive scan. Without it, all the photos are processed.</td><td><code>--include-dir Paris --include-dir "Summer 2026"</code></td></tr>
+<tr><td><code>--include-dirs-file</code></td><td>Text file (UTF-8) listing the subfolders to process, one per line (same as several <code>--include-dir</code>)</td><td><code>--include-dirs-file folders.txt</code></td></tr>
 <tr><td><code>--sort</code></td><td>Sort photos by: <code>date</code> (EXIF) or <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Number of images per HTML gallery page (default: 48)</td><td><code>--html-per-page 60</code></td></tr>
 <tr><td><code>--html-originals</code></td><td>Add the full-size originals to the HTML gallery (the download button serves them; RAW files are converted to JPEG, no RAW file is placed in the gallery; the gallery gets much bigger, and the originals do not carry the watermark)</td><td><code>--html --html-originals</code></td></tr>

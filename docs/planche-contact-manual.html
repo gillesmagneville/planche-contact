@@ -63,7 +63,7 @@
 <p>À partir d'un même dossier de photos, l'outil peut produire simultanément :</p>
 <ul>
     <li>des <strong>planches contact</strong> au format JPEG (une ou plusieurs pages) ;</li>
-    <li>un <strong>PDF</strong> assemblant toutes les planches ;</li>
+    <li>un <strong>PDF</strong> assemblant toutes les planches (légendes, titre et numéros de page peuvent être sélectionnés, copiés et recherchés dans n'importe quel lecteur PDF) ;</li>
     <li>une <strong>galerie HTML</strong> paginée, autonome, avec vignettes cliquables ouvrant chaque photo dans une visionneuse plein écran : nom du fichier et numéro de page affichés, navigation entre les photos de la page (clavier ou flèches ‹ ›), saut direct à une autre page, zoom de 50 % à 200 %, téléchargement de la photo affichée (ou de l'original pleine taille, avec l'option « Originaux pleine taille dans la galerie »), informations techniques (résolution d'origine, taille, date de prise de vue) et bascule en plein écran ;</li>
     <li>un <strong>index CSV</strong> listant chaque photo avec son numéro.</li>
 </ul>
@@ -96,6 +96,7 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
 <tr><td><strong>Dossier d'entrée</strong></td><td>Dossier contenant les photographies à traiter (obligatoire). Affiche automatiquement un aperçu des photos du dossier (voir §3.5).</td></tr>
 <tr><td><strong>Dossier de sortie</strong></td><td>Dossier où seront créés les résultats. Par défaut : <code>Portfolio/</code> dans le dossier source. Créé automatiquement s'il n'existe pas encore.</td></tr>
 <tr><td><strong>Recherche récursive</strong></td><td>Si coché, analyse aussi tous les sous-dossiers.</td></tr>
+<tr><td><strong>Choisir les sous-dossiers...</strong></td><td>Disponible quand « Recherche récursive » est cochée : ouvre une fenêtre qui liste chaque dossier contenant des photos (« Dossier principal » d'abord, puis les sous-dossiers, chacun avec son nombre de photos). Ne cochez que les dossiers à inclure (« Tout cocher » / « Tout décocher ») : seules les photos placées <em>directement</em> dans un dossier coché sont traitées, donc cocher <code>Paris</code> ne coche pas <code>Paris/Louvre</code>. Les planches, le PDF, la galerie HTML, l'index CSV et l'aperçu suivent tous la sélection, affichée à côté du bouton (« 3 dossier(s) sur 5 »). Le choix est réinitialisé quand le dossier d'entrée change ou que « Recherche récursive » est décochée.</td></tr>
 <tr><td><strong>Images par planche</strong></td><td>Nombre de vignettes par page (8 à 48, par pas de 4). Sur la même ligne que les trois champs suivants.</td></tr>
 <tr><td><strong>Format de la planche</strong></td><td>Format papier : A5, A4, A3, A2 ou Letter.</td></tr>
 <tr><td><strong>Filigrane (texte)</strong></td><td>Texte répété en mosaïque sur toutes les images (planches, PDF et galerie HTML) — un « © » est ajouté automatiquement s'il est absent.</td></tr>
@@ -116,7 +117,7 @@ Le support des fichiers RAW s'appuie sur la bibliothèque <code>rawpy</code>, in
 <p>Si aucun des trois champs Titre / Auteur / Filigrane n'est renseigné, l'en-tête des planches affiche par défaut le nom du dossier d'entrée (sans son chemin complet), pour éviter une planche totalement anonyme.</p>
 
 <h3>3.3 Mise en page, légendes et thème (réglages avancés)</h3>
-<p>Le bouton « Réglages avancés… » de la fenêtre principale ouvre une fenêtre à part, qui permet de personnaliser en détail la mise en page, les légendes et les couleurs du thème graphique des planches (le thème lui-même se choisit dans la fenêtre principale, voir §3.2) — sans rien changer au comportement par défaut tant qu'on n'y touche pas. Cette fenêtre se ferme avec le bouton « Fermer » ou la touche Échap ; les réglages sont conservés entre deux ouvertures. Si l'écran est petit, son contenu défile (ascenseur) et le bouton « Fermer » reste toujours visible.</p>
+<p>Le bouton « Réglages avancés… » de la fenêtre principale ouvre une fenêtre à part, qui permet de personnaliser en détail la mise en page, les légendes et les couleurs du thème graphique des planches (le thème lui-même se choisit dans la fenêtre principale, voir §3.2) — tant qu'on n'y touche pas, les planches affichent le nom du fichier sous chaque photo (réglage par défaut, désactivable ici). Cette fenêtre se ferme avec le bouton « Fermer » ou la touche Échap ; les réglages sont conservés entre deux ouvertures. Si l'écran est petit, son contenu défile (ascenseur) et le bouton « Fermer » reste toujours visible.</p>
 
 <p><strong>Mise en page</strong></p>
 <table>
@@ -201,6 +202,8 @@ Un changement de langue ne prend effet qu'au redémarrage de l'application. La l
 <tr><td><code>--html</code></td><td>Générer une galerie HTML</td><td></td></tr>
 <tr><td><code>--csv</code></td><td>Générer un index CSV</td><td></td></tr>
 <tr><td><code>-r, --recursive</code></td><td>Analyse récursive des sous-dossiers</td><td></td></tr>
+<tr><td><code>--include-dir</code></td><td>Ne traiter que les photos placées directement dans ce sous-dossier (chemin relatif au dossier d'entrée, <code>.</code> pour le dossier d'entrée lui-même). Répétable ; implique le parcours récursif. Sans cette option, toutes les photos sont traitées.</td><td><code>--include-dir Paris --include-dir "Été 2026"</code></td></tr>
+<tr><td><code>--include-dirs-file</code></td><td>Fichier texte (UTF-8) listant les sous-dossiers à traiter, un par ligne (équivalent de plusieurs <code>--include-dir</code>)</td><td><code>--include-dirs-file dossiers.txt</code></td></tr>
 <tr><td><code>--sort</code></td><td>Tri des photos : <code>date</code> (EXIF) ou <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Nombre d'images par page dans la galerie HTML (défaut : 48)</td><td><code>--html-per-page 60</code></td></tr>
 <tr><td><code>--html-originals</code></td><td>Joindre à la galerie HTML les originaux pleine taille (le bouton de téléchargement les donne ; les fichiers RAW sont convertis en JPEG, aucun RAW n'est placé dans la galerie ; la galerie devient nettement plus volumineuse, et les originaux ne portent pas le filigrane)</td><td><code>--html --html-originals</code></td></tr>

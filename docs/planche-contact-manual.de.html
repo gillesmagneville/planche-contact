@@ -63,7 +63,7 @@
 <p>Aus demselben Fotoordner kann das Programm gleichzeitig erzeugen:</p>
 <ul>
     <li><strong>Kontaktbögen</strong> im JPEG-Format (eine oder mehrere Seiten);</li>
-    <li>ein <strong>PDF</strong>, das alle Kontaktbögen zusammenfasst;</li>
+    <li>ein <strong>PDF</strong>, das alle Kontaktbögen zusammenfasst (Bildunterschriften, Titel und Seitenzahlen lassen sich in jedem PDF-Betrachter markieren, kopieren und durchsuchen);</li>
     <li>eine paginierte, eigenständige <strong>HTML-Galerie</strong> mit anklickbaren Miniaturbildern, die jedes Foto in einer Vollbild-Ansicht öffnen: Dateiname und Seitenzahl werden angezeigt, Navigation zwischen den Fotos der Seite (Tastatur oder Pfeile ‹ ›), direkter Sprung zu einer anderen Seite, Zoom von 50 % bis 200 %, Herunterladen des angezeigten Fotos (oder des Originals in voller Größe, mit der Option „Originale in voller Größe in der Galerie“), technische Informationen (Originalauflösung, Größe, Aufnahmedatum) und Vollbild-Umschaltung;</li>
     <li>ein <strong>CSV-Verzeichnis</strong>, das jedes Foto mit seiner Nummer aufführt.</li>
 </ul>
@@ -96,6 +96,7 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
 <tr><td><strong>Quellordner</strong></td><td>Ordner mit den zu verarbeitenden Fotografien (erforderlich). Zeigt automatisch eine Vorschau der Fotos im Ordner (siehe §3.5).</td></tr>
 <tr><td><strong>Zielordner</strong></td><td>Ordner, in dem die Ergebnisse erstellt werden. Standard: <code>Portfolio/</code> im Quellordner. Wird automatisch erstellt, falls er noch nicht existiert.</td></tr>
 <tr><td><strong>Rekursive Suche</strong></td><td>Wenn aktiviert, werden auch alle Unterordner durchsucht.</td></tr>
+<tr><td><strong>Unterordner auswählen...</strong></td><td>Verfügbar, sobald „Rekursive Suche“ aktiviert ist: öffnet ein Fenster mit allen Ordnern, die Fotos enthalten („Hauptordner“ zuerst, dann die Unterordner, jeweils mit der Anzahl ihrer Fotos). Aktivieren Sie nur die einzuschließenden Ordner („Alle auswählen“ / „Keine auswählen“): Verarbeitet werden nur die Fotos, die <em>direkt</em> in einem aktivierten Ordner liegen – das Aktivieren von <code>Paris</code> aktiviert also nicht <code>Paris/Louvre</code>. Kontaktbögen, PDF, HTML-Galerie, CSV-Index und Vorschau folgen alle der Auswahl, die neben der Schaltfläche angezeigt wird („3 von 5 Ordner(n)“). Die Auswahl wird zurückgesetzt, wenn sich der Eingabeordner ändert oder „Rekursive Suche“ deaktiviert wird.</td></tr>
 <tr><td><strong>Bilder pro Kontaktbogen</strong></td><td>Anzahl der Miniaturbilder pro Seite (8 bis 48, in Schritten von 4). Auf derselben Zeile wie die nächsten drei Felder.</td></tr>
 <tr><td><strong>Format des Kontaktbogens</strong></td><td>Papierformat: A5, A4, A3, A2 oder Letter.</td></tr>
 <tr><td><strong>Wasserzeichen (Text)</strong></td><td>Text, der als Muster über alle Bilder wiederholt wird (Kontaktbögen, PDF und HTML-Galerie) — ein „©" wird automatisch hinzugefügt, falls nicht vorhanden.</td></tr>
@@ -116,7 +117,7 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
 <p>Wenn keines der Felder Titel / Autor / Wasserzeichen ausgefüllt ist, zeigt die Kopfzeile der Kontaktbögen standardmäßig den Namen des Quellordners (ohne vollständigen Pfad) an, um einen völlig anonymen Kontaktbogen zu vermeiden.</p>
 
 <h3>3.3 Layout, Bildunterschriften und Thema (erweiterte Einstellungen)</h3>
-<p>Die Schaltfläche „Erweiterte Einstellungen…“ im Hauptfenster öffnet ein eigenes Fenster, in dem Layout, Bildunterschriften und die Farben des grafischen Themas der Kontaktbögen im Detail angepasst werden können (das Thema selbst wird im Hauptfenster gewählt, siehe §3.2) — ohne das Standardverhalten zu ändern, solange man nichts daran verstellt. Dieses Fenster wird mit der Schaltfläche „Schließen“ oder der Escape-Taste geschlossen; die Einstellungen bleiben zwischen zwei Öffnungen erhalten. Auf einem kleinen Bildschirm lässt sich sein Inhalt scrollen (Bildlaufleiste), und die Schaltfläche „Schließen“ bleibt immer sichtbar.</p>
+<p>Die Schaltfläche „Erweiterte Einstellungen…“ im Hauptfenster öffnet ein eigenes Fenster, in dem Layout, Bildunterschriften und die Farben des grafischen Themas der Kontaktbögen im Detail angepasst werden können (das Thema selbst wird im Hauptfenster gewählt, siehe §3.2) — solange man nichts daran verstellt, zeigen die Kontaktbögen den Dateinamen unter jedem Foto (Standardeinstellung, hier abschaltbar). Dieses Fenster wird mit der Schaltfläche „Schließen“ oder der Escape-Taste geschlossen; die Einstellungen bleiben zwischen zwei Öffnungen erhalten. Auf einem kleinen Bildschirm lässt sich sein Inhalt scrollen (Bildlaufleiste), und die Schaltfläche „Schließen“ bleibt immer sichtbar.</p>
 
 <p><strong>Layout</strong></p>
 <table>
@@ -201,6 +202,8 @@ Eine Sprachänderung wird erst nach einem Neustart der Anwendung wirksam. Die ge
 <tr><td><code>--html</code></td><td>HTML-Galerie erstellen</td><td></td></tr>
 <tr><td><code>--csv</code></td><td>CSV-Verzeichnis erstellen</td><td></td></tr>
 <tr><td><code>-r, --recursive</code></td><td>Rekursive Analyse der Unterordner</td><td></td></tr>
+<tr><td><code>--include-dir</code></td><td>Nur die Fotos verarbeiten, die direkt in diesem Unterordner liegen (Pfad relativ zum Eingabeordner, <code>.</code> für den Eingabeordner selbst). Mehrfach angebbar; impliziert die rekursive Suche. Ohne diese Option werden alle Fotos verarbeitet.</td><td><code>--include-dir Paris --include-dir "Sommer 2026"</code></td></tr>
+<tr><td><code>--include-dirs-file</code></td><td>Textdatei (UTF-8) mit den zu verarbeitenden Unterordnern, einer pro Zeile (wie mehrere <code>--include-dir</code>)</td><td><code>--include-dirs-file ordner.txt</code></td></tr>
 <tr><td><code>--sort</code></td><td>Sortierung der Fotos: <code>date</code> (EXIF) oder <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Anzahl der Bilder pro HTML-Galerieseite (Standard: 48)</td><td><code>--html-per-page 60</code></td></tr>
 <tr><td><code>--html-originals</code></td><td>Die Originale in voller Größe der HTML-Galerie hinzufügen (die Download-Schaltfläche liefert sie; RAW-Dateien werden in JPEG umgewandelt, keine RAW-Datei landet in der Galerie; die Galerie wird deutlich größer, und die Originale tragen kein Wasserzeichen)</td><td><code>--html --html-originals</code></td></tr>

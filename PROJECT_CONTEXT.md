@@ -55,12 +55,13 @@ confirmation, `-Major/-Minor/-Patch` options).
 | Module | Role |
 |---|---|
 | `config.py` | `Config` dataclass: all the parameters of a generation |
-| `scanner.py` | Folder scan (recursive or not), sorting by EXIF date or name (delegates to `utils.get_exif_date()`), excludes `planches/` and `gallery/` of the configured output folder to avoid re-scanning its own generated files (comparison by real file identity via `os.path.samefile()`, not by text — see §5) |
+| `scanner.py` | Folder scan (recursive or not), sorting by EXIF date or name (delegates to `utils.get_exif_date()`), excludes `planches/` and `gallery/` of the configured output folder to avoid re-scanning its own generated files (comparison by real file identity via `os.path.samefile()`, not by text — see §5); `Config.include_dirs` restricts the scan to the photos placed directly in the listed folders (and forces the recursive walk), `list_image_folders()` gives the list the interface offers ("Choose subfolders...") |
 | `rawloader.py` | Unified image/RAW loading: embedded JPEG preview first (fast), full demosaicing (`rawpy`) only if this preview is missing or too small; `get_original_dimensions()`: real original resolution (metadata only, EXIF/RAW orientation applied), used by the HTML gallery viewer; `load_full_resolution()`: image at the FULL resolution of the shot (embedded preview if it covers ≥ 98% of the sensor, otherwise demosaicing), for the "original" JPEG of a RAW in the gallery |
 | `thumbnail.py` | Parallel thumbnail generation (`ProcessPoolExecutor`, `spawn` context forced) |
 | `contactsheet.py` | Generates the contact sheets (header, thumbnail grid, 3-line footer: page number, credit, developer/license - positions and space reserved below the grid in `layout_engine.FOOTER_*`) |
 | `presentation/` | Common layout/captions/theme engine (`profile.py`: `Profile` dataclass + JSON; `layout_engine.py`: geometry of the grid/landscape/portrait/large thumbnails/free templates; `captions.py`: resolution of the EXIF captions, including their wrapping within a width in pixels (`layout_caption_lines()`); `themes.py`: Light/Dark/Neutral/System palettes). **Single source of truth**, used by both `contactsheet.py` (JPEG/PDF sheets) and `htmlgallery.py` (HTML gallery) — never a layout/caption/color rule duplicated between the two. The absence of a Profile (or a partial/invalid Profile) never changes the default behavior nor raises an exception (`default_profile()`); `Config.__post_init__()` backward-compatibly synchronizes the historical "simple" settings (`page_format`/`num_per_sheet`) into the Profile as long as it has not already customized them |
 | `pdfexport.py` | Assembles the sheets into a PDF (`reportlab`); top margin reduced independently of the other margins |
+| `textlayer.py` | Invisible text layer of the PDF (render mode 3, DejaVu subset embedded from `fonts/`): `ContactSheetGenerator` records every text it draws (`TextRun`, via `_put_text()`), `PDFExporter` replays them over the page image so that file names can be selected and copied. A failure never prevents the PDF from being produced |
 | `htmlgallery.py` | Paginated HTML gallery; **a single decoding pass** per photo (the thumbnail is derived from the already-decoded full-size image, not a second decoding); `ImageOps.exif_transpose()` applied systematically to respect orientation (see §5); watermark applied **only once** on the full-size image, the thumbnail being derived by resizing this already-watermarked version (see §5, avoids a disproportionate/truncated pattern); full-screen viewer in vanilla JS built into each generated page (previous/next **crossing pages** with looping over the whole gallery (warning displayed at both ends, see §5), keyboard, mouse wheel, no external dependency) with page indicator, direct jump to a page, filename, download (via blob, see §5 — over `file://`, via a `.js` sidecar file per original) of the displayed copy (2000 px) **or, with the `Config.html_include_originals` option / `--html-originals` / main window checkbox (disabled by default), of the full-size original in `gallery/originals/` (copied as is, except RAW files, converted to JPEG: no RAW in the gallery)** (unique names chosen by the main process, not by the workers; encoded URLs; fallback to the displayed copy if the copy fails; the originals do NOT carry the watermark, hence a CLI warning), information panel (resolution/size/date, computed by the worker at the same time as the image), 50-200% zoom in real width/height, always centered, draggable by drag-and-drop once zoomed (mouse/touch via Pointer Events, bounded so as never to leave the frame completely — see §5, buttons, keyboard, Ctrl/Alt+wheel to zoom and wheel alone to move, never `transform: scale()` for the zoom, reset on each photo change) and full-screen toggle (`Fullscreen API`); footer with developer/license notice; **entirely translated** into the active language at generation time (`<html lang="...">` included), through `i18n.py` |
 | `csvindex.py` | Generates the CSV index |
 | `utils.py` | `get_font()` (bundled font, cached), `apply_watermark()` (tiled watermark, **single function** used by the sheets, the PDF and the gallery), `get_exif_date()` (shooting date, RAW included — **single function** used by the sorting in `scanner.py` and the viewer information in `htmlgallery.py`), `format_file_size()`, `setup_logging()` |
@@ -175,6 +176,7 @@ planche-contact/
 ├── planche-contact-gtk.py          # GTK4 interface (shared Linux/Windows)
 ├── planche-contact-gtk             # Launch wrapper (Linux)
 ├── build-deb.sh                    # .deb package build (Linux)
+├── build-appimage.sh               # AppImage build (Linux, any distribution; uses quick-sharun from Anylinux-AppImages, SHA-256 checked)
 ├── build-windows.ps1               # Root relay -> windows/build-windows.ps1
 │
 ├── portfolio/                      # Engine, 100% shared
@@ -185,6 +187,7 @@ planche-contact/
 │   ├── thumbnail.py
 │   ├── contactsheet.py
 │   ├── pdfexport.py
+│   ├── textlayer.py
 │   ├── htmlgallery.py
 │   ├── csvindex.py
 │   ├── utils.py

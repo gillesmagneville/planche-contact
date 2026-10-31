@@ -1,8 +1,9 @@
 import logging
 import os
+import posixpath
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, Optional
 
 from .config import Config
 from .utils import get_exif_date
@@ -71,11 +72,34 @@ class ImageScanner:
                 break
         return False
 
+    def _included_dirs(self) -> Optional[frozenset]:
+        """Sous-dossiers retenus (chemins relatifs normalisés, "." = le
+        dossier d'entrée lui-même), ou None quand toutes les photos sont
+        prises en compte (comportement historique). Une entrée hors du
+        dossier d'entrée est ignorée avec un avertissement."""
+        wanted = getattr(self.config, "include_dirs", None)
+        if wanted is None:
+            return None
+        kept = set()
+        for entry in wanted:
+            relative = normalize_include_dir(self.config.input_dir, entry)
+            if relative is None:
+                self.logger.warning(_("engine.warn_include_dir_outside", dir=entry))
+            else:
+                kept.add(relative)
+        return frozenset(kept)
+
     def scan(self) -> list[dict]:
         images = []
-        pattern = "**/*" if self.config.recursive else "*"
+        # Choisir des sous-dossiers suppose de les parcourir : la recherche
+        # est alors forcément récursive, même sans l'option -r.
+        include_dirs = self._included_dirs()
+        recursive = self.config.recursive or include_dirs is not None
+        pattern = "**/*" if recursive else "*"
 
-        self.logger.info(_("engine.log_scan_folder", dir=self.config.input_dir, recursive=self.config.recursive))
+        self.logger.info(_("engine.log_scan_folder", dir=self.config.input_dir, recursive=recursive))
+        if include_dirs is not None:
+            self.logger.info(_("engine.log_include_dirs", count=len(include_dirs)))
 
         # Sous-dossiers générés par une exécution précédente (planches/,
         # gallery/) à exclure du scan : sinon, une nouvelle génération en
@@ -105,6 +129,17 @@ class ImageScanner:
         for path in self.config.input_dir.glob(pattern):
             if not path.is_file() or not self._is_image_file(path):
                 continue
+
+            # Seules comptent les photos situées DIRECTEMENT dans un des
+            # dossiers retenus (pas celles de leurs sous-dossiers : chacun
+            # se coche séparément).
+            if include_dirs is not None:
+                try:
+                    relative_parent = path.parent.relative_to(self.config.input_dir).as_posix()
+                except ValueError:
+                    continue
+                if relative_parent not in include_dirs:
+                    continue
 
             if excluded_dirs:
                 resolved_path = path.resolve()
@@ -139,3 +174,69 @@ class ImageScanner:
             )
         self.logger.info(_("engine.log_images_found_sorted", count=len(images)))
         return images
+
+
+def normalize_include_dir(input_dir: Path, entry) -> Optional[str]:
+    """Chemin relatif POSIX de `entry` par rapport à `input_dir` ("." pour
+    le dossier d'entrée lui-même), ou None s'il désigne un endroit hors de
+    ce dossier. Accepte un chemin relatif (la forme produite par
+    list_image_folders()) comme un chemin absolu situé sous `input_dir`."""
+    candidate = Path(str(entry))
+    if candidate.is_absolute():
+        try:
+            candidate = candidate.relative_to(input_dir)
+        except ValueError:
+            try:
+                candidate = candidate.resolve().relative_to(Path(input_dir).resolve())
+            except (ValueError, OSError):
+                return None
+    relative = posixpath.normpath(candidate.as_posix() or ".")
+    if relative == ".." or relative.startswith("../") or relative.startswith("/"):
+        return None
+    return relative
+
+
+def list_image_folders(input_dir: Path, output_dir: Optional[Path] = None) -> list[tuple[str, int]]:
+    """Dossiers de `input_dir` (lui-même compris) qui contiennent DIRECTEMENT
+    au moins une photo prise en charge, avec leur nombre de photos :
+    `[(chemin relatif POSIX, nombre)]`, "." (le dossier d'entrée) en tête,
+    puis par ordre alphabétique. C'est la liste proposée à l'utilisateur
+    pour choisir les sous-dossiers à traiter (Config.include_dirs).
+
+    Mêmes exclusions que ImageScanner.scan() : les sous-dossiers `planches`
+    et `gallery` du dossier de sortie (une génération précédente) ne sont
+    jamais proposés. Seuls les noms de fichiers sont lus - ni EXIF ni
+    ouverture d'image -, ce qui reste rapide sur de grosses photothèques."""
+    input_dir = Path(input_dir)
+    excluded = []
+    if output_dir:
+        try:
+            output_resolved = Path(output_dir).resolve()
+            excluded = [output_resolved / "planches", output_resolved / "gallery"]
+        except OSError:
+            excluded = []
+
+    def is_excluded(folder: str) -> bool:
+        for excluded_dir in excluded:
+            try:
+                if excluded_dir.exists() and os.path.samefile(folder, excluded_dir):
+                    return True
+            except OSError:
+                continue
+        return False
+
+    extensions = ImageScanner.SUPPORTED_EXTENSIONS
+    found: dict[str, int] = {}
+    for dirpath, dirnames, filenames in os.walk(input_dir):
+        if excluded:
+            dirnames[:] = [
+                name for name in dirnames
+                if not (name in ("planches", "gallery") and is_excluded(os.path.join(dirpath, name)))
+            ]
+        dirnames.sort(key=str.lower)
+        count = sum(1 for name in filenames if Path(name).suffix.lower() in extensions)
+        if count:
+            relative = os.path.relpath(dirpath, input_dir).replace(os.sep, "/")
+            found[relative] = count
+
+    return sorted(found.items(), key=lambda item: (item[0] != ".", item[0].lower(), item[0]))

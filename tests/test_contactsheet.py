@@ -989,7 +989,8 @@ def test_sheet_and_gallery_use_the_same_license_wording(restore_language, lang):
 def test_the_rendered_sheet_carries_the_license_line_and_the_pdf_inherits_it(tmp_path):
     """Bout en bout : la planche JPEG réellement générée porte les deux
     mentions ; le PDF est construit à partir de ces planches (il ne dessine
-    aucun texte lui-même) et les reprend donc à l'identique."""
+    aucun texte visible lui-même, seulement une couche de texte invisible
+    - voir tests/test_pdf_text.py) et les reprend donc à l'identique."""
     images = _make_images(tmp_path, 6)
     config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=6,
                     profile=Profile(layout=LayoutSettings(per_page=6)))
