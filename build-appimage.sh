@@ -22,7 +22,7 @@ PYTHON="${PYTHON:-python3}"
 # adopter une nouvelle version après l'avoir examinée). Lui-même vérifie les
 # empreintes de tout ce qu'il télécharge ensuite (sharun, appimagetool...).
 QUICK_SHARUN_URL="${QUICK_SHARUN_URL:-https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/quick-sharun.sh}"
-QUICK_SHARUN_SHA256="${QUICK_SHARUN_SHA256:-0aa3286d3329e0ead74ae8b3a5281f6210eda8cbc413e8d254c00316519111bb}"
+QUICK_SHARUN_SHA256="${QUICK_SHARUN_SHA256:-fa9dbe2532d568e1c1b8eeaba94d1c57109b776b5541d21b74d3f44b74faf4d3}"
 # ===========================================================
 
 show_help() {
