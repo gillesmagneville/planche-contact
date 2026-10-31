@@ -44,7 +44,7 @@ Generate high-resolution contact sheets, PDF documents, responsive HTML gallerie
 
 ## Download
 
-**Latest stable release: [v5.1.10](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.1.10)**
+**Latest stable release: [v5.2.0](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.2.0)**
 
 Planche-Contact is available as ready-to-use packages for Linux and Windows.
 
@@ -52,42 +52,55 @@ Planche-Contact is available as ready-to-use packages for Linux and Windows.
 
 **Debian / Ubuntu — 64-bit**
 
-[Download `planche-contact_5.1.10_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.1.10/planche-contact_5.1.10_amd64.deb)
+[Download `planche-contact_5.2.0_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.0/planche-contact_5.2.0_amd64.deb)
 
 ```bash
-sudo apt install ./planche-contact_5.1.10_amd64.deb
+sudo apt install ./planche-contact_5.2.0_amd64.deb
 ```
 
 SHA-256:
 
 ```text
-76c8617f00b610a79d04a48572c840658fc653d303e0d3efe81e2fcf9ccb9acb
+<SHA256:planche-contact_5.2.0_amd64.deb>
 ```
 
 **Any Linux distribution — AppImage**
 
-A single executable file that bundles Python, GTK 4 and every library Planche-Contact needs: nothing to install. It is built by `./build-appimage.sh` and is meant to be attached to the releases together with its `.sha256` file. Not published yet: see [AppImage](#appimage-any-linux-distribution) to build it yourself.
+[Download `Planche-Contact-5.2.0-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.0/Planche-Contact-5.2.0-x86_64.AppImage)
+
+```bash
+chmod +x Planche-Contact-5.2.0-x86_64.AppImage
+./Planche-Contact-5.2.0-x86_64.AppImage
+```
+
+SHA-256:
+
+```text
+<SHA256:Planche-Contact-5.2.0-x86_64.AppImage>
+```
+
+A single file that bundles Python, GTK 4 and every library Planche-Contact needs: nothing to install. Details and build: [AppImage](#appimage-any-linux-distribution).
 
 ### Windows
 
 **Windows 10 / 11 — Installer**
 
-[Download `planche-contact_5.1.10_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.1.10/planche-contact_5.1.10_windows-setup.exe)
+[Download `planche-contact_5.2.0_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.0/planche-contact_5.2.0_windows-setup.exe)
 
 SHA-256:
 
 ```text
-bfda000d4dc3b14bb289bfa12a3af53e134e0fc7bbde87184089ac0db1f8be10
+<SHA256:planche-contact_5.2.0_windows-setup.exe>
 ```
 
 **Windows — Portable version**
 
-[Download `planche-contact_5.1.10_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.1.10/planche-contact_5.1.10_windows-portable.zip)
+[Download `planche-contact_5.2.0_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.0/planche-contact_5.2.0_windows-portable.zip)
 
 SHA-256:
 
 ```text
-18cef5bbf7a5fc3aae20bf94c00341b9d65b70239b9d2d97da4f4c65c1df8839
+<SHA256:planche-contact_5.2.0_windows-portable.zip>
 ```
 
 If you simply want to use Planche-Contact, **you do not need to build it from source**.
@@ -326,24 +339,19 @@ This makes Planche-Contact particularly useful when you simply want to **present
 
 ---
 
-# What's new in v5.1.10?
+# What's new in v5.2.0?
 
-Version **5.1.10** continues the evolution of Planche-Contact with improvements to the HTML gallery, image viewer, presentation workflow, Windows support and overall robustness.
+Version **5.2.0** answers requests from users.
 
 Highlights include:
 
-- Improved HTML gallery and integrated image viewer
-- Full-resolution image downloads
-- RAW-to-JPEG conversion for gallery downloads
-- Improved handling of duplicate filenames
-- Robust URL encoding
-- `file://` download support through JavaScript sidecars
-- Improved GTK advanced settings interface
-- Continued improvements to presentation profiles and layouts
-- Additional tests and documentation improvements
-- Multilingual documentation and generated HTML galleries
+- The **file name** is shown under each photo by default in the graphical interface
+- **PDF with selectable text**: file names, title and page numbers can be selected, copied and searched
+- **Choice of the subfolders** to include (graphical interface, `--include-dir` and `--include-dirs-file` options)
+- **AppImage**: a single file for any Linux distribution, with its SHA-256 checksum
+- Bilingual documentation (English / French) and all four manuals shipped in the packages
 
-See the complete [v5.1.10 release notes](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.1.10) for the full list of changes.
+See the complete [v5.2.0 release notes](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.2.0) for the full list of changes.
 
 ---
 
@@ -405,7 +413,7 @@ This produces `Planche-Contact-<version>-<arch>.AppImage` and its `.sha256` at t
 
 - The interface is drawn with GTK's software renderer (Cairo): no OpenGL, Vulkan or graphics driver is needed, and the graphics libraries of the host are not loaded.
 - The AppImage is built for the architecture of the machine that builds it (`x86_64`, `aarch64`...).
-- Status: built and tested on Ubuntu 24.04 (x86_64) under a virtual X display only. Other distributions, Wayland and real graphics hardware have not been tested yet — feedback is welcome.
+- Status: built on Ubuntu 24.04 (x86_64), tested under a virtual X display and on the maintainer's machine. Other distributions and Wayland have not been tested yet — feedback is welcome.
 
 ---
 
