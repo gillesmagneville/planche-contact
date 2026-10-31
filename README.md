@@ -61,7 +61,7 @@ sudo apt install ./planche-contact_5.2.0_amd64.deb
 SHA-256:
 
 ```text
-<SHA256:planche-contact_5.2.0_amd64.deb>
+aa63f26c6a00f5316ba8c793f1972ab5e1b36fa67935dcc1d5690a1a4a000e27
 ```
 
 **Any Linux distribution — AppImage**
@@ -76,7 +76,7 @@ chmod +x Planche-Contact-5.2.0-x86_64.AppImage
 SHA-256:
 
 ```text
-<SHA256:Planche-Contact-5.2.0-x86_64.AppImage>
+2929fcf5c732b2ab1154bc14ef686d8a8e334b057708f7767e3e32970e71ac8e
 ```
 
 A single file that bundles Python, GTK 4 and every library Planche-Contact needs: nothing to install. Details and build: [AppImage](#appimage-any-linux-distribution).
@@ -90,7 +90,7 @@ A single file that bundles Python, GTK 4 and every library Planche-Contact needs
 SHA-256:
 
 ```text
-<SHA256:planche-contact_5.2.0_windows-setup.exe>
+3f6e056492b0d99a804437d3f92a97e068581e6b1837b426b7c7c262b74aea51
 ```
 
 **Windows — Portable version**
@@ -100,7 +100,7 @@ SHA-256:
 SHA-256:
 
 ```text
-<SHA256:planche-contact_5.2.0_windows-portable.zip>
+737754f129431d4d047adc8151049070fe33b1c39474e7d4b6a2d471a866935e
 ```
 
 If you simply want to use Planche-Contact, **you do not need to build it from source**.
