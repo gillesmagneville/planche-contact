@@ -1,20 +1,20 @@
-; installer.nsi - Installeur Windows pour Planche-Contact
+; installer.nsi - Windows installer for Planche-Contact
 ;
-; Appele par build-windows.ps1, qui genere au prealable un petit fichier
-; build-vars.nsh (dans ce meme dossier) contenant les !define suivants,
-; avant d'invoquer makensis sur ce fichier :
-;   PC_VERSION    version a afficher (ex: 1.4.0)
-;   PC_DIST_DIR   dossier contenant l'application gelee (PyInstaller)
-;   PC_OUTPUT     chemin complet du .exe installeur a generer
-;   PC_ICON       chemin vers l'icone .ico
+; Called by build-windows.ps1, which first generates a small build-vars.nsh
+; file (in this same folder) holding the following !define lines, before
+; invoking makensis on this file:
+;   PC_VERSION    version to display (e.g. 1.4.0)
+;   PC_DIST_DIR   folder holding the frozen application (PyInstaller)
+;   PC_OUTPUT     full path of the installer .exe to generate
+;   PC_ICON       path to the .ico icon
 ;
-; (la directive "!getenv" utilisee dans une version precedente de ce
-; fichier n'existe pas en NSIS - la methode standard et documentee pour
-; faire passer des valeurs depuis l'exterieur est /D en ligne de commande
-; de makensis, equivalent a !define. On passe ici par un fichier .nsh
-; genere plutot que par /D directement, pour eviter tout probleme
-; d'echappement avec des chemins contenant des espaces, par exemple
-; "C:\Users\Jean Dupont\...".)
+; (the "!getenv" directive used in a previous version of this file
+; does not exist in NSIS - the standard, documented way to pass values
+; from outside is /D on the command line of makensis, equivalent to
+; !define. A generated .nsh file is used here rather than /D directly,
+; to avoid any escaping problem with paths containing spaces, for
+; example
+; "C:\Users\John Smith\...".)
 
 !include "build-vars.nsh"
 
@@ -30,7 +30,7 @@ RequestExecutionLevel admin
 SetCompressor /SOLID lzma
 
 !include "MUI2.nsh"
-!include "FileFunc.nsh"  ; pour ${GetSize}, utilisé plus bas (EstimatedSize)
+!include "FileFunc.nsh"  ; for ${GetSize}, used further down (EstimatedSize)
 
 !define MUI_ABORTWARNING
 !define MUI_ICON "${PC_ICON}"
@@ -75,10 +75,10 @@ Section "Planche-Contact (obligatoire)" SecMain
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PlancheContact" \
                   "NoRepair" 1
 
-    ; Taille installée, affichée dans Parametres > Applications (colonne
-    ; "Taille"). Sans cette valeur, Windows affiche parfois des tailles
-    ; aberrantes ou n'affiche rien du tout. Doit être calculée après que
-    ; tous les fichiers ont été copiés (File /r ci-dessus).
+    ; Installed size, shown in Settings > Apps (the "Size" column). Without
+    ; this value, Windows sometimes shows absurd sizes or nothing at all.
+    ; Must be computed after all the files have been copied (File /r
+    ; above).
     ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
     IntFmt $0 "0x%X" $0
     WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PlancheContact" \

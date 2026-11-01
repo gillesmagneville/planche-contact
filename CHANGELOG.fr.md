@@ -8,6 +8,46 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 ## [Non publié]
 
+## [5.2.1] - 2026-11-01
+
+Version de maintenance : le programme lui-même ne change pas.
+
+### Ajouté
+
+- **Un code de conduite** ([`CODE_OF_CONDUCT.fr.md`](CODE_OF_CONDUCT.fr.md), en français et
+  en anglais), fondé sur le _Contributor Covenant_ 3.0, avec le mainteneur comme contact pour
+  les signalements. Les paquets l'embarquent : dans `/usr/share/doc/planche-contact/` pour le
+  `.deb`, à la racine des paquets Windows (installeur et portable) et dans l'AppImage.
+
+### Modifié
+
+- **Les scripts de construction et les fichiers de packaging sont maintenant en anglais**, comme
+  la documentation : `build-deb.sh`, `build-appimage.sh`, `build-windows.ps1` (celui de la
+  racine comme celui de `windows/`), `debian/postinst` et `debian/control`, ainsi que les
+  commentaires de `windows/installer.nsi` et de `windows/planche-contact.spec`. Leurs questions
+  de confirmation se valident désormais par `y` (`[y/N]`) au lieu de `o`. Les écrans de
+  l'installeur Windows restent en français, et les commentaires du code source du programme ne
+  changent pas.
+- **La licence est maintenant déclarée de la même façon partout** : GPL-3.0-only, comme dans le
+  fichier `LICENSE`, le README et le programme. Les métadonnées AppStream et `debian/copyright`
+  indiquaient « GPL-3.0-or-later », et le paquet `.deb` « GPL-3.0 ». Les paquets déclarent
+  désormais `GPL-3.0-only AND CC-BY-SA-4.0` (le code de conduite est distribué sous CC BY-SA 4.0),
+  et `debian/copyright` décrit les deux.
+- Les métadonnées AppStream (`metainfo/planche-contact.metainfo.xml`) sont maintenant écrites en
+  anglais par défaut, avec les traductions française, espagnole et allemande (les formulations
+  espagnole et allemande restent à faire relire par un locuteur natif).
+- README : la section « Téléchargement » pointe vers cette version ; le badge Windows ne dit plus
+  « build from source », puisque l'installeur est publié.
+
+### Corrigé
+
+- `build-appimage.sh` pouvait s'arrêter sans aucun message sur une machine possédant beaucoup de
+  bibliothèques système, et pouvait, plus rarement, oublier une bibliothèque dans l'AppImage.
+  Cause : certaines commandes s'arrêtent à la première correspondance d'une longue sortie de
+  `ldconfig` ou `ldd`, et avec `pipefail` le SIGPIPE qui en résulte arrêtait le script (ou faisait
+  échouer un test) au hasard. Ces commandes lisent maintenant toute leur sortie. Le script indique
+  aussi la ligne où il s'arrête, et signale un échec du téléchargement de `quick-sharun`.
+
 ## [5.2.0] - 2026-10-30
 
 ### Ajouté

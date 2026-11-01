@@ -231,6 +231,8 @@ planche-contact/
 ├── CONTRIBUTING.md                 # English (default); French version: CONTRIBUTING.fr.md
 ├── CONTRIBUTING.fr.md
 ├── LICENSE                         # GNU GPL v3
+├── CODE_OF_CONDUCT.md              # Contributor Covenant 3.0 (CC BY-SA 4.0); French version: CODE_OF_CONDUCT.fr.md
+├── CODE_OF_CONDUCT.fr.md
 ├── PROJECT_CONTEXT.md              # This file (English)
 └── PROJECT_CONTEXT.fr.md           # French version of this file
 ```
@@ -280,7 +282,12 @@ exist in the current `portfolio.py`).
 ## 5. Coding conventions
 
 - **Language**: code identifiers (variables, functions, classes) in
-  English; code comments in French; strings visible to the user in the
+  English; code comments in French (the build and packaging scripts —
+  `build-deb.sh`, `build-appimage.sh`, `build-windows.ps1`, `debian/postinst` —
+  are entirely in English, messages included, and their confirmation questions
+  are answered by `y` (`[y/N]`); the comments of `windows/installer.nsi` and
+  `windows/planche-contact.spec` are in English too, while the screens of the
+  Windows installer itself stay in French); strings visible to the user in the
   interface and messages through `portfolio/locales/` (English, French,
   German, Spanish — `en.py` must stay complete, since English is the
   fallback language). The documentation (`.md` files) is bilingual: the

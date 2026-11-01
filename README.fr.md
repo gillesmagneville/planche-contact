@@ -25,7 +25,7 @@
 
 ![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![Platform](https://img.shields.io/badge/Linux-Debian%20%7C%20Ubuntu-orange)
-![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011%20(build%20from%20source)-0078D6)
+![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)
 ![GTK](https://img.shields.io/badge/GTK-4-3584E4)
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB)
 ![Status](https://img.shields.io/badge/Status-Stable-success)
@@ -44,7 +44,7 @@ Générez des planches contact haute résolution, des documents PDF, des galerie
 
 ## Téléchargement
 
-**Dernière version stable : [v5.2.0](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.2.0)**
+**Dernière version stable : [v5.2.1](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.2.1)**
 
 Planche-Contact est disponible sous forme de paquets prêts à l'emploi pour Linux et Windows.
 
@@ -52,31 +52,31 @@ Planche-Contact est disponible sous forme de paquets prêts à l'emploi pour Lin
 
 **Debian / Ubuntu — 64 bits**
 
-[Télécharger `planche-contact_5.2.0_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.0/planche-contact_5.2.0_amd64.deb)
+[Télécharger `planche-contact_5.2.1_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.1/planche-contact_5.2.1_amd64.deb)
 
 ```bash
-sudo apt install ./planche-contact_5.2.0_amd64.deb
+sudo apt install ./planche-contact_5.2.1_amd64.deb
 ```
 
 SHA-256 :
 
 ```text
-aa63f26c6a00f5316ba8c793f1972ab5e1b36fa67935dcc1d5690a1a4a000e27
+e77d98d07e70747793786a62a6d1f9056df669c99287ee693c274aad421a579d
 ```
 
 **Toutes distributions Linux — AppImage**
 
-[Télécharger `Planche-Contact-5.2.0-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.0/Planche-Contact-5.2.0-x86_64.AppImage)
+[Télécharger `Planche-Contact-5.2.1-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.1/Planche-Contact-5.2.1-x86_64.AppImage)
 
 ```bash
-chmod +x Planche-Contact-5.2.0-x86_64.AppImage
-./Planche-Contact-5.2.0-x86_64.AppImage
+chmod +x Planche-Contact-5.2.1-x86_64.AppImage
+./Planche-Contact-5.2.1-x86_64.AppImage
 ```
 
 SHA-256 :
 
 ```text
-2929fcf5c732b2ab1154bc14ef686d8a8e334b057708f7767e3e32970e71ac8e
+af9fc5a794653f5556fd82a4b5ac670a6e463d1e30fe48ebf4d6d71b34ec06e2
 ```
 
 Un seul fichier qui embarque Python, GTK 4 et toutes les bibliothèques nécessaires à Planche-Contact : rien à installer. Détails et construction : [AppImage](#appimage-toutes-distributions-linux).
@@ -85,22 +85,22 @@ Un seul fichier qui embarque Python, GTK 4 et toutes les bibliothèques nécessa
 
 **Windows 10 / 11 — Installeur**
 
-[Télécharger `planche-contact_5.2.0_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.0/planche-contact_5.2.0_windows-setup.exe)
+[Télécharger `planche-contact_5.2.1_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.1/planche-contact_5.2.1_windows-setup.exe)
 
 SHA-256 :
 
 ```text
-3f6e056492b0d99a804437d3f92a97e068581e6b1837b426b7c7c262b74aea51
+349924cb3264bc643d7369774ea2ac24049603e91083dbaf06dae600a5707c7a
 ```
 
 **Windows — Version portable**
 
-[Télécharger `planche-contact_5.2.0_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.0/planche-contact_5.2.0_windows-portable.zip)
+[Télécharger `planche-contact_5.2.1_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.1/planche-contact_5.2.1_windows-portable.zip)
 
 SHA-256 :
 
 ```text
-737754f129431d4d047adc8151049070fe33b1c39474e7d4b6a2d471a866935e
+cb3f47b8cd11ba8f564f3e30d4ca366f35ff61dc4360890276281c6c58d860db
 ```
 
 Si vous voulez simplement utiliser Planche-Contact, **vous n'avez pas besoin de le compiler depuis les sources**.
@@ -339,7 +339,9 @@ Planche-Contact est donc particulièrement utile lorsque vous voulez simplement 
 
 ---
 
-# Nouveautés de la v5.2.0
+# Nouveautés
+
+La version **5.2.1** est une version de maintenance : le projet a maintenant un [code de conduite](CODE_OF_CONDUCT.fr.md), que les paquets embarquent, et ses scripts de construction sont écrits en anglais. Le programme lui-même ne change pas.
 
 La version **5.2.0** répond à des demandes d'utilisateurs.
 
@@ -351,7 +353,7 @@ Parmi les points forts :
 - **AppImage** : un seul fichier pour toutes les distributions Linux, avec son empreinte SHA-256
 - Documentation bilingue (anglais / français) et quatre manuels embarqués dans les paquets
 
-Consultez les [notes de version complètes de la v5.2.0](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.2.0) pour la liste détaillée des changements.
+Consultez les [notes de version](https://github.com/gillesmagneville/planche-contact/releases) pour la liste détaillée des changements de chaque version.
 
 ---
 
@@ -479,7 +481,7 @@ prérequis et le dépannage.
 | [CHANGELOG.fr.md](CHANGELOG.fr.md) · [🇬🇧](CHANGELOG.md) | Historique des versions |
 | [CONTRIBUTING.fr.md](CONTRIBUTING.fr.md) · [🇬🇧](CONTRIBUTING.md) | Guide de contribution |
 | [PROJECT_CONTEXT.fr.md](PROJECT_CONTEXT.fr.md) · [🇬🇧](PROJECT_CONTEXT.md) | Notes pour les développeurs : architecture, conventions, décisions techniques |
-| CODE_OF_CONDUCT.md | Règles de la communauté |
+| [CODE_OF_CONDUCT.fr.md](CODE_OF_CONDUCT.fr.md) · [🇬🇧](CODE_OF_CONDUCT.md) | Règles de la communauté (Contributor Covenant 3.0) |
 | LICENSE | GNU GPL v3 |
 
 ---
@@ -499,7 +501,9 @@ Les contributions sont les bienvenues.
 
 Que vous souhaitiez signaler un bug, suggérer une fonctionnalité, améliorer la documentation ou proposer du code, votre aide est appréciée.
 
-Merci de lire **CONTRIBUTING.fr.md** avant d'ouvrir une Issue ou une Pull Request.
+Merci de lire **[CONTRIBUTING.fr.md](CONTRIBUTING.fr.md)** avant d'ouvrir une Issue ou une Pull Request.
+
+En participant à ce projet, vous vous engagez à respecter son [Code de conduite](CODE_OF_CONDUCT.fr.md).
 
 ---
 
@@ -508,7 +512,9 @@ Merci de lire **CONTRIBUTING.fr.md** avant d'ouvrir une Issue ou une Pull Reques
 Planche-Contact est développé par **Gilles MAGNEVILLE**, avec l'aide de
 [Claude.ai](https://claude.ai) (Anthropic).
 
-Distribué selon les termes de la **GNU General Public License v3.0**.
+Distribué selon les termes de la **GNU General Public License v3.0** (GPL-3.0-only).
+
+Le code de conduite ([CODE_OF_CONDUCT.fr.md](CODE_OF_CONDUCT.fr.md)) est le _Contributor Covenant_ 3.0, adapté pour ce projet ; il est distribué sous sa propre licence, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/deed.fr).
 
 ---
 

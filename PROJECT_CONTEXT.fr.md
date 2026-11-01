@@ -231,6 +231,8 @@ planche-contact/
 ├── CONTRIBUTING.md                 # Anglais (par défaut) ; version française : CONTRIBUTING.fr.md
 ├── CONTRIBUTING.fr.md
 ├── LICENSE                         # GNU GPL v3
+├── CODE_OF_CONDUCT.md              # Contributor Covenant 3.0 (CC BY-SA 4.0) ; version française : CODE_OF_CONDUCT.fr.md
+├── CODE_OF_CONDUCT.fr.md
 ├── PROJECT_CONTEXT.md              # Version anglaise de ce fichier
 └── PROJECT_CONTEXT.fr.md           # Ce fichier (version française)
 ```
@@ -280,7 +282,13 @@ bel et bien dans `portfolio.py` actuel).
 ## 5. Conventions de codage
 
 - **Langue** : identifiants de code (variables, fonctions, classes) en
-  anglais ; commentaires de code en français ; chaînes visibles par
+  anglais ; commentaires de code en français (les scripts de construction et
+  de packaging — `build-deb.sh`, `build-appimage.sh`, `build-windows.ps1`,
+  `debian/postinst` — sont entièrement en anglais, messages compris, et leurs
+  questions de confirmation attendent `y` (`[y/N]`) ; les commentaires de
+  `windows/installer.nsi` et de `windows/planche-contact.spec` sont aussi en
+  anglais, alors que les écrans de l'installeur Windows restent en français) ;
+  chaînes visibles par
   l'utilisateur dans l'interface et les messages via `portfolio/locales/`
   (anglais, français, allemand, espagnol — `en.py` doit rester complet,
   l'anglais étant la langue de repli). La documentation (fichiers `.md`)

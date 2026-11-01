@@ -17,10 +17,9 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
          python3-pil,
          python3-reportlab
 Recommends: python3-pil, python3-reportlab
-Description: Outil léger de génération de planches contact photographiques
- Planche Contact est un outil simple et rapide permettant de générer
- des planches contact de haute qualité (300 dpi) à partir de dossiers
- d'images.
+Description: Lightweight photographic contact sheet generator
+ Planche Contact is a simple and fast tool that generates high-quality
+ (300 dpi) contact sheets from folders of images.
  .
- Il propose une interface graphique moderne en GTK4 ainsi qu'une
- interface en ligne de commande.
+ It offers a modern GTK4 graphical interface as well as a command-line
+ interface.

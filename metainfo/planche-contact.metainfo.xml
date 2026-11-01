@@ -1,34 +1,64 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Métadonnées AppStream de Planche-Contact.
+  AppStream metadata for Planche-Contact.
 
-  Sans ce fichier, les gestionnaires logiciels modernes qui s'appuient sur
-  PackageKit + AppStream (dont l'App Center d'Ubuntu depuis la 26.04) ne
-  reconnaissent l'application que partiellement via son .desktop, avec un
-  affichage incomplet (taille, description enrichie, etc.).
+  Without this file, modern software centers built on PackageKit + AppStream
+  (including Ubuntu's App Center since 26.04) only partially recognize the
+  application through its .desktop file, with an incomplete display (size,
+  rich description, etc.).
 
-  L'<id> doit correspondre au nom du fichier lui-même
-  (planche-contact.metainfo.xml) et le <launchable> doit correspondre au
-  nom du fichier .desktop installé (planche-contact.desktop).
+  The <id> must match the name of the file itself
+  (planche-contact.metainfo.xml) and the <launchable> must match the name of
+  the installed .desktop file (planche-contact.desktop).
 -->
 <component type="desktop-application">
   <id>planche-contact</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>GPL-3.0-or-later</project_license>
+  <project_license>GPL-3.0-only AND CC-BY-SA-4.0</project_license>
 
   <name>Planche-Contact</name>
-  <summary>Génère des planches contact photographiques haute qualité</summary>
+  <summary>Generates high-quality photographic contact sheets</summary>
+  <summary xml:lang="fr">Génère des planches contact photographiques haute qualité</summary>
+  <summary xml:lang="es">Genera hojas de contacto fotográficas de alta calidad</summary>
+  <summary xml:lang="de">Erzeugt hochwertige fotografische Kontaktbögen</summary>
 
   <description>
     <p>
+      Planche-Contact creates professional contact sheets (300 dpi), PDF
+      documents, paginated HTML galleries and CSV indexes from a folder of
+      JPEG or RAW photos, with no database or catalog.
+    </p>
+    <p xml:lang="fr">
       Planche-Contact crée des planches contact professionnelles (300 dpi),
       des documents PDF, des galeries HTML paginées et des index CSV à
       partir d'un dossier de photos JPEG ou RAW, sans base de données ni
       catalogue.
     </p>
+    <p xml:lang="es">
+      Planche-Contact crea hojas de contacto profesionales (300 ppp),
+      documentos PDF, galerías HTML paginadas e índices CSV a partir de una
+      carpeta de fotos JPEG o RAW, sin base de datos ni catálogo.
+    </p>
+    <p xml:lang="de">
+      Planche-Contact erstellt professionelle Kontaktbögen (300 dpi),
+      PDF-Dokumente, seitenweise HTML-Galerien und CSV-Indizes aus einem
+      Ordner mit JPEG- oder RAW-Fotos, ohne Datenbank und ohne Katalog.
+    </p>
     <p>
+      It works directly on existing folders: no import or catalog management
+      is needed.
+    </p>
+    <p xml:lang="fr">
       Fonctionne directement sur les dossiers existants : aucune importation
       ni gestion de catalogue n'est nécessaire.
+    </p>
+    <p xml:lang="es">
+      Funciona directamente sobre las carpetas existentes: no hace falta
+      importar nada ni gestionar un catálogo.
+    </p>
+    <p xml:lang="de">
+      Funktioniert direkt mit vorhandenen Ordnern: Weder ein Import noch eine
+      Katalogverwaltung ist nötig.
     </p>
   </description>
 

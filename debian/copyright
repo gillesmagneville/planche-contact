@@ -5,13 +5,24 @@ Source: https://github.com/gillesmagneville/planche-contact
 
 Files: *
 Copyright: 2025-2026 Gilles MAGNEVILLE
-License: GPL-3.0-or-later
+License: GPL-3.0-only
 
-License: GPL-3.0-or-later
+Files: CODE_OF_CONDUCT.md CODE_OF_CONDUCT.fr.md
+Copyright: 2014-2026 Coraline Ada Ehmke and the Contributor Covenant contributors
+           2026 Gilles MAGNEVILLE (adaptation)
+License: CC-BY-SA-4.0
+Comment: Contributor Covenant 3.0, adapted for this project (reporting contact and
+ enforcement note filled in).
+
+License: CC-BY-SA-4.0
+ This work is licensed under the Creative Commons Attribution-ShareAlike 4.0
+ International License. To view a copy of this license, visit
+ <https://creativecommons.org/licenses/by-sa/4.0/legalcode>.
+
+License: GPL-3.0-only
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
- the Free Software Foundation, either version 3 of the License, or
- (at your option) any later version.
+ the Free Software Foundation, version 3 of the License.
  .
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of

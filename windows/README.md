@@ -42,7 +42,9 @@ Options identical to `build-deb.sh`:
 ```
 
 The script automatically checks the prerequisites and offers to install them
-if they are missing (see below). At the end, two files appear at the root of
+if they are missing (see below). Every question it asks (confirmation of the
+version, installation of a missing prerequisite) is answered with `y` to accept;
+any other answer declines. At the end, two files appear at the root of
 the repository:
 
 - `planche-contact_X.Y.Z_windows-portable.zip` — standalone folder to
