@@ -1,15 +1,15 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Relais vers windows\build-windows.ps1, pour un usage symetrique a
-    build-deb.sh (qui se lance depuis la racine du depot).
+    Relay to windows\build-windows.ps1, for a usage symmetrical to
+    build-deb.sh (which is run from the root of the repository).
 
 .DESCRIPTION
-    Ce script ne fait que transmettre tous ses arguments a
-    windows\build-windows.ps1, ou vit la logique de build reelle (voir
-    windows\README.md pour le detail complet : prerequis, options,
-    depannage). Rien n'est duplique : ce fichier reste a jour tout seul,
-    puisqu'il ne fait qu'appeler l'autre script.
+    This script only forwards all its arguments to
+    windows\build-windows.ps1, where the real build logic lives (see
+    windows\README.md for the full details: prerequisites, options,
+    troubleshooting). Nothing is duplicated: this file stays up to date by
+    itself, since it only calls the other script.
 
 .EXAMPLE
     .\build-windows.ps1

@@ -8,6 +8,44 @@ The project follows the recommendations of **Keep a Changelog** and **Semantic V
 
 ## [Unreleased]
 
+## [5.2.1] - 2026-11-01
+
+Maintenance release: the program itself does not change.
+
+### Added
+
+- **A Code of Conduct** ([`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md), in English and in
+  French), based on the Contributor Covenant 3.0, with the maintainer as the contact for
+  reports. The packages ship it: in `/usr/share/doc/planche-contact/` for the `.deb`, in the
+  root folder of the Windows packages (installer and portable) and inside the AppImage.
+
+### Changed
+
+- **The build scripts and the packaging files are now in English**, like the documentation:
+  `build-deb.sh`, `build-appimage.sh`, `build-windows.ps1` (both the one at the root and the
+  one in `windows/`), `debian/postinst` and `debian/control`, as well as the comments of
+  `windows/installer.nsi` and `windows/planche-contact.spec`. Their confirmation questions are
+  now answered with `y` (`[y/N]`) instead of `o`. The screens of the Windows installer itself
+  stay in French, and the comments of the program's source code are unchanged.
+- **The license is now declared the same way everywhere**: GPL-3.0-only, as in the `LICENSE`
+  file, the README and the program. The AppStream metadata and `debian/copyright` said
+  "GPL-3.0-or-later", and the `.deb` package said "GPL-3.0". The packages now declare
+  `GPL-3.0-only AND CC-BY-SA-4.0` (the Code of Conduct is distributed under CC BY-SA 4.0), and
+  `debian/copyright` describes both.
+- The AppStream metadata (`metainfo/planche-contact.metainfo.xml`) is now written in English by
+  default, with the French, Spanish and German translations (the Spanish and German wording
+  still needs a proofread by a native speaker).
+- README: the "Download" section points to this release; the Windows badge no longer says
+  "build from source", since the installer is published.
+
+### Fixed
+
+- `build-appimage.sh` could stop without any message on a machine with many system libraries,
+  and could, more rarely, leave a library out of the AppImage. Cause: some commands quit at the
+  first match of a long `ldconfig` or `ldd` output, and with `pipefail` the resulting SIGPIPE
+  made the script stop (or a test fail) at random. These commands now read their whole output.
+  The script also reports the line where it stops, and a failed download of `quick-sharun`.
+
 ## [5.2.0] - 2026-10-30
 
 ### Added

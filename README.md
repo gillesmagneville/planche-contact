@@ -25,7 +25,7 @@
 
 ![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![Platform](https://img.shields.io/badge/Linux-Debian%20%7C%20Ubuntu-orange)
-![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011%20(build%20from%20source)-0078D6)
+![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)
 ![GTK](https://img.shields.io/badge/GTK-4-3584E4)
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB)
 ![Status](https://img.shields.io/badge/Status-Stable-success)
@@ -44,7 +44,7 @@ Generate high-resolution contact sheets, PDF documents, responsive HTML gallerie
 
 ## Download
 
-**Latest stable release: [v5.2.0](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.2.0)**
+**Latest stable release: [v5.2.1](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.2.1)**
 
 Planche-Contact is available as ready-to-use packages for Linux and Windows.
 
@@ -52,31 +52,31 @@ Planche-Contact is available as ready-to-use packages for Linux and Windows.
 
 **Debian / Ubuntu — 64-bit**
 
-[Download `planche-contact_5.2.0_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.0/planche-contact_5.2.0_amd64.deb)
+[Download `planche-contact_5.2.1_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.1/planche-contact_5.2.1_amd64.deb)
 
 ```bash
-sudo apt install ./planche-contact_5.2.0_amd64.deb
+sudo apt install ./planche-contact_5.2.1_amd64.deb
 ```
 
 SHA-256:
 
 ```text
-aa63f26c6a00f5316ba8c793f1972ab5e1b36fa67935dcc1d5690a1a4a000e27
+e77d98d07e70747793786a62a6d1f9056df669c99287ee693c274aad421a579d
 ```
 
 **Any Linux distribution — AppImage**
 
-[Download `Planche-Contact-5.2.0-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.0/Planche-Contact-5.2.0-x86_64.AppImage)
+[Download `Planche-Contact-5.2.1-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.1/Planche-Contact-5.2.1-x86_64.AppImage)
 
 ```bash
-chmod +x Planche-Contact-5.2.0-x86_64.AppImage
-./Planche-Contact-5.2.0-x86_64.AppImage
+chmod +x Planche-Contact-5.2.1-x86_64.AppImage
+./Planche-Contact-5.2.1-x86_64.AppImage
 ```
 
 SHA-256:
 
 ```text
-2929fcf5c732b2ab1154bc14ef686d8a8e334b057708f7767e3e32970e71ac8e
+af9fc5a794653f5556fd82a4b5ac670a6e463d1e30fe48ebf4d6d71b34ec06e2
 ```
 
 A single file that bundles Python, GTK 4 and every library Planche-Contact needs: nothing to install. Details and build: [AppImage](#appimage-any-linux-distribution).
@@ -85,22 +85,22 @@ A single file that bundles Python, GTK 4 and every library Planche-Contact needs
 
 **Windows 10 / 11 — Installer**
 
-[Download `planche-contact_5.2.0_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.0/planche-contact_5.2.0_windows-setup.exe)
+[Download `planche-contact_5.2.1_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.1/planche-contact_5.2.1_windows-setup.exe)
 
 SHA-256:
 
 ```text
-3f6e056492b0d99a804437d3f92a97e068581e6b1837b426b7c7c262b74aea51
+349924cb3264bc643d7369774ea2ac24049603e91083dbaf06dae600a5707c7a
 ```
 
 **Windows — Portable version**
 
-[Download `planche-contact_5.2.0_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.0/planche-contact_5.2.0_windows-portable.zip)
+[Download `planche-contact_5.2.1_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.1/planche-contact_5.2.1_windows-portable.zip)
 
 SHA-256:
 
 ```text
-737754f129431d4d047adc8151049070fe33b1c39474e7d4b6a2d471a866935e
+cb3f47b8cd11ba8f564f3e30d4ca366f35ff61dc4360890276281c6c58d860db
 ```
 
 If you simply want to use Planche-Contact, **you do not need to build it from source**.
@@ -339,7 +339,9 @@ This makes Planche-Contact particularly useful when you simply want to **present
 
 ---
 
-# What's new in v5.2.0?
+# What's new?
+
+Version **5.2.1** is a maintenance release: the project now has a [Code of Conduct](CODE_OF_CONDUCT.md), which the packages ship, and its build scripts are written in English. The program itself does not change.
 
 Version **5.2.0** answers requests from users.
 
@@ -351,7 +353,7 @@ Highlights include:
 - **AppImage**: a single file for any Linux distribution, with its SHA-256 checksum
 - Bilingual documentation (English / French) and all four manuals shipped in the packages
 
-See the complete [v5.2.0 release notes](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.2.0) for the full list of changes.
+See the complete [release notes](https://github.com/gillesmagneville/planche-contact/releases) for the full list of changes of each version.
 
 ---
 
@@ -477,7 +479,7 @@ and troubleshooting.
 | [CHANGELOG.md](CHANGELOG.md) · [🇫🇷](CHANGELOG.fr.md) | Release history |
 | [CONTRIBUTING.md](CONTRIBUTING.md) · [🇫🇷](CONTRIBUTING.fr.md) | Contribution guidelines |
 | [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) · [🇫🇷](PROJECT_CONTEXT.fr.md) | Developer notes: architecture, conventions, technical decisions |
-| CODE_OF_CONDUCT.md | Community rules |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [🇫🇷](CODE_OF_CONDUCT.fr.md) | Community rules (Contributor Covenant 3.0) |
 | LICENSE | GNU GPL v3 |
 
 ---
@@ -499,6 +501,8 @@ Whether you want to report a bug, suggest a feature, improve the documentation o
 
 Please read **[CONTRIBUTING.md](CONTRIBUTING.md)** before opening an Issue or a Pull Request.
 
+By taking part in this project, you agree to follow its [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ---
 
 # License
@@ -506,7 +510,9 @@ Please read **[CONTRIBUTING.md](CONTRIBUTING.md)** before opening an Issue or a 
 Planche-Contact is developed by **Gilles MAGNEVILLE**, with the help of
 [Claude.ai](https://claude.ai) (Anthropic).
 
-Distributed under the terms of the **GNU General Public License v3.0**.
+Distributed under the terms of the **GNU General Public License v3.0** (GPL-3.0-only).
+
+The code of conduct ([CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)) is the Contributor Covenant 3.0, adapted for this project; it is distributed under its own license, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 
 ---
 

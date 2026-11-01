@@ -42,8 +42,9 @@ Options identiques à `build-deb.sh` :
 ```
 
 Le script vérifie automatiquement les prérequis et propose de les installer
-s'ils manquent (voir ci-dessous). À la fin, deux fichiers apparaissent à la
-racine du dépôt :
+s'ils manquent (voir ci-dessous). Chaque question qu'il pose (confirmation de la
+version, installation d'un prérequis manquant) se valide par `y` ; toute autre
+réponse refuse. À la fin, deux fichiers apparaissent à la racine du dépôt :
 
 - `planche-contact_X.Y.Z_windows-portable.zip` — dossier autonome à
   décompresser et lancer sans installation.

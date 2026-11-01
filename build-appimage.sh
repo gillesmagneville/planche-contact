@@ -1,26 +1,29 @@
 #!/bin/bash
 set -euo pipefail
+# With "set -e" a failing command stops the script; without this message the
+# stop would be silent, and the user could not tell where it happened.
+trap 'echo "Error: the script stopped at line $LINENO (command: $BASH_COMMAND)." >&2' ERR
 
 # ====================== CONFIGURATION ======================
 PACKAGE_NAME="planche-contact"
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERSION_FILE="$PROJECT_DIR/VERSION"
 ARCH="$(uname -m)"
-# Dossier de travail (hors du dépôt) : AppDir, venv pip, outils téléchargés.
+# Working folder (outside the repository): AppDir, pip venv, downloaded tools.
 BUILD_DIR="${APPIMAGE_BUILD_DIR:-$HOME/appimage-build}"
-# Interpréteur Python embarqué (celui qui voit PyGObject et GTK4).
+# Embedded Python interpreter (the one that sees PyGObject and GTK4).
 PYTHON="${PYTHON:-python3}"
 
-# quick-sharun : l'outil de l'écosystème « Anylinux-AppImages »
-# (https://github.com/pkgforge-dev/Anylinux-AppImages) qui embarque les
-# bibliothèques dont GTK4 et Python ont besoin - y compris la glibc, ce qui
-# rend l'AppImage indépendante de la distribution qui l'exécute - puis
-# assemble le fichier .AppImage. Il est téléchargé à chaque construction, mais
-# son empreinte SHA-256 est vérifiée : si le script amont change, la
-# construction s'arrête au lieu d'exécuter un code qu'on n'a pas relu (voir
-# les variables d'environnement QUICK_SHARUN_URL / QUICK_SHARUN_SHA256 pour
-# adopter une nouvelle version après l'avoir examinée). Lui-même vérifie les
-# empreintes de tout ce qu'il télécharge ensuite (sharun, appimagetool...).
+# quick-sharun: the tool of the "Anylinux-AppImages" ecosystem
+# (https://github.com/pkgforge-dev/Anylinux-AppImages) that bundles the
+# libraries GTK4 and Python need - glibc included, which makes the AppImage
+# independent of the distribution that runs it - then assembles the
+# .AppImage file. It is downloaded at every build, but its SHA-256 checksum
+# is verified: if the upstream script changes, the build stops instead of
+# running code nobody has read (see the QUICK_SHARUN_URL /
+# QUICK_SHARUN_SHA256 environment variables to adopt a new version after
+# reviewing it). It in turn verifies the checksums of everything it then
+# downloads (sharun, appimagetool...).
 QUICK_SHARUN_URL="${QUICK_SHARUN_URL:-https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/quick-sharun.sh}"
 QUICK_SHARUN_SHA256="${QUICK_SHARUN_SHA256:-fa9dbe2532d568e1c1b8eeaba94d1c57109b776b5541d21b74d3f44b74faf4d3}"
 # ===========================================================
@@ -29,36 +32,36 @@ show_help() {
     cat << EOF
 Usage: ./build-appimage.sh [options]
 
-Construit l'AppImage de Planche Contact (un seul fichier exécutable, avec
-Python, GTK4 et toutes les dépendances embarqués) et son empreinte SHA-256 :
+Builds the Planche Contact AppImage (a single executable file, with Python,
+GTK4 and every dependency bundled) and its SHA-256 checksum:
 
     Planche-Contact-<version>-${ARCH}.AppImage
     Planche-Contact-<version>-${ARCH}.AppImage.sha256
 
-La version est celle du fichier VERSION (lancez ./build-deb.sh avant pour
-l'incrémenter, si besoin : les deux paquets portent alors le même numéro).
+The version is the one in the VERSION file (run ./build-deb.sh first to bump
+it, if needed: both packages then carry the same number).
 
-OPTIONS :
-  --test       Après la construction, vérifie l'AppImage : ligne de commande
-               (génération réelle d'un PDF) puis, si xvfb-run est installé,
-               démarrage de l'interface graphique
-  --clean      Supprime le dossier de travail et les AppImage générées
-  --help, -h   Affiche cette aide
+OPTIONS:
+  --test       After the build, checks the AppImage: command line (real
+               generation of a PDF) then, if xvfb-run is installed, starts
+               the graphical interface
+  --clean      Deletes the working folder and the generated AppImages
+  --help, -h   Show this help
 
-PRÉREQUIS (Debian / Ubuntu) :
+PREREQUISITES (Debian / Ubuntu):
   sudo apt install python3 python3-venv python3-gi gir1.2-gtk-4.0 \\
-       patchelf binutils curl strace   # + xvfb pour --test
+       patchelf binutils curl strace   # + xvfb for --test
 
-Construire sur Arch Linux est ce que recommande le projet Anylinux-AppImages
-(chaque distribution range ses bibliothèques à sa façon) ; Debian/Ubuntu
-fonctionne mais n'est pas le cas de référence de l'outil.
-Voir README.md, section « AppImage ».
+Building on Arch Linux is what the Anylinux-AppImages project recommends
+(each distribution lays out its libraries its own way); Debian/Ubuntu works
+but is not the tool's reference case.
+See README.md, "AppImage" section.
 
-VARIABLES D'ENVIRONNEMENT :
-  APPIMAGE_BUILD_DIR   Dossier de travail (défaut : ~/appimage-build)
-  PYTHON               Python à embarquer (défaut : python3)
-  QUICK_SHARUN_URL     Adresse de quick-sharun
-  QUICK_SHARUN_SHA256  Empreinte attendue de ce script
+ENVIRONMENT VARIABLES:
+  APPIMAGE_BUILD_DIR   Working folder (default: ~/appimage-build)
+  PYTHON               Python to bundle (default: python3)
+  QUICK_SHARUN_URL     Address of quick-sharun
+  QUICK_SHARUN_SHA256  Expected checksum of that script
 EOF
 }
 
@@ -71,7 +74,7 @@ while [[ $# -gt 0 ]]; do
         --clean)     CLEAN=true; shift ;;
         --help|-h)   show_help; exit 0 ;;
         *)
-            echo "Option inconnue : $1"
+            echo "Unknown option: $1"
             show_help
             exit 1
             ;;
@@ -82,83 +85,86 @@ run_test() {
     local image="$1" work photos
     work="$(mktemp -d)"
     photos="$work/photos"
-    mkdir -p "$photos/sous-dossier"
-    echo ">>> Vérification de $(basename "$image")..."
+    mkdir -p "$photos/subfolder"
+    echo ">>> Checking $(basename "$image")..."
 
-    # Trois photos de test, dont une dans un sous-dossier. Pillow vient du
-    # dossier de dépendances de la construction.
+    # Three test photos, one of them in a subfolder. Pillow comes from the
+    # dependencies folder of the build.
     PYTHONPATH="$SITE_DIR" "$BUILD_DIR/venv/bin/python3" - "$photos" << 'PYEOF'
 import sys
 from PIL import Image
 
 root = sys.argv[1]
-for name in ("alpha.jpg", "beta.jpg", "sous-dossier/gamma.jpg"):
+for name in ("alpha.jpg", "beta.jpg", "subfolder/gamma.jpg"):
     Image.new("RGB", (640, 480), (90, 140, 200)).save(f"{root}/{name}")
 PYEOF
 
     export APPIMAGE_EXTRACT_AND_RUN=1
     local ok=true
 
-    # 1. Ligne de commande : une vraie génération (PDF + index CSV).
+    # 1. Command line: a real generation (PDF + CSV index).
     if "$image" portfolio -i "$photos" -o "$work/out" -r --pdf --csv --language en > "$work/cli.log" 2>&1 \
             && [ -s "$work/out/portfolio.pdf" ] && [ "$(wc -l < "$work/out/index.csv")" -eq 4 ]; then
-        echo "    [OK] ligne de commande : PDF et index CSV générés"
+        echo "    [OK] command line: PDF and CSV index generated"
     else
-        echo "    [ÉCHEC] ligne de commande (journal : $work/cli.log)"
+        echo "    [FAIL] command line (log: $work/cli.log)"
         ok=false
     fi
 
-    # 2. Interface graphique : doit rester ouverte (code 124 = arrêtée par
-    # timeout, donc toujours en vie) - nécessite un affichage virtuel.
+    # 2. Graphical interface: must stay open (code 124 = stopped by the
+    # timeout, hence still alive; 137 = it did not stop on the first signal
+    # and was killed 5 seconds later, which is just as good) - needs a
+    # virtual display. Without --kill-after, a program that ignores the
+    # first signal would block the test (and Ctrl+C) forever.
     if command -v xvfb-run > /dev/null 2>&1; then
         local status=0
-        HOME="$work" timeout 15 xvfb-run -a "$image" > "$work/gui.log" 2>&1 || status=$?
-        if [ "$status" -eq 124 ]; then
-            echo "    [OK] interface graphique : démarre et reste ouverte"
+        HOME="$work" timeout --kill-after=5 15 xvfb-run -a "$image" > "$work/gui.log" 2>&1 || status=$?
+        if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+            echo "    [OK] graphical interface: starts and stays open"
         else
-            echo "    [ÉCHEC] interface graphique (code $status, journal : $work/gui.log)"
+            echo "    [FAIL] graphical interface (code $status, log: $work/gui.log)"
             ok=false
         fi
     else
-        echo "    [--] interface graphique non testée (xvfb-run absent : sudo apt install xvfb)"
+        echo "    [--] graphical interface not tested (xvfb-run missing: sudo apt install xvfb)"
     fi
 
     if [ "$ok" = true ]; then
         rm -rf "$work"
     else
-        echo "    Fichiers de test conservés dans $work"
+        echo "    Test files kept in $work"
         return 1
     fi
 }
 
-# === Mode nettoyage ===
+# === Clean mode ===
 if [ "$CLEAN" = true ]; then
-    echo ">>> Nettoyage du dossier de travail ($BUILD_DIR)..."
+    echo ">>> Cleaning the working folder ($BUILD_DIR)..."
     rm -rf "$BUILD_DIR"
-    echo ">>> Suppression des AppImage et empreintes générées..."
+    echo ">>> Deleting the generated AppImages and checksums..."
     rm -f "$PROJECT_DIR"/*.AppImage "$PROJECT_DIR"/*.AppImage.sha256
-    echo ">>> Nettoyage terminé."
+    echo ">>> Cleaning done."
     exit 0
 fi
 
-# === Vérification des outils ===
+# === Checking the tools ===
 missing=()
 for tool in "$PYTHON" patchelf strings curl sha256sum tar; do
     command -v "$tool" > /dev/null 2>&1 || missing+=("$tool")
 done
 if [ "${#missing[@]}" -gt 0 ]; then
-    echo "Erreur : outil(s) manquant(s) : ${missing[*]}"
-    echo "Sur Debian/Ubuntu : sudo apt install python3 python3-venv patchelf binutils curl"
+    echo "Error: missing tool(s): ${missing[*]}"
+    echo "On Debian/Ubuntu: sudo apt install python3 python3-venv patchelf binutils curl"
     exit 1
 fi
 if ! "$PYTHON" -c 'import gi; gi.require_version("Gtk", "4.0"); from gi.repository import Gtk' 2> /dev/null; then
-    echo "Erreur : PyGObject et GTK4 sont introuvables pour $PYTHON."
-    echo "Sur Debian/Ubuntu : sudo apt install python3-gi gir1.2-gtk-4.0"
+    echo "Error: PyGObject and GTK4 not found for $PYTHON."
+    echo "On Debian/Ubuntu: sudo apt install python3-gi gir1.2-gtk-4.0"
     exit 1
 fi
 if ! "$PYTHON" -c 'import venv, ensurepip' 2> /dev/null; then
-    echo "Erreur : le module venv de Python est incomplet."
-    echo "Sur Debian/Ubuntu : sudo apt install python3-venv"
+    echo "Error: Python's venv module is incomplete."
+    echo "On Debian/Ubuntu: sudo apt install python3-venv"
     exit 1
 fi
 
@@ -174,8 +180,8 @@ SHARE_DIR="$APPDIR/share/$PACKAGE_NAME"
 SITE_DIR="$SHARE_DIR/site-packages"
 OUT_DIR="$BUILD_DIR/dist"
 
-# Python du système : c'est lui qui est embarqué (avec PyGObject, qui ne
-# s'installe pas de façon fiable par pip - voir requirements.txt).
+# The system's Python: it is the one that gets bundled (with PyGObject, which
+# cannot be installed reliably through pip - see requirements.txt).
 PYTHON_BIN="$(readlink -f "$(command -v "$PYTHON")")"
 PY_MM="$("$PYTHON" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
 PY_STDLIB="$("$PYTHON" -c 'import sysconfig; print(sysconfig.get_path("stdlib"))')"
@@ -185,82 +191,92 @@ echo ""
 echo "========================================"
 echo " AppImage $PACKAGE_NAME v$VERSION ($ARCH)"
 echo " Python $PY_MM  -  $PYTHON_BIN"
-echo " Dossier de travail : $BUILD_DIR"
+echo " Working folder: $BUILD_DIR"
 echo "========================================"
 echo ""
 
 rm -rf "$BUILD_DIR"
 mkdir -p "$SHARE_DIR" "$APPDIR/bin" "$OUT_DIR" "$BUILD_DIR/tmp"
 
-# === 1. Les sources de l'application (comme build-deb.sh) ===
-echo ">>> Copie des fichiers du projet..."
+# === 1. The application sources (like build-deb.sh) ===
+echo ">>> Copying the project files..."
 (
     cd "$PROJECT_DIR"
     items=(planche-contact-gtk.py portfolio docs)
-    [ -f LICENSE ] && items+=(LICENSE)
+    # The license and the code of conduct (Contributor Covenant 3.0, under
+    # CC-BY-SA-4.0, in both languages).
+    for extra in LICENSE CODE_OF_CONDUCT.md CODE_OF_CONDUCT.fr.md; do
+        if [ -f "$extra" ]; then
+            items+=("$extra")
+        fi
+    done
     tar --exclude='__pycache__' -cf - "${items[@]}"
 ) | tar -xf - -C "$SHARE_DIR"
 echo "$VERSION" > "$SHARE_DIR/VERSION"
 
-# === 2. Dépendances Python (pip) dans un dossier à part ===
-echo ">>> Installation des dépendances Python (Pillow, reportlab, rawpy, exifread)..."
+# === 2. Python dependencies (pip) in a separate folder ===
+echo ">>> Installing the Python dependencies (Pillow, reportlab, rawpy, exifread)..."
 "$PYTHON" -m venv "$BUILD_DIR/venv"
 PIP_LOG="$BUILD_DIR/pip.log"
 if ! "$BUILD_DIR/venv/bin/pip" install --quiet --target "$SITE_DIR" \
         Pillow reportlab rawpy exifread > "$PIP_LOG" 2>&1; then
-    echo "Erreur : l'installation des dépendances Python a échoué."
+    echo "Error: installing the Python dependencies failed."
     sed 's/^/  /' "$PIP_LOG"
     exit 1
 fi
 rm -rf "$SITE_DIR/bin"
 
-# PyGObject (module « gi ») : celui du système, compilé pour ce Python.
-echo ">>> Copie de PyGObject ($GI_DIR)..."
+# PyGObject ("gi" module): the system's, compiled for this Python.
+echo ">>> Copying PyGObject ($GI_DIR)..."
 tar --exclude='__pycache__' -C "$(dirname "$GI_DIR")" -cf - "$(basename "$GI_DIR")" | tar -xf - -C "$SITE_DIR"
 
-# === 3. La bibliothèque standard de Python ===
-# quick-sharun sait embarquer Python quand la bibliothèque standard se trouve
-# dans le dossier des bibliothèques du système (Arch) ; sur Debian/Ubuntu
-# elle est dans /usr/lib/pythonX.Y : on la copie donc ici, quick-sharun ne
-# s'occupant que de l'exécutable et des bibliothèques dont il dépend.
-echo ">>> Copie de la bibliothèque standard de Python..."
+# === 3. The Python standard library ===
+# quick-sharun knows how to bundle Python when the standard library is in
+# the system's library folder (Arch); on Debian/Ubuntu it is in
+# /usr/lib/pythonX.Y: it is therefore copied here, quick-sharun only taking
+# care of the executable and the libraries it depends on.
+echo ">>> Copying the Python standard library..."
 mkdir -p "$APPDIR/lib"
 tar -C "$(dirname "$PY_STDLIB")" -cf - \
     --exclude='__pycache__' --exclude='test' --exclude='tests' --exclude='idlelib' \
     --exclude='turtledemo' --exclude='tkinter' --exclude='lib2to3' --exclude='ensurepip' \
     --exclude='EXTERNALLY-MANAGED' "$(basename "$PY_STDLIB")" | tar -xf - -C "$APPDIR/lib"
 
-# Modules d'extension qui dépendent d'une bibliothèque du système (hors libc) :
-# on les passe à quick-sharun pour qu'il embarque ces bibliothèques. Exclus :
-# SSL/hashlib (hashlib retombe sur ses versions internes), sqlite, curses,
-# readline, tkinter et les bases dbm, dont l'application n'a pas besoin.
+# Extension modules that depend on a system library (other than libc): they
+# are passed to quick-sharun so that it bundles those libraries. Excluded:
+# SSL/hashlib (hashlib falls back to its internal versions), sqlite, curses,
+# readline, tkinter and the dbm databases, which the application does not
+# need.
 EXTRA_LIBS=()
 for module in "$PY_STDLIB"/lib-dynload/*.so; do
     case "$(basename "$module")" in
         _ssl.*|_hashlib.*|_tkinter.*|_sqlite3.*|_curses*|_dbm.*|_gdbm.*|readline.*) continue ;;
     esac
-    if ldd "$module" 2> /dev/null | grep -v 'linux-vdso\|libc\.so\|libm\.so\|ld-linux\|libpython' | grep -q '=>'; then
+    # No "grep -q" here: it quits at the first match, and with "pipefail" the
+    # SIGPIPE received by ldd would then make the test fail at random.
+    if ldd "$module" 2> /dev/null | grep -v 'linux-vdso\|libc\.so\|libm\.so\|ld-linux\|libpython' | grep '=>' > /dev/null; then
         EXTRA_LIBS+=("$module")
     fi
 done
 
-# === 4. Lanceurs, icône, métadonnées ===
-echo ">>> Création des lanceurs, du .desktop et de l'icône..."
+# === 4. Launchers, icon, metadata ===
+echo ">>> Creating the launchers, the .desktop file and the icon..."
 cat > "$APPDIR/bin/planche-contact" << 'EOF'
 #!/bin/sh
-# Interface graphique : Python embarqué + sources dans share/planche-contact.
+# Graphical interface: bundled Python + sources in share/planche-contact.
 HERE="${APPDIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 SHARE="$HERE/share/planche-contact"
 export PYTHONPATH="$SHARE/site-packages${PYTHONPATH:+:$PYTHONPATH}"
 export PYTHONNOUSERSITE=1
 export PYTHONDONTWRITEBYTECODE=1
-# Le python embarqué par son chemin complet, jamais « python3 » via le PATH :
-# ce serait, selon la machine, un autre Python que celui des modules livrés.
+# The bundled python by its full path, never "python3" through the PATH:
+# depending on the machine, that would be another Python than the one the
+# shipped modules were built for.
 exec "$HERE/bin/@PYBIN@" "$SHARE/planche-contact-gtk.py" "$@"
 EOF
 cat > "$APPDIR/bin/portfolio" << 'EOF'
 #!/bin/sh
-# Ligne de commande : ./Planche-Contact-*.AppImage portfolio -i PHOTOS --pdf
+# Command line: ./Planche-Contact-*.AppImage portfolio -i PHOTOS --pdf
 HERE="${APPDIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 SHARE="$HERE/share/planche-contact"
 export PYTHONPATH="$SHARE/site-packages${PYTHONPATH:+:$PYTHONPATH}"
@@ -271,10 +287,14 @@ EOF
 sed -i "s|@PYBIN@|python$PY_MM|" "$APPDIR/bin/planche-contact" "$APPDIR/bin/portfolio"
 chmod +x "$APPDIR/bin/planche-contact" "$APPDIR/bin/portfolio"
 
+# Same Comment lines as the .desktop file of the .deb (build-deb.sh).
 cat > "$BUILD_DIR/$PACKAGE_NAME.desktop" << 'EOF'
 [Desktop Entry]
 Name=Planche Contact
-Comment=Outil de génération de planches contact photographiques
+Comment=Photographic contact sheet generator
+Comment[de]=Generator für fotografische Kontaktbögen
+Comment[es]=Generador de hojas de contacto fotográficas
+Comment[fr]=Générateur de planches contact photographiques
 Exec=planche-contact
 Icon=planche-contact
 Terminal=false
@@ -285,7 +305,7 @@ EOF
 
 ICON_SOURCE="$PROJECT_DIR/screenshots/application-icon.png"
 if [ -f "$ICON_SOURCE" ]; then
-    # Pillow (déjà installé ci-dessus) évite de dépendre d'ImageMagick.
+    # Pillow (already installed above) avoids depending on ImageMagick.
     PYTHONPATH="$SITE_DIR" "$BUILD_DIR/venv/bin/python3" - "$ICON_SOURCE" "$BUILD_DIR/$PACKAGE_NAME.png" << 'PYEOF'
 import sys
 from PIL import Image
@@ -293,7 +313,7 @@ from PIL import Image
 Image.open(sys.argv[1]).convert("RGBA").resize((256, 256), Image.LANCZOS).save(sys.argv[2], "PNG")
 PYEOF
 else
-    echo "Attention : icône introuvable ($ICON_SOURCE) - AppImage sans icône personnalisée." >&2
+    echo "Warning: icon not found ($ICON_SOURCE) - AppImage without a custom icon." >&2
     exit 1
 fi
 
@@ -302,40 +322,49 @@ if [ -f "$PROJECT_DIR/metainfo/$PACKAGE_NAME.metainfo.xml" ]; then
     cp "$PROJECT_DIR/metainfo/$PACKAGE_NAME.metainfo.xml" "$APPDIR/share/metainfo/"
 fi
 
-# === 5. quick-sharun : bibliothèques, glibc, GTK4, assemblage ===
-echo ">>> Téléchargement de quick-sharun (vérification de l'empreinte)..."
+# === 5. quick-sharun: libraries, glibc, GTK4, assembly ===
+echo ">>> Downloading quick-sharun (checksum verification)..."
 QUICK_SHARUN="$BUILD_DIR/quick-sharun.sh"
-curl -fsSL "$QUICK_SHARUN_URL" -o "$QUICK_SHARUN"
+if ! curl -fsSL "$QUICK_SHARUN_URL" -o "$QUICK_SHARUN"; then
+    echo "Error: quick-sharun could not be downloaded from:"
+    echo "  $QUICK_SHARUN_URL"
+    echo "Check the network connection and run again."
+    exit 1
+fi
 if ! echo "$QUICK_SHARUN_SHA256  $QUICK_SHARUN" | sha256sum -c - > /dev/null 2>&1; then
-    echo "Erreur : l'empreinte de quick-sharun ne correspond pas à celle attendue."
-    echo "  attendue : $QUICK_SHARUN_SHA256"
-    echo "  obtenue  : $(sha256sum "$QUICK_SHARUN" | cut -d' ' -f1)"
-    echo "Le script amont a changé depuis la dernière vérification. Relisez-le"
-    echo "($QUICK_SHARUN), puis relancez avec QUICK_SHARUN_SHA256=<nouvelle empreinte>."
+    echo "Error: the checksum of quick-sharun does not match the expected one."
+    echo "  expected: $QUICK_SHARUN_SHA256"
+    echo "  obtained: $(sha256sum "$QUICK_SHARUN" | cut -d' ' -f1)"
+    echo "The upstream script has changed since the last verification. Read it"
+    echo "($QUICK_SHARUN), then run again with QUICK_SHARUN_SHA256=<new checksum>."
     exit 1
 fi
 
-# libgirepository et GTK4 : chargées dynamiquement par PyGObject (fichiers
-# .typelib), donc invisibles pour l'analyse des dépendances - on les nomme.
+# libgirepository and GTK4: loaded dynamically by PyGObject (.typelib
+# files), hence invisible to the dependency analysis - they are named.
 GI_EXT="$(ls "$SITE_DIR"/gi/_gi.*.so | head -n 1)"
+# The awk commands below read their whole input instead of quitting at the
+# first match ("exit"): with "pipefail", the SIGPIPE that ldconfig or ldd
+# would receive on a long output (a machine with many libraries) made the
+# whole script stop silently.
 find_lib() {
-    ldconfig -p 2> /dev/null | awk -v n="$1" '$1 == n { print $NF; exit }'
+    ldconfig -p 2> /dev/null | awk -v n="$1" '$1 == n && !found { print $NF; found = 1 }'
 }
-GIREPO_LIB="$(ldd "$GI_EXT" | awk '/libgirepository/ { print $3; exit }')"
+GIREPO_LIB="$(ldd "$GI_EXT" | awk '/libgirepository/ && !found { print $3; found = 1 }')"
 GTK_LIB="$(find_lib libgtk-4.so.1)"
 if [ -z "$GIREPO_LIB" ] || [ -z "$GTK_LIB" ]; then
-    echo "Erreur : libgirepository ou libgtk-4 introuvable (GTK4 est-il installé ?)."
+    echo "Error: libgirepository or libgtk-4 not found (is GTK4 installed?)."
     exit 1
 fi
-# libanl : sharun la précharge ; sans copie embarquée, c'est celle de la
-# machine qui serait chargée, avec la glibc de CETTE machine (version
-# différente de la glibc embarquée). Absente des glibc récentes : sans objet.
+# libanl: sharun preloads it; without a bundled copy, the machine's own
+# would be loaded, with THIS machine's glibc (a different version from the
+# bundled glibc). Absent from recent glibc versions: nothing to do then.
 ANL_LIB="$(find_lib libanl.so.1)"
 if [ -n "$ANL_LIB" ]; then
     EXTRA_LIBS+=("$ANL_LIB")
 fi
 
-echo ">>> Embarquement des bibliothèques et assemblage de l'AppImage (quelques minutes)..."
+echo ">>> Bundling the libraries and assembling the AppImage (a few minutes)..."
 QS_LOG="$BUILD_DIR/quick-sharun.log"
 if ! (
     cd "$BUILD_DIR"
@@ -344,44 +373,44 @@ if ! (
     export MAIN_BIN=planche-contact
     export DESKTOP="$BUILD_DIR/$PACKAGE_NAME.desktop" ICON="$BUILD_DIR/$PACKAGE_NAME.png"
     export DEPLOY_GTK=1
-    # Rendu logiciel de GTK (Cairo) : l'interface n'a besoin ni d'OpenGL ni de
-    # Vulkan. Cela évite d'embarquer Mesa et LLVM (des dizaines de Mo) et de
-    # dépendre des pilotes graphiques de la machine - cause classique d'une
-    # AppImage qui démarre ici et pas là.
+    # GTK software rendering (Cairo): the interface needs neither OpenGL nor
+    # Vulkan. This avoids bundling Mesa and LLVM (tens of MB) and depending
+    # on the machine's graphics drivers - the classic cause of an AppImage
+    # that starts here and not there.
     export ALWAYS_SOFTWARE=1
-    # Sans Mesa embarqué, libepoxy (GTK) tente tout de même d'ouvrir libEGL au
-    # démarrage et trouverait celle de la machine, avec ses pilotes, LLVM, etc.
-    # (compilés pour une autre glibc). On l'en empêche : GTK se rabat alors,
-    # proprement, sur le rendu Cairo, identique sur toutes les machines.
+    # Without a bundled Mesa, libepoxy (GTK) still tries to open libEGL at
+    # startup and would find the machine's, with its drivers, LLVM, etc.
+    # (built for another glibc). It is prevented from doing so: GTK then
+    # falls back, cleanly, on Cairo rendering, identical on every machine.
     export ANYLINUX_DO_NOT_LOAD_LIBS='libEGL*:libGL.so*:libGLdispatch*:libgbm*'
-    # Python : sa bibliothèque standard est copiée à la main (voir 3) ;
-    # l'exécutable est passé en argument comme n'importe quel binaire.
+    # Python: its standard library is copied by hand (see 3); the executable
+    # is passed as an argument like any binary.
     export STRACE_MODE=0
     export OUTPUT_APPIMAGE=1
     sh "$QUICK_SHARUN" "$PYTHON_BIN" "$GIREPO_LIB" "$GTK_LIB" "$GI_EXT" ${EXTRA_LIBS[@]+"${EXTRA_LIBS[@]}"}
 ) > "$QS_LOG" 2>&1; then
-    echo "Erreur : quick-sharun a échoué. Fin du journal ($QS_LOG) :"
+    echo "Error: quick-sharun failed. End of the log ($QS_LOG):"
     tail -n 25 "$QS_LOG" | sed 's/^/  /'
     exit 1
 fi
 
 if [ ! -f "$OUT_DIR/$APPIMAGE_NAME" ]; then
-    echo "Erreur : $APPIMAGE_NAME n'a pas été produit (voir $QS_LOG)."
+    echo "Error: $APPIMAGE_NAME was not produced (see $QS_LOG)."
     exit 1
 fi
 
-# === 6. Livraison : l'AppImage et son empreinte, à la racine du projet ===
+# === 6. Delivery: the AppImage and its checksum, at the project root ===
 rm -f "$PROJECT_DIR"/*.AppImage "$PROJECT_DIR"/*.AppImage.sha256
 cp "$OUT_DIR/$APPIMAGE_NAME" "$PROJECT_DIR/$APPIMAGE_NAME"
 chmod +x "$PROJECT_DIR/$APPIMAGE_NAME"
 (cd "$PROJECT_DIR" && sha256sum "$APPIMAGE_NAME" > "$APPIMAGE_NAME.sha256")
 
 echo ""
-echo "AppImage générée :"
+echo "AppImage generated:"
 ls -lh "$PROJECT_DIR/$APPIMAGE_NAME" | awk '{print "   " $5 "  " $NF}'
 echo "   $(cat "$PROJECT_DIR/$APPIMAGE_NAME.sha256")"
 
-# === 7. Vérification facultative ===
+# === 7. Optional check ===
 if [ "$RUN_TEST" = true ]; then
     echo ""
     run_test "$PROJECT_DIR/$APPIMAGE_NAME"

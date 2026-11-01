@@ -6,6 +6,8 @@ Thank you for your interest in contributing to **Planche-Contact**.
 
 Contributions of all kinds are welcome, including bug reports, feature requests, documentation improvements, translations and code contributions.
 
+By taking part in this project, you agree to follow its [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Reporting Bugs
 
 If you discover a bug, please open an Issue on GitHub and provide as much information as possible:
@@ -60,7 +62,7 @@ This includes:
 - examples;
 - screenshots.
 
-The project documentation (`README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `PROJECT_CONTEXT.md` and `windows/README.md`) is bilingual: the English version is the default file (`X.md`) and the French version sits next to it (`X.fr.md`). When you change one of them, please update the other too, or say so in your Pull Request so that the maintainer can update it.
+The project documentation (`README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`, `PROJECT_CONTEXT.md` and `windows/README.md`) is bilingual: the English version is the default file (`X.md`) and the French version sits next to it (`X.fr.md`). When you change one of them, please update the other too, or say so in your Pull Request so that the maintainer can update it.
 
 ## Translations
 
@@ -77,3 +79,5 @@ If you have questions, feel free to open a GitHub Issue.
 ## License
 
 By contributing to this project, you agree that your contributions will be distributed under the GNU GPL v3.0 license.
+
+The Code of Conduct is the Contributor Covenant 3.0, adapted for this project, and is distributed under its own license, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
