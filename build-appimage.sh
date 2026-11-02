@@ -111,18 +111,44 @@ PYEOF
         ok=false
     fi
 
-    # 2. Graphical interface: must stay open (code 124 = stopped by the
-    # timeout, hence still alive; 137 = it did not stop on the first signal
-    # and was killed 5 seconds later, which is just as good) - needs a
-    # virtual display. Without --kill-after, a program that ignores the
-    # first signal would block the test (and Ctrl+C) forever.
+    # 2. Graphical interface: must still be running after 15 seconds - needs
+    # a virtual display. The program is started in its own session (setsid),
+    # without access to the terminal, and watched by this script itself
+    # instead of the "timeout" command: on some systems "timeout" ends up
+    # stopped along with the program and then blocks the whole test, Ctrl+C
+    # included.
     if command -v xvfb-run > /dev/null 2>&1; then
-        local status=0
-        HOME="$work" timeout --kill-after=5 15 xvfb-run -a "$image" > "$work/gui.log" 2>&1 || status=$?
-        if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
-            echo "    [OK] graphical interface: starts and stays open"
+        local gui_pid gui_status=0 gui_states="" i
+        # TMPDIR: the program unpacks itself there; inside the test folder,
+        # it is deleted with it, even if the program is stopped by force.
+        mkdir -p "$work/tmp"
+        HOME="$work" TMPDIR="$work/tmp" setsid xvfb-run -a "$image" < /dev/null > "$work/gui.log" 2>&1 &
+        gui_pid=$!
+        for i in $(seq 1 15); do
+            sleep 1
+            kill -0 "$gui_pid" 2> /dev/null || break
+        done
+        if kill -0 "$gui_pid" 2> /dev/null; then
+            gui_states="$(ps -o stat= -s "$gui_pid" 2> /dev/null || true)"
+            # Stop everything that was started: politely first, by force
+            # after 5 seconds.
+            kill -TERM -- "-$gui_pid" 2> /dev/null || true
+            for i in 1 2 3 4 5; do
+                kill -0 "$gui_pid" 2> /dev/null || break
+                sleep 1
+            done
+            kill -KILL -- "-$gui_pid" 2> /dev/null || true
+            wait "$gui_pid" 2> /dev/null || true
+            case "$gui_states" in
+                *T*)
+                    echo "    [FAIL] graphical interface: the program was stopped (log: $work/gui.log)"
+                    ok=false ;;
+                *)
+                    echo "    [OK] graphical interface: starts and stays open" ;;
+            esac
         else
-            echo "    [FAIL] graphical interface (code $status, log: $work/gui.log)"
+            wait "$gui_pid" 2> /dev/null || gui_status=$?
+            echo "    [FAIL] graphical interface: the program stopped by itself (code $gui_status, log: $work/gui.log)"
             ok=false
         fi
     else
@@ -387,6 +413,17 @@ if ! (
     # is passed as an argument like any binary.
     export STRACE_MODE=0
     export OUTPUT_APPIMAGE=1
+    # quick-sharun copies by itself "/usr/share/<name of the program>" of the
+    # machine it runs on. If the .deb package is installed here, that would
+    # add its whole virtualenv (hundreds of MB) to the AppImage and, worse,
+    # overwrite our files (VERSION, planche-contact-gtk.py, portfolio/...)
+    # with those of the installed package: an AppImage of the wrong version.
+    # Everything the application needs is already copied above.
+    export DEPLOY_DATADIR=0
+    # The interface plays no sound or video: GStreamer, which recent GTK 4
+    # versions pull in with all its plugins (ffmpeg, codecs, speech voices...),
+    # would add tens of MB for nothing.
+    export DEPLOY_GSTREAMER=0
     sh "$QUICK_SHARUN" "$PYTHON_BIN" "$GIREPO_LIB" "$GTK_LIB" "$GI_EXT" ${EXTRA_LIBS[@]+"${EXTRA_LIBS[@]}"}
 ) > "$QS_LOG" 2>&1; then
     echo "Error: quick-sharun failed. End of the log ($QS_LOG):"
@@ -396,6 +433,20 @@ fi
 
 if [ ! -f "$OUT_DIR/$APPIMAGE_NAME" ]; then
     echo "Error: $APPIMAGE_NAME was not produced (see $QS_LOG)."
+    exit 1
+fi
+
+# Safety check: the application files inside the AppImage must be exactly
+# those of this project (see DEPLOY_DATADIR above), and nothing else must
+# have been added next to them.
+if [ "$(cat "$SHARE_DIR/VERSION")" != "$VERSION" ] \
+        || ! cmp -s "$PROJECT_DIR/planche-contact-gtk.py" "$SHARE_DIR/planche-contact-gtk.py" \
+        || ! diff -rq -x __pycache__ "$PROJECT_DIR/portfolio" "$SHARE_DIR/portfolio" > /dev/null \
+        || [ -e "$SHARE_DIR/venv" ]; then
+    rm -f "$OUT_DIR/$APPIMAGE_NAME"
+    echo "Error: the application files inside the AppImage differ from the project's"
+    echo "(a copy of the program installed on this machine was probably mixed in)."
+    echo "The AppImage was deleted. Compare $SHARE_DIR with $PROJECT_DIR."
     exit 1
 fi
 

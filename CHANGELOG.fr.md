@@ -8,6 +8,12 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 ## [Non publié]
 
+### Corrigé
+
+- **`build-appimage.sh` mélangeait à l'AppImage le programme installé sur la machine de construction.** Quand le paquet `.deb` est installé, `quick-sharun` (l'outil d'assemblage) copiait de lui-même `/usr/share/planche-contact` dans l'AppImage : tout le virtualenv du paquet (des centaines de Mo) s'y ajoutait et, pire, les fichiers de la version installée (`VERSION`, `planche-contact-gtk.py`, `portfolio/`...) écrasaient ceux du projet, ce qui donnait une AppImage de l'ancienne version. Cette copie est maintenant désactivée, et le script vérifie, avant de livrer l'AppImage, que les fichiers de l'application qu'elle contient sont exactement ceux du projet (sinon il supprime l'AppImage et s'arrête). Les AppImage publiées (5.2.0 et 5.2.1) ont été construites sur une machine sans le paquet installé et ne sont pas concernées.
+- `build-appimage.sh` ne demande plus à `quick-sharun` d'embarquer GStreamer (avec ffmpeg, des codecs et des voix de synthèse vocale) que les versions récentes de GTK 4 entraînent : l'interface ne lit ni son ni vidéo.
+- **Le contrôle graphique de `./build-appimage.sh --test` pouvait rester bloqué indéfiniment sur Ubuntu 26.04** (sa commande `timeout`, celle de uutils coreutils, était arrêtée par le terminal en même temps que le programme qu'elle surveillait, si bien qu'elle ne le coupait jamais et que Ctrl+C restait sans effet). Le programme est maintenant lancé dans sa propre session, sans accès au terminal, et surveillé par le script lui-même ; il doit être toujours en marche après 15 secondes, et un programme arrêté ou terminé trop tôt est désormais signalé comme un échec. Ses fichiers temporaires sont supprimés avec le dossier du test.
+
 ## [5.2.1] - 2026-11-01
 
 Version de maintenance : le programme lui-même ne change pas.
