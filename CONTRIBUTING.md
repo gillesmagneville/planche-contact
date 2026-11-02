@@ -8,6 +8,8 @@ Contributions of all kinds are welcome, including bug reports, feature requests,
 
 By taking part in this project, you agree to follow its [Code of Conduct](CODE_OF_CONDUCT.md).
 
+To report a **security problem**, please do not open a public Issue: follow the [Security Policy](SECURITY.md).
+
 ## Reporting Bugs
 
 If you discover a bug, please open an Issue on GitHub and provide as much information as possible:
@@ -62,7 +64,7 @@ This includes:
 - examples;
 - screenshots.
 
-The project documentation (`README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`, `PROJECT_CONTEXT.md` and `windows/README.md`) is bilingual: the English version is the default file (`X.md`) and the French version sits next to it (`X.fr.md`). When you change one of them, please update the other too, or say so in your Pull Request so that the maintainer can update it.
+The project documentation (`README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `CHANGELOG.md`, `PROJECT_CONTEXT.md` and `windows/README.md`) is bilingual: the English version is the default file (`X.md`) and the French version sits next to it (`X.fr.md`). When you change one of them, please update the other too, or say so in your Pull Request so that the maintainer can update it.
 
 ## Translations
 

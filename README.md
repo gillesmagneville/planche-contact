@@ -480,6 +480,7 @@ and troubleshooting.
 | [CONTRIBUTING.md](CONTRIBUTING.md) · [🇫🇷](CONTRIBUTING.fr.md) | Contribution guidelines |
 | [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) · [🇫🇷](PROJECT_CONTEXT.fr.md) | Developer notes: architecture, conventions, technical decisions |
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [🇫🇷](CODE_OF_CONDUCT.fr.md) | Community rules (Contributor Covenant 3.0) |
+| [SECURITY.md](SECURITY.md) · [🇫🇷](SECURITY.fr.md) | Security policy: how to report a vulnerability |
 | LICENSE | GNU GPL v3 |
 
 ---
@@ -502,6 +503,8 @@ Whether you want to report a bug, suggest a feature, improve the documentation o
 Please read **[CONTRIBUTING.md](CONTRIBUTING.md)** before opening an Issue or a Pull Request.
 
 By taking part in this project, you agree to follow its [Code of Conduct](CODE_OF_CONDUCT.md).
+
+To report a security problem, please do not open a public Issue: follow the [Security Policy](SECURITY.md).
 
 ---
 

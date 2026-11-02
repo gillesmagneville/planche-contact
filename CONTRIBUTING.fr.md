@@ -8,6 +8,8 @@ Les contributions de toute nature sont les bienvenues : signalements de bugs, de
 
 En participant à ce projet, vous vous engagez à respecter son [Code de conduite](CODE_OF_CONDUCT.fr.md).
 
+Pour signaler un **problème de sécurité**, merci de ne pas ouvrir d'Issue publique : suivez la [Politique de sécurité](SECURITY.fr.md).
+
 ## Signaler un bug
 
 Si vous découvrez un bug, merci d'ouvrir une Issue sur GitHub en fournissant le plus d'informations possible :
@@ -62,7 +64,7 @@ Cela comprend :
 - les exemples ;
 - les captures d'écran.
 
-La documentation du projet (`README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`, `PROJECT_CONTEXT.md` et `windows/README.md`) est bilingue : la version anglaise est le fichier par défaut (`X.md`) et la version française se trouve à côté (`X.fr.md`). Lorsque vous modifiez l'une d'elles, merci de mettre l'autre à jour également, ou de l'indiquer dans votre Pull Request afin que le mainteneur puisse la mettre à jour.
+La documentation du projet (`README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `CHANGELOG.md`, `PROJECT_CONTEXT.md` et `windows/README.md`) est bilingue : la version anglaise est le fichier par défaut (`X.md`) et la version française se trouve à côté (`X.fr.md`). Lorsque vous modifiez l'une d'elles, merci de mettre l'autre à jour également, ou de l'indiquer dans votre Pull Request afin que le mainteneur puisse la mettre à jour.
 
 ## Traductions
 
