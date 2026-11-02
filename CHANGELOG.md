@@ -8,6 +8,12 @@ The project follows the recommendations of **Keep a Changelog** and **Semantic V
 
 ## [Unreleased]
 
+### Fixed
+
+- **`build-appimage.sh` mixed into the AppImage the program installed on the build machine.** When the `.deb` package is installed, `quick-sharun` (the assembly tool) copied by itself `/usr/share/planche-contact` into the AppImage: the whole virtualenv of the package (hundreds of MB) was added and, worse, the files of the installed version (`VERSION`, `planche-contact-gtk.py`, `portfolio/`...) overwrote those of the project, which gave an AppImage of the old version. This copy is now disabled, and the script checks, before delivering the AppImage, that the application files inside it are exactly those of the project (otherwise it deletes the AppImage and stops). The published AppImages (5.2.0 and 5.2.1) were built on a machine without the package installed and are not affected.
+- `build-appimage.sh` no longer asks `quick-sharun` to bundle GStreamer (with ffmpeg, codecs and speech voices) that recent GTK 4 versions pull in: the interface plays neither sound nor video.
+- **The graphical check of `./build-appimage.sh --test` could stay blocked forever on Ubuntu 26.04** (its `timeout` command, from uutils coreutils, was stopped by the terminal along with the program it supervised, so it never cut it off, and Ctrl+C had no effect either). The program is now started in its own session, without access to the terminal, and watched by the script itself; it must still be running after 15 seconds, and a program stopped or ended too early is now reported as a failure. Its temporary files are deleted with the test folder.
+
 ## [5.2.1] - 2026-11-01
 
 Maintenance release: the program itself does not change.
