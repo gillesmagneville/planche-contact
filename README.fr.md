@@ -482,6 +482,7 @@ prérequis et le dépannage.
 | [CONTRIBUTING.fr.md](CONTRIBUTING.fr.md) · [🇬🇧](CONTRIBUTING.md) | Guide de contribution |
 | [PROJECT_CONTEXT.fr.md](PROJECT_CONTEXT.fr.md) · [🇬🇧](PROJECT_CONTEXT.md) | Notes pour les développeurs : architecture, conventions, décisions techniques |
 | [CODE_OF_CONDUCT.fr.md](CODE_OF_CONDUCT.fr.md) · [🇬🇧](CODE_OF_CONDUCT.md) | Règles de la communauté (Contributor Covenant 3.0) |
+| [SECURITY.fr.md](SECURITY.fr.md) · [🇬🇧](SECURITY.md) | Politique de sécurité : comment signaler une vulnérabilité |
 | LICENSE | GNU GPL v3 |
 
 ---
@@ -504,6 +505,8 @@ Que vous souhaitiez signaler un bug, suggérer une fonctionnalité, améliorer l
 Merci de lire **[CONTRIBUTING.fr.md](CONTRIBUTING.fr.md)** avant d'ouvrir une Issue ou une Pull Request.
 
 En participant à ce projet, vous vous engagez à respecter son [Code de conduite](CODE_OF_CONDUCT.fr.md).
+
+Pour signaler un problème de sécurité, merci de ne pas ouvrir d'Issue publique : suivez la [Politique de sécurité](SECURITY.fr.md).
 
 ---
 

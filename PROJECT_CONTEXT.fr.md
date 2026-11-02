@@ -233,6 +233,8 @@ planche-contact/
 ├── LICENSE                         # GNU GPL v3
 ├── CODE_OF_CONDUCT.md              # Contributor Covenant 3.0 (CC BY-SA 4.0) ; version française : CODE_OF_CONDUCT.fr.md
 ├── CODE_OF_CONDUCT.fr.md
+├── SECURITY.md                     # Politique de sécurité (anglais, par défaut) ; version française : SECURITY.fr.md
+├── SECURITY.fr.md
 ├── PROJECT_CONTEXT.md              # Version anglaise de ce fichier
 └── PROJECT_CONTEXT.fr.md           # Ce fichier (version française)
 ```

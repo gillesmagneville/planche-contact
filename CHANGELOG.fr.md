@@ -8,6 +8,10 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 ## [Non publié]
 
+### Ajouté
+
+- **Une politique de sécurité** ([`SECURITY.fr.md`](SECURITY.fr.md), en français et en anglais) : comment signaler une vulnérabilité en privé, quelles versions reçoivent des correctifs et ce qu'on peut en attendre. C'est un fichier du dépôt ; les paquets ne l'embarquent pas.
+
 ### Corrigé
 
 - **`build-appimage.sh` mélangeait à l'AppImage le programme installé sur la machine de construction.** Quand le paquet `.deb` est installé, `quick-sharun` (l'outil d'assemblage) copiait de lui-même `/usr/share/planche-contact` dans l'AppImage : tout le virtualenv du paquet (des centaines de Mo) s'y ajoutait et, pire, les fichiers de la version installée (`VERSION`, `planche-contact-gtk.py`, `portfolio/`...) écrasaient ceux du projet, ce qui donnait une AppImage de l'ancienne version. Cette copie est maintenant désactivée, et le script vérifie, avant de livrer l'AppImage, que les fichiers de l'application qu'elle contient sont exactement ceux du projet (sinon il supprime l'AppImage et s'arrête). Les AppImage publiées (5.2.0 et 5.2.1) ont été construites sur une machine sans le paquet installé et ne sont pas concernées.
