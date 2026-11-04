@@ -12,12 +12,11 @@ class Config:
 
     # Scan options
     recursive: bool = False
-    # Sous-dossiers à traiter (chemins relatifs POSIX par rapport à
-    # input_dir, "." = le dossier d'entrée lui-même) : seules les photos
-    # situées DIRECTEMENT dans ces dossiers sont retenues. None (défaut) =
-    # toutes les photos, comportement historique. Choisir des sous-dossiers
-    # impose une recherche récursive (voir ImageScanner.scan()). La liste
-    # des dossiers possibles vient de scanner.list_image_folders().
+    # Subfolders to process (POSIX paths relative to input_dir, "." = the
+    # input folder itself): only the photos located DIRECTLY in these folders
+    # are kept. None (default) = all photos, the historical behaviour.
+    # Choosing subfolders forces a recursive search (see ImageScanner.scan()).
+    # The list of possible folders comes from scanner.list_image_folders().
     include_dirs: Optional[tuple] = None
     sort_by: str = "date"
 
@@ -32,12 +31,12 @@ class Config:
     generate_html: bool = False
     generate_csv: bool = False
     html_images_per_page: int = 48
-    # Joint à la galerie HTML les fichiers ORIGINAUX (pleine résolution,
-    # copiés tels quels, RAW compris) pour que le bouton de téléchargement
-    # de la visionneuse donne la photo de la prise de vue, et non la copie
-    # réduite (2000 px) affichée à l'écran. Désactivé par défaut : la
-    # galerie pèse alors autant que le dossier source, et ces originaux ne
-    # portent ni le filigrane ni aucune retouche (voir htmlgallery.py).
+    # Attaches the ORIGINAL files (full resolution, copied as-is, RAW
+    # included) to the HTML gallery so that the viewer's download button
+    # gives the photo as shot, not the reduced copy (2000 px) shown on
+    # screen. Off by default: the gallery would then weigh as much as the
+    # source folder, and these originals carry neither the watermark nor
+    # any edit (see htmlgallery.py).
     html_include_originals: bool = False
 
     # Header
@@ -49,32 +48,30 @@ class Config:
     watermark_orientation: str = "Horizontal"
     watermark_opacity: int = 40
 
-    # Mise en page / légendes / thème personnalisés (cahier des charges
-    # §1/§2/§4) - un Profil par défaut (default_profile()) reproduit
-    # exactement le comportement actuel (grille simple, pas de légende,
-    # thème "light"). Voir portfolio/presentation/profile.py.
+    # Custom layout / captions / theme (specification §1/§2/§4) - a default
+    # Profile (default_profile()) reproduces the current behaviour exactly
+    # (simple grid, no captions, "light" theme). See
+    # portfolio/presentation/profile.py.
     profile: Profile = field(default_factory=default_profile)
 
     def __post_init__(self):
-        # Synchronisation rétrocompatible : page_format et num_per_sheet
-        # sont les réglages "simples" historiques, déjà exposés par la
-        # ligne de commande et l'interface graphique, bien avant
-        # l'existence d'un Profil. Pour tout appelant qui ne fournit pas
-        # de Profil explicite (la totalité des appelants existants avant
-        # cette fonctionnalité), self.profile est un default_profile()
-        # fraîchement créé dont layout.page_format/per_page valent encore
-        # les valeurs par défaut de LayoutSettings (A4/12) : on les aligne
-        # ici sur les réglages "simples" réellement demandés, pour un
-        # calcul de géométrie identique à avant l'introduction du Profil.
+        # Backward-compatible synchronisation: page_format and num_per_sheet
+        # are the historical "simple" settings, already exposed by the
+        # command line and the graphical interface long before a Profile
+        # existed. For any caller that does not supply an explicit Profile
+        # (all the callers that existed before this feature), self.profile is a
+        # freshly created default_profile() whose layout.page_format/per_page
+        # still hold the LayoutSettings defaults (A4/12): they are aligned here
+        # with the "simple" settings actually requested, so that the geometry
+        # is computed exactly as before the Profile was introduced.
         #
-        # Si un Profil EXPLICITE a été fourni (ex : --profile, étape
-        # ultérieure) et qu'il définit déjà un format ou un nombre par
-        # planche DIFFÉRENT des valeurs par défaut de LayoutSettings, on
-        # ne l'écrase PAS : c'est alors le profil, plus spécifique, qui
-        # prévaut - la question de la priorité exacte entre un --profile
-        # et un --format/--num explicitement fournis EN MÊME TEMPS reste
-        # à trancher lors du câblage CLI/interface graphique de cette
-        # fonctionnalité (étape ultérieure), pas ici.
+        # If an EXPLICIT Profile was supplied (e.g. --profile, a later step)
+        # and it already defines a format or a number per sheet DIFFERENT from
+        # the LayoutSettings defaults, it is NOT overwritten: the more specific
+        # profile then prevails - the exact priority between a --profile and a
+        # --format/--num supplied AT THE SAME TIME remains to be decided when
+        # this feature is wired into the CLI/graphical interface (a later
+        # step), not here.
         default_layout = LayoutSettings()
         overrides = {}
         if (self.profile.layout.page_format == default_layout.page_format

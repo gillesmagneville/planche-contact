@@ -11,27 +11,26 @@ from .textlayer import draw_text_layer
 class PDFExporter:
     def create_pdf(self, planche_files: list[Path], output_path: Path,
                    text_runs: Optional[dict] = None) -> None:
-        """Assemble les planches en un PDF (une planche par page).
+        """Assembles the sheets into a PDF (one sheet per page).
 
-        `text_runs` : `{chemin de planche: [TextRun, ...]}` (voir
-        textlayer.py, ContactSheetGenerator.last_text_runs). Quand il est
-        fourni, le texte de chaque planche (titre, légendes, pied de page)
-        est posé en INVISIBLE par-dessus l'image : la page est visuellement
-        identique, mais son texte est sélectionnable, copiable et
-        recherchable. Sans lui, le PDF ne contient que les images."""
+        `text_runs`: `{sheet path: [TextRun, ...]}` (see textlayer.py,
+        ContactSheetGenerator.last_text_runs). When supplied, the text of each
+        sheet (title, captions, footer) is laid over the image as INVISIBLE
+        text: the page looks identical, but its text can be selected, copied
+        and searched. Without it, the PDF contains only the images."""
         if not planche_files:
             logging.warning("Aucune planche à exporter en PDF.")
             return
 
         logger = logging.getLogger(__name__)
 
-        # On prend les dimensions de la première planche (toutes devraient être identiques)
+        # We take the dimensions of the first sheet (they should all be identical)
         first_planche = sorted(planche_files)[0]
         with PILImage.open(first_planche) as img:
             img_w, img_h = img.size
 
-        # Marge symétrique autour de chaque planche
-        pdf_margin = 12   # ~4,2 mm de chaque côté
+        # Symmetric margin around each sheet
+        pdf_margin = 12   # ~4.2 mm on each side
 
         page_w = img_w + (2 * pdf_margin)
         page_h = img_h + (2 * pdf_margin)
@@ -43,7 +42,7 @@ class PDFExporter:
             try:
                 c.setPageSize((page_w, page_h))
 
-                # On centre parfaitement l'image
+                # The image is perfectly centred
                 c.drawImage(
                     str(planche),
                     pdf_margin,
@@ -58,8 +57,8 @@ class PDFExporter:
                             sheet_h = sheet_img.size[1]
                         draw_text_layer(c, runs, sheet_h, pdf_margin)
                     except Exception as e:
-                        # Le texte sélectionnable est un plus : sa
-                        # défaillance ne doit jamais coûter la page.
+                        # The selectable text is a bonus: its failure must
+                        # never cost the page.
                         logger.warning(f"Texte sélectionnable ignoré pour {planche.name} : {e}")
                 c.showPage()
 

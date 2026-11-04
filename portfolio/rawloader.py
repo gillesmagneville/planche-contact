@@ -1,27 +1,29 @@
 """
-rawloader.py - Chargement unifié des images, RAW comprises.
+rawloader.py - Unified loading of images, RAW included.
 
-Pillow seul ne sait pas décoder les fichiers RAW (.cr2, .cr3, .nef, .dng, .arw...).
-Ce module fournit un point d'entrée unique (`load_image`) utilisé partout dans
-l'application (vignettes, planches contact, galerie HTML) pour charger un fichier
-image, qu'il s'agisse d'un format standard (JPEG, PNG, TIFF...) ou d'un format RAW.
+Pillow alone cannot decode RAW files (.cr2, .cr3, .nef, .dng, .arw...).
+This module provides a single entry point (`load_image`) used everywhere
+in the application (thumbnails, contact sheets, HTML gallery) to load an
+image file, whether it is a standard format (JPEG, PNG, TIFF...) or a RAW
+format.
 
-Stratégie pour les RAW :
-1. On tente d'extraire la miniature/aperçu JPEG embarqué dans le fichier RAW
-   (quasi instantané, suffisant pour vignettes et planches contact).
-2. Si aucun aperçu n'est disponible, ou qu'il est trop petit pour l'usage
-   demandé (voir `target_size`), on effectue un dématriçage complet via
-   LibRaw (nettement plus lent : de l'ordre de la seconde par photo, contre
-   quelques dizaines de millisecondes pour l'aperçu embarqué).
+Strategy for RAW files:
+1. We try to extract the thumbnail/JPEG preview embedded in the RAW file
+   (almost instant, sufficient for thumbnails and contact sheets).
+2. If no preview is available, or if it is too small for the requested
+   use (see `target_size`), a full demosaicing is performed via LibRaw
+   (much slower: of the order of a second per photo, against a few tens
+   of milliseconds for the embedded preview).
 
-Le paramètre `target_size` (optionnel) sert deux buts liés à la performance :
-- Pour un JPEG standard, il active le décodage "draft" de Pillow, qui
-  s'appuie sur la mise à l'échelle native d'un JPEG (facteurs 1/2, 1/4, 1/8)
-  pour décoder directement une image plus petite, sans jamais décoder la
-  pleine résolution puis la redimensionner. Gain typique : plusieurs fois
-  plus rapide sur de grandes photos JPEG.
-- Pour un RAW, il détermine si l'aperçu embarqué (rapide) est assez grand
-  pour l'usage demandé ; sinon, on bascule sur le dématriçage complet.
+The (optional) `target_size` parameter serves two performance-related
+purposes:
+- For a standard JPEG, it enables Pillow's "draft" decoding, which relies
+  on a JPEG's native scaling (factors 1/2, 1/4, 1/8) to decode a smaller
+  image directly, without ever decoding the full resolution and then
+  resizing. Typical gain: several times faster on large JPEG photos.
+- For a RAW, it determines whether the embedded preview (fast) is large
+  enough for the requested use; otherwise, we fall back to full
+  demosaicing.
 """
 
 import io
@@ -52,15 +54,14 @@ def is_raw_file(path: Path) -> bool:
 
 
 def get_original_dimensions(path: Path):
-    """Résolution réelle du fichier source (largeur, hauteur), orientation
-    EXIF/RAW appliquée pour refléter ce que l'utilisateur voit réellement -
-    utilisé pour l'affichage d'informations dans la visionneuse de la
-    galerie HTML (voir htmlgallery.py). Toujours une lecture de métadonnées
-    seules (en-tête JPEG/TIFF, ou `rawpy.sizes` pour un RAW) : jamais un
-    décodage complet, donc rapide même sur plusieurs centaines de photos.
+    """Real resolution of the source file (width, height), with the EXIF/RAW
+    orientation applied to reflect what the user actually sees - used to
+    display information in the HTML gallery viewer (see htmlgallery.py).
+    Always a metadata-only read (JPEG/TIFF header, or `rawpy.sizes` for a
+    RAW): never a full decode, hence fast even on several hundred photos.
 
-    Retourne None si la lecture échoue (fichier corrompu, format non
-    supporté...) - à charge de l'appelant de gérer l'absence de résultat.
+    Returns None if reading fails (corrupted file, unsupported format...) -
+    it is up to the caller to handle the absence of a result.
     """
     path = Path(path)
     try:
@@ -69,10 +70,9 @@ def get_original_dimensions(path: Path):
                 return None
             with rawpy.imread(str(path)) as raw:
                 width, height = raw.sizes.width, raw.sizes.height
-                # raw.sizes.flip est le code de rotation LibRaw (0 = aucune,
-                # 3 = 180°, 5/6 = 90° dans un sens ou l'autre) : width/height
-                # restent dans l'orientation NATIVE du capteur, à échanger
-                # pour les rotations à 90°.
+                # raw.sizes.flip is LibRaw's rotation code (0 = none, 3 = 180°,
+                # 5/6 = 90° one way or the other): width/height stay in the sensor's
+                # NATIVE orientation, to be swapped for 90° rotations.
                 if raw.sizes.flip in (5, 6):
                     width, height = height, width
                 return (width, height)
@@ -80,7 +80,7 @@ def get_original_dimensions(path: Path):
         with Image.open(path) as img:
             width, height = img.size
             exif = img.getexif()
-            orientation = exif.get(0x0112)  # tag EXIF Orientation
+            orientation = exif.get(0x0112)  # EXIF Orientation tag
             if orientation in (5, 6, 7, 8):
                 width, height = height, width
             return (width, height)
@@ -90,25 +90,25 @@ def get_original_dimensions(path: Path):
 
 
 def _large_enough(img_size, target_size, tolerance=0.9, fill=False):
-    """Vrai si img_size couvre au moins ~tolerance fois le plus grand côté
-    demandé. Une petite marge est tolérée : un aperçu embarqué très
-    légèrement plus petit que la cible reste largement préférable, en
-    vitesse, à un dématriçage complet pour une différence imperceptible.
+    """True if img_size covers at least ~tolerance times the longest side
+    requested. A small margin is tolerated: an embedded preview very
+    slightly smaller than the target remains far preferable, in speed, to a
+    full demosaicing for an imperceptible difference.
 
-    `fill` : la vignette sera RECADRÉE pour remplir toute sa cellule (mode
-    d'ajustement "cover", voir thumbnail.fit_thumbnail_image()) - c'est
-    alors le PETIT côté de l'aperçu qui doit atteindre la cible, pas le
-    grand : un aperçu 4:3 dont seul le grand côté suffirait laisserait un
-    carré recadré plus petit que sa cellule."""
+    `fill`: the thumbnail will be CROPPED to fill its whole cell ("cover"
+    fit mode, see thumbnail.fit_thumbnail_image()) - it is then the SHORT
+    side of the preview that must reach the target, not the long one: a 4:3
+    preview whose long side alone would suffice would leave a cropped square
+    smaller than its cell."""
     side = min(img_size) if fill else max(img_size)
     return side >= max(target_size) * tolerance
 
 
 def _load_raw(path: Path, use_embedded_thumb: bool = True, target_size=None, fill: bool = False,
               min_ratio: float = 0.9) -> Image.Image:
-    """Charge un fichier RAW et retourne une image PIL en mode RGB.
-    `min_ratio` : part de `target_size` que l'aperçu embarqué doit couvrir
-    pour être accepté (voir _large_enough())."""
+    """Loads a RAW file and returns a PIL image in RGB mode.
+    `min_ratio`: share of `target_size` that the embedded preview must
+    cover to be accepted (see _large_enough())."""
     if not RAWPY_AVAILABLE:
         raise RuntimeError(_("engine.raw_module_missing", name=path.name))
 
@@ -132,36 +132,35 @@ def _load_raw(path: Path, use_embedded_thumb: bool = True, target_size=None, fil
                 if img is not None:
                     if target_size is None or _large_enough(img.size, target_size, tolerance=min_ratio, fill=fill):
                         return img
-                    # Aperçu trop petit pour l'usage demandé : on continue
-                    # plus bas vers un dématriçage complet.
+                    # Preview too small for the requested use: we continue below
+                    # to a full demosaicing.
             except (rawpy.LibRawNoThumbnailError, rawpy.LibRawUnsupportedThumbnailError):
                 pass
             except Exception as e:
                 logger.debug(f"Aperçu embarqué inutilisable pour {path.name} : {e}")
 
-        # Pas d'aperçu exploitable (ou trop petit) : dématriçage complet.
+        # No usable preview (or too small): full demosaicing.
         rgb = raw.postprocess(use_camera_wb=True, no_auto_bright=False, output_bps=8)
         return Image.fromarray(rgb)
 
 
 def load_image(path: Path, use_embedded_thumb: bool = True, target_size=None, fill: bool = False) -> Image.Image:
     """
-    Point d'entrée unique pour charger n'importe quelle image (RAW ou standard).
-    Retourne toujours une image PIL en mode RGB. Lève une exception en cas d'échec
-    (à charge de l'appelant de logger/ignorer).
+    Single entry point to load any image (RAW or standard).
+    Always returns a PIL image in RGB mode. Raises an exception on failure
+    (it is up to the caller to log/ignore).
 
-    target_size : tuple (largeur_max, hauteur_max) optionnel indiquant la
-    taille finale approximative souhaitée. Fournir cette information quand
-    elle est connue accélère significativement le décodage (voir docstring
-    du module) ; elle n'a aucun effet sur le résultat final si l'appelant
-    redimensionne de toute façon ensuite (thumbnail(), etc.) - c'est une
-    pure optimisation de vitesse.
+    target_size: optional tuple (max_width, max_height) giving the
+    approximate final size wanted. Supplying this information when it is
+    known significantly speeds up decoding (see the module docstring); it
+    has no effect on the final result if the caller resizes afterwards
+    anyway (thumbnail(), etc.) - it is a pure speed optimisation.
 
-    fill : mettre à True quand l'appelant va RECADRER l'image pour remplir
-    une zone `target_size` (vignette en mode "cover") plutôt que l'y
-    inscrire : un aperçu RAW embarqué n'est alors jugé assez grand que si
-    son petit côté atteint la cible (voir _large_enough()). Sans effet
-    pour les images non RAW.
+    fill: set to True when the caller is going to CROP the image to fill a
+    `target_size` area (thumbnail in "cover" mode) rather than fit it
+    inside: an embedded RAW preview is then judged large enough only if its
+    short side reaches the target (see _large_enough()). No effect for
+    non-RAW images.
     """
     path = Path(path)
     if is_raw_file(path):
@@ -177,35 +176,34 @@ def load_image(path: Path, use_embedded_thumb: bool = True, target_size=None, fi
         return img
 
 
-#: Part de la résolution du capteur qu'un aperçu JPEG embarqué doit couvrir
-#: pour servir d'image « pleine taille » (voir load_full_resolution()) :
-#: quasi exact, contrairement à la tolérance de 90 % des vignettes - un
-#: aperçu sensiblement plus petit que la prise de vue n'est pas la photo
-#: complète.
+#: Share of the sensor resolution that an embedded JPEG preview must
+#: cover to serve as the "full-size" image (see load_full_resolution()):
+#: almost exact, unlike the 90% tolerance of the thumbnails - a preview
+#: noticeably smaller than the shot is not the complete photo.
 FULL_RESOLUTION_PREVIEW_MIN_RATIO = 0.98
 
 
 def load_full_resolution(path: Path) -> Image.Image:
-    """Image à la résolution COMPLÈTE de la prise de vue, en RGB - pour
-    produire un fichier JPEG téléchargeable à partir d'un RAW (galerie HTML,
-    option « originaux pleine taille »), à la différence de load_image() qui
-    se contente d'une image « assez grande pour l'usage demandé ».
+    """Image at the FULL resolution of the shot, in RGB - to produce a
+    downloadable JPEG file from a RAW (HTML gallery, "full-size originals"
+    option), unlike load_image() which settles for an image "large enough
+    for the requested use".
 
-    Fichier non RAW : identique à load_image(). RAW : l'aperçu JPEG embarqué
-    s'il couvre au moins FULL_RESOLUTION_PREVIEW_MIN_RATIO de la résolution
-    du capteur (c'est le rendu de l'appareil lui-même, et l'extraction est
-    quasi instantanée - beaucoup d'appareils y enregistrent une image pleine
-    taille) ; sinon, dématriçage complet. Lève une exception en cas d'échec
-    (rawpy absent, fichier illisible...) : jamais de repli sur un aperçu plus
-    petit, qui serait présenté comme l'original."""
+    Non-RAW file: identical to load_image(). RAW: the embedded JPEG preview
+    if it covers at least FULL_RESOLUTION_PREVIEW_MIN_RATIO of the sensor
+    resolution (it is the camera's own rendering, and extraction is almost
+    instant - many cameras store a full-size image there); otherwise, full
+    demosaicing. Raises an exception on failure (rawpy missing, unreadable
+    file...): never falls back to a smaller preview, which would be
+    presented as the original."""
     path = Path(path)
     if not is_raw_file(path):
         return load_image(path)
     dimensions = get_original_dimensions(path)
     return _load_raw(
         path,
-        # Résolution du capteur inconnue : impossible d'apprécier l'aperçu,
-        # dématriçage complet.
+        # Sensor resolution unknown: impossible to judge the preview,
+        # full demosaicing.
         use_embedded_thumb=dimensions is not None,
         target_size=dimensions,
         min_ratio=FULL_RESOLUTION_PREVIEW_MIN_RATIO,

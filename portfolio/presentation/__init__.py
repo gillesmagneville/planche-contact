@@ -1,22 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-portfolio/presentation/ - Moteur commun de mise en page, légendes et thèmes.
+portfolio/presentation/ - Common engine for layout, captions and themes.
 
-Package introduit pour les évolutions "légendes EXIF personnalisables",
-"modèles de mise en page personnalisables", "prévisualisation" et "thèmes
-graphiques". Avant ce package, chaque générateur de sortie (contactsheet.py,
-htmlgallery.py) réimplémentait sa propre logique de mise en page et ses
-propres couleurs en dur - voir PROJECT_CONTEXT.md. Ce package centralise :
+Package introduced for the "customisable EXIF captions", "customisable
+layout templates", "preview" and "graphic themes" enhancements. Before
+this package, each output generator (contactsheet.py, htmlgallery.py)
+reimplemented its own layout logic and its own hard-coded colours - see
+PROJECT_CONTEXT.md. This package centralises:
 
-- profile.py        : modèle de données (Profil) + (dé)sérialisation JSON
-- layout_engine.py  : calcul de géométrie
-- captions.py       : résolution des légendes EXIF (formatage - voir
-                      portfolio.utils.get_exif_metadata() pour l'extraction)
-- themes.py         : palettes de couleurs
+- profile.py        : data model (Profile) + JSON (de)serialisation
+- layout_engine.py  : geometry computation
+- captions.py       : resolution of EXIF captions (formatting - see
+                      portfolio.utils.get_exif_metadata() for extraction)
+- themes.py         : colour palettes
 
-Règle générale, valable pour tout le package : l'ABSENCE de profil, ou un
-profil partiel/invalide, ne doit jamais changer le comportement actuel de
-l'application ni lever d'exception - voir profile.default_profile().
+General rule, valid for the whole package: the ABSENCE of a profile, or
+a partial/invalid profile, must never change the application's current
+behaviour nor raise an exception - see profile.default_profile().
 """
 
 from .profile import (

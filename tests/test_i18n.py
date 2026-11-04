@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Cohérence des traductions (portfolio/locales/{fr,en,de,es}.py) : une clé
-absente d'une langue ne plante pas l'application (repli silencieux de
-portfolio.i18n._()), mais afficherait un texte dans la mauvaise langue -
-exactement le genre de défaut qui passe inaperçu tant qu'on ne teste pas
-chaque langue à la main.
+Consistency of the translations (portfolio/locales/{fr,en,de,es}.py): a key
+missing from a language does not crash the application (silent fallback of
+portfolio.i18n._()), but would display text in the wrong language -
+exactly the kind of defect that goes unnoticed as long as each language
+is not tested by hand.
 """
 import importlib
 import re
@@ -27,15 +27,15 @@ def test_all_locales_define_exactly_the_same_keys():
     for lang in LANGS:
         keys = set(_strings(lang))
         assert keys == reference, (
-            f"{lang} : clés manquantes {sorted(reference - keys)}, "
-            f"en trop {sorted(keys - reference)}"
+            f"{lang}: missing keys {sorted(reference - keys)}, "
+            f"extra {sorted(keys - reference)}"
         )
 
 
 def test_every_literal_translation_key_used_in_the_code_exists():
-    """Toute clé écrite en littéral dans un appel `_("...")` (interface
-    graphique et moteur) doit exister. Les clés construites dynamiquement
-    (f-strings) ne sont pas vues ici : voir les tests dédiés ci-dessous."""
+    """Every key written as a literal in a `_("...")` call (graphical
+    interface and engine) must exist. Dynamically built keys (f-strings)
+    are not seen here: see the dedicated tests below."""
     pattern = re.compile(r'\b_\(\s*"([a-z][a-z0-9_]*\.[A-Za-z0-9_.]+)"')
     sources = [REPO / "planche-contact-gtk.py", *sorted((REPO / "portfolio").glob("*.py"))]
     reference = set(_strings("fr"))
@@ -44,14 +44,14 @@ def test_every_literal_translation_key_used_in_the_code_exists():
         for key in pattern.findall(source.read_text(encoding="utf-8")):
             if key not in reference:
                 missing.setdefault(key, []).append(source.name)
-    assert not missing, f"clés de traduction utilisées mais jamais définies : {missing}"
+    assert not missing, f"translation keys used but never defined: {missing}"
 
 
 @pytest.mark.parametrize("lang", LANGS)
 def test_theme_menu_of_the_main_window_is_translated(lang):
-    """Le menu « Thème » de la fenêtre principale construit ses options par
-    f-string (`gen.theme_mode.{mode}`) : une option oubliée dans une langue
-    ne serait détectée par aucun test statique."""
+    """The main window's "Theme" menu builds its options with an f-string
+    (`gen.theme_mode.{mode}`): an option forgotten in one language would be
+    caught by no static test."""
     strings = _strings(lang)
     for mode in THEME_MODES:
         assert strings.get(f"gen.theme_mode.{mode}"), (lang, mode)

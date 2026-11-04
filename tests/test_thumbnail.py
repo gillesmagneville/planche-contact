@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Tests du mode d'ajustement des vignettes (LayoutSettings.fit_mode) :
-"contain" (photo entière, comportement d'origine) et "cover" (photo
-recadrée en carré pour remplir toute sa cellule - « Remplir » dans
-l'interface). Ce réglage était exposé (Profil JSON, interface, manuel) mais
-jamais lu par le rendu : « Remplir » ne recadrait rien.
+Tests of the thumbnail fit mode (LayoutSettings.fit_mode):
+"contain" (whole photo, original behaviour) and "cover" (photo
+cropped to a square to fill its whole cell - "Fill" in the
+interface). This setting was exposed (JSON Profile, interface, manual) but
+never read by the renderer: "Fill" cropped nothing.
 """
 from pathlib import Path
 
@@ -20,11 +20,11 @@ RED, GREEN, BLUE = (220, 20, 20), (20, 200, 20), (20, 20, 220)
 
 
 def _striped_landscape(width=800, height=600, band=60):
-    """Bande rouge à gauche, bleue à droite, verte au centre : un recadrage
-    CENTRÉ en carré doit couper les deux bandes. Bandes volontairement plus
-    étroites que la marge rognée (100 px de chaque côté pour 800x600 -> 400
-    carré) : un bord de bande pile sur le bord du recadrage serait mélangé
-    au vert par le rééchantillonnage LANCZOS, sans rien dire du recadrage."""
+    """Red band on the left, blue on the right, green in the centre: a
+    CENTRED square crop must cut off both bands. Bands deliberately narrower
+    than the trimmed margin (100 px on each side for 800x600 -> 400 square):
+    a band edge exactly on the crop edge would be blended with the green by
+    LANCZOS resampling, which would say nothing about the cropping."""
     img = Image.new("RGB", (width, height), GREEN)
     img.paste(Image.new("RGB", (band, height), RED), (0, 0))
     img.paste(Image.new("RGB", (band, height), BLUE), (width - band, 0))
@@ -38,15 +38,15 @@ def _colors(img):
 def test_contain_keeps_the_whole_photo_with_its_proportions():
     thumb = fit_thumbnail_image(_striped_landscape(), 400, "contain")
     assert thumb.size == (400, 300)
-    assert {RED, BLUE} <= {c for c in _colors(thumb) if c in (RED, BLUE)}, "toute la photo doit rester visible"
+    assert {RED, BLUE} <= {c for c in _colors(thumb) if c in (RED, BLUE)}, "the whole photo must remain visible"
 
 
 def test_cover_crops_the_photo_to_a_centered_square_filling_the_cell():
-    # 800x600 -> petit côté ramené à 400 -> 533x400, puis carré central de 400
-    # = x de 100 à 700 sur l'original : les bandes 0-60 et 740-800 disparaissent.
+    # 800x600 -> short side brought down to 400 -> 533x400, then central square of 400
+    # = x from 100 to 700 on the original: the 0-60 and 740-800 bands disappear.
     thumb = fit_thumbnail_image(_striped_landscape(), 400, "cover")
     assert thumb.size == (400, 400)
-    assert _colors(thumb) == {GREEN}, "le recadrage doit être centré et retirer les bords"
+    assert _colors(thumb) == {GREEN}, "the crop must be centred and remove the edges"
 
 
 def test_cover_also_crops_portrait_photos_around_their_center():
@@ -60,8 +60,8 @@ def test_cover_also_crops_portrait_photos_around_their_center():
 
 @pytest.mark.parametrize("size", [(800, 600), (600, 800), (1001, 667), (4000, 3001), (401, 400), (1000, 1000)])
 def test_cover_always_yields_a_full_square_for_large_enough_photos(size):
-    """Pas d'arrondi qui laisserait un côté à 399 px (carré incomplet) -
-    la vignette remplirait alors presque, mais pas tout à fait, la cellule."""
+    """No rounding that would leave a side at 399 px (incomplete square) -
+    the thumbnail would then almost, but not quite, fill the cell."""
     thumb = fit_thumbnail_image(Image.new("RGB", size, GREEN), 400, "cover")
     assert thumb.size == (400, 400)
 
@@ -87,13 +87,13 @@ def _write_photos(tmp_path, n=3, size=(800, 600)):
 
 
 def _is_all_green(img, tolerance=40):
-    """Tolérance : les photos de ces tests passent par du JPEG (avec pertes)."""
+    """Tolerance: the photos in these tests go through (lossy) JPEG."""
     return bool(np.all(np.abs(np.asarray(img).astype(int) - np.array(GREEN)) < tolerance))
 
 
 def test_generate_parallel_passes_fit_mode_to_the_worker_processes(tmp_path):
-    """Les workers sont des processus `spawn` : le mode doit leur être
-    transmis explicitement (ils n'héritent d'aucun état du parent)."""
+    """The workers are `spawn` processes: the mode must be passed to them
+    explicitly (they inherit no state from the parent)."""
     gen = ThumbnailGenerator(Config(input_dir=tmp_path, output_dir=tmp_path / "out"))
     paths = _write_photos(tmp_path)
 
@@ -102,7 +102,7 @@ def test_generate_parallel_passes_fit_mode_to_the_worker_processes(tmp_path):
 
     assert [t.size for t in contain] == [(400, 300)] * 3
     assert [t.size for t in cover] == [(400, 400)] * 3
-    assert all(_is_all_green(t) for t in cover), "recadrage centré : plus de bandes rouge/bleue"
+    assert all(_is_all_green(t) for t in cover), "centred crop: no more red/blue bands"
 
 
 def test_create_thumbnail_supports_fit_mode(tmp_path):
@@ -113,10 +113,10 @@ def test_create_thumbnail_supports_fit_mode(tmp_path):
 
 
 def test_raw_embedded_preview_must_be_large_enough_on_its_short_side_to_fill():
-    """Un aperçu RAW embarqué 4:3 de 640x424 suffit pour INSCRIRE une photo
-    dans 600x600 (grand côté), mais pas pour la RECADRER en 600x600 : son
-    petit côté (424) donnerait un carré trop petit - il faut alors
-    dématricer le RAW complet."""
+    """A 640x424 embedded 4:3 RAW preview is enough to FIT a photo inside
+    600x600 (long side), but not to CROP it to 600x600: its short side (424)
+    would give a square that is too small - the full RAW must then be
+    demosaiced."""
     assert _large_enough((640, 424), (600, 600)) is True
     assert _large_enough((640, 424), (600, 600), fill=True) is False
     assert _large_enough((1620, 1080), (600, 600), fill=True) is True

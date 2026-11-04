@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Réglages par défaut de l'INTERFACE GRAPHIQUE : « Nom du fichier » est
-coché (nom du fichier sous chaque photo), alors que la ligne de commande,
-sans --profile, ne met toujours aucune légende (default_profile() inchangé,
-ce dont dépendent les scripts existants).
+Default settings of the GRAPHICAL INTERFACE: "File name" is ticked (file
+name under each photo), whereas the command line, without --profile, still
+puts no caption (default_profile() unchanged, which existing scripts
+depend on).
 """
 from portfolio.config import Config
 from portfolio.contactsheet import ContactSheetGenerator
@@ -27,9 +27,9 @@ def test_the_interface_default_shows_the_file_name_below_each_photo():
 
 
 def test_the_interface_default_differs_from_the_command_line_default():
-    """C'est cette différence qui fait que l'interface transmet toujours
-    son profil au CLI (--profile) : sans elle, la légende par défaut ne
-    serait jamais appliquée."""
+    """It is this difference that makes the interface always pass its
+    profile to the CLI (--profile): without it, the default caption would
+    never be applied."""
     assert interface_default_profile() != default_profile()
 
 

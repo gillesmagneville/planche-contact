@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Tests de Config.__post_init__() - synchronisation rétrocompatible entre les
-réglages "simples" historiques (page_format, num_per_sheet) et le nouveau
-Profil (profile.layout.page_format/per_page), cahier des charges §2/§8.
+Tests of Config.__post_init__() - backward-compatible synchronisation between
+the historical "simple" settings (page_format, num_per_sheet) and the new
+Profile (profile.layout.page_format/per_page), specification §2/§8.
 """
 from pathlib import Path
 
@@ -11,18 +11,18 @@ from portfolio.presentation import Profile, LayoutSettings
 
 
 def test_default_profile_matches_default_legacy_fields():
-    """Sans aucun réglage explicite, le Profil par défaut doit déjà
-    correspondre aux valeurs par défaut historiques de Config (A4/12)."""
+    """With no explicit setting, the default Profile must already match
+    Config's historical defaults (A4/12)."""
     config = Config(input_dir=Path("in"), output_dir=Path("out"))
     assert config.profile.layout.page_format == "A4"
     assert config.profile.layout.per_page == 12
 
 
 def test_explicit_legacy_fields_sync_into_the_default_profile():
-    """Cas réel actuel (CLI/interface graphique, pas de Profil fourni) :
-    page_format/num_per_sheet explicites doivent se refléter dans le
-    Profil interne, sans quoi le moteur de mise en page calculerait une
-    géométrie incohérente avec ce que l'utilisateur a demandé."""
+    """Actual current case (CLI/graphical interface, no Profile supplied):
+    explicit page_format/num_per_sheet must be reflected in the internal
+    Profile, otherwise the layout engine would compute a geometry
+    inconsistent with what the user asked for."""
     config = Config(
         input_dir=Path("in"), output_dir=Path("out"),
         page_format="A3", num_per_sheet=24,
@@ -32,11 +32,10 @@ def test_explicit_legacy_fields_sync_into_the_default_profile():
 
 
 def test_explicit_custom_profile_is_not_clobbered_by_default_legacy_fields():
-    """Un Profil explicite (ex: --profile, étape ultérieure) dont le
-    format/nombre par planche diffère DÉJÀ des valeurs par défaut de
-    LayoutSettings ne doit pas être écrasé par les valeurs par défaut de
-    Config (page_format="A4", num_per_sheet=12) quand elles n'ont, elles,
-    pas été explicitement changées par l'appelant."""
+    """An explicit Profile (e.g. --profile, a later step) whose
+    format/number per sheet ALREADY differs from the LayoutSettings defaults
+    must not be overwritten by Config's defaults (page_format="A4",
+    num_per_sheet=12) when the caller has not explicitly changed them."""
     custom_profile = Profile(layout=LayoutSettings(page_format="A2", per_page=48))
     config = Config(input_dir=Path("in"), output_dir=Path("out"), profile=custom_profile)
 
@@ -45,15 +44,15 @@ def test_explicit_custom_profile_is_not_clobbered_by_default_legacy_fields():
 
 
 def test_explicit_legacy_fields_do_not_override_an_already_customized_profile():
-    """Précision du même comportement : si le Profil fourni a DÉJÀ un
-    format différent des valeurs par défaut de LayoutSettings, un
-    page_format legacy resté à sa valeur par défaut ("A4") ne doit pas
-    l'emporter sur le Profil, plus spécifique (voir Config.__post_init__
-    pour la limite explicitement documentée de cette heuristique)."""
+    """Clarification of the same behaviour: if the supplied Profile ALREADY
+    has a format different from the LayoutSettings defaults, a legacy
+    page_format left at its default value ("A4") must not take precedence
+    over the more specific Profile (see Config.__post_init__ for the
+    explicitly documented limit of this heuristic)."""
     custom_profile = Profile(layout=LayoutSettings(page_format="A2"))
     config = Config(
         input_dir=Path("in"), output_dir=Path("out"),
-        page_format="A4",  # valeur par défaut de Config, donc non "explicite" au sens de cette heuristique
+        page_format="A4",  # Config's default value, hence not "explicit" in the sense of this heuristic
         profile=custom_profile,
     )
     assert config.profile.layout.page_format == "A2"
