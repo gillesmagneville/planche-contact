@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-portfolio.py - Générateur de planches-contact
+portfolio.py - Contact sheet generator
 """
 
 import sys
@@ -24,11 +24,11 @@ from portfolio.presentation import compute_effective_per_page, load_profile
 
 
 def _pre_resolve_language():
-    """Détermine la langue à utiliser pour --help et les messages du CLI,
-    avant même le parsing normal des arguments : argparse construit le
-    texte d'aide de chaque add_argument() immédiatement à la déclaration
-    du parser, donc avant qu'on connaisse la valeur de args.language - il
-    faut donc regarder sys.argv nous-mêmes en amont, pour ce seul besoin.
+    """Determines the language to use for --help and the CLI messages,
+    before even the normal argument parsing: argparse builds the help text
+    of each add_argument() immediately at parser declaration, hence before
+    the value of args.language is known - so we have to look at sys.argv
+    ourselves beforehand, for this one need.
     """
     for i, arg in enumerate(sys.argv):
         if arg == "--language" and i + 1 < len(sys.argv):
@@ -41,9 +41,9 @@ def _pre_resolve_language():
 def parse_args():
     import argparse
 
-    # Résolu AVANT de construire le parser : le texte d'aide de chaque
-    # add_argument() ci-dessous appelle _() en supposant la langue déjà
-    # active (voir _pre_resolve_language() ci-dessus).
+    # Resolved BEFORE building the parser: the help text of each
+    # add_argument() below calls _() assuming the language is already
+    # active (see _pre_resolve_language() above).
     language, unsupported_detected = set_language(_pre_resolve_language())
     if unsupported_detected is not None:
         print(_("lang.fallback_warning_detail", detected=unsupported_detected), file=sys.stderr)
@@ -66,56 +66,55 @@ def parse_args():
     parser.add_argument("--html-per-page", type=int, default=48, help=_("cli.help_html_per_page"))
     parser.add_argument("--html-originals", action="store_true", help=_("cli.help_html_originals"))
     parser.add_argument("--watermark", default=None, help=_("cli.help_watermark"))
-    # Choix laissés en français : valeur interne comparée en dur par
-    # portfolio/config.py (voir PROJECT_CONTEXT.md §5) - seul le texte
-    # d'aide affiché est traduit, jamais les valeurs elles-mêmes.
+    # Choices left in French: internal value compared as a hard-coded literal
+    # by portfolio/config.py (see PROJECT_CONTEXT.md §5) - only the displayed
+    # help text is translated, never the values themselves.
     parser.add_argument("--watermark-orientation", default="Horizontal",
                         choices=["Horizontal", "Diagonale horaire", "Diagonale anti-horaire"],
                         help=_("cli.help_watermark_orientation"))
     parser.add_argument("--watermark-opacity", type=int, default=40,
                         help=_("cli.help_watermark_opacity"))
-    # Déjà résolu ci-dessus (voir _pre_resolve_language) : simplement
-    # déclaré ici pour qu'argparse reconnaisse l'option (utile en
-    # particulier quand l'interface graphique lance ce script en
-    # sous-processus avec sa propre langue déjà active - voir
-    # planche-contact-gtk.py, _on_generate) et l'affiche dans --help.
+    # Already resolved above (see _pre_resolve_language): merely
+    # declared here so that argparse recognises the option (useful in
+    # particular when the graphical interface launches this script as a
+    # subprocess with its own language already active - see
+    # planche-contact-gtk.py, _on_generate) and shows it in --help.
     parser.add_argument("--language", default="system", choices=AVAILABLE_LANGUAGES,
                         help=_("cli.help_language"))
-    # Mise en page/légendes/thème personnalisables (cahier des charges
-    # §2/§4.4) : un profil JSON réutilisable, enregistré via
-    # presentation.save_profile() (interface graphique, étape ultérieure)
-    # ou écrit/modifié à la main. Voir la note de précédence avec
-    # --format/--num ci-dessous (Config.__post_init__).
+    # Customisable layout/captions/theme (specification §2/§4.4): a
+    # reusable JSON profile, saved via presentation.save_profile()
+    # (graphical interface, a later step) or written/edited by hand. See
+    # the note on precedence with --format/--num below
+    # (Config.__post_init__).
     parser.add_argument("--profile", type=Path, default=None, help=_("cli.help_profile"))
-    # Choix des sous-dossiers à traiter (la liste des dossiers qui
-    # contiennent des photos est proposée par l'interface graphique, voir
-    # scanner.list_image_folders()). Implique une recherche récursive.
+    # Choice of the subfolders to process (the list of folders that contain
+    # photos is offered by the graphical interface, see
+    # scanner.list_image_folders()). Implies a recursive search.
     parser.add_argument("--include-dir", action="append", default=None, metavar="DIR",
                         help=_("cli.help_include_dir"))
     parser.add_argument("--include-dirs-file", type=Path, default=None, metavar="FILE",
                         help=_("cli.help_include_dirs_file"))
 
-    # Mode prévisualisation (cahier des charges §3), réservé à un usage
-    # interne par l'interface graphique (planche-contact-gtk.py,
-    # _on_preview_clicked) : génère UNE SEULE planche (la première page,
-    # avec le nombre de photos réellement affichées dessus - voir
-    # compute_effective_per_page) dans ce sous-processus CLI totalement
-    # séparé de l'application GTK, puis écrit le résultat en PNG au chemin
-    # donné et s'arrête - sans jamais toucher au dossier de sortie réel ni
-    # générer de PDF/CSV/galerie HTML. Voir _generate_preview_sheet()
-    # ci-dessous pour la raison de cet isolement en sous-processus.
+    # Preview mode (specification §3), reserved for internal use by the
+    # graphical interface (planche-contact-gtk.py, _on_preview_clicked):
+    # generates a SINGLE sheet (the first page, with the number of photos
+    # actually shown on it - see compute_effective_per_page) in this CLI
+    # subprocess entirely separate from the GTK application, then writes the
+    # result as a PNG at the given path and stops - without ever touching
+    # the real output folder or generating any PDF/CSV/HTML gallery. See
+    # _generate_preview_sheet() below for the reason for this subprocess
+    # isolation.
     parser.add_argument("--preview-output", type=Path, default=None, help=_("cli.help_preview_output"))
 
     return parser.parse_args()
 
 
 def _include_dirs_from_args(args):
-    """Sous-dossiers demandés par --include-dir (répétable) et/ou
-    --include-dirs-file (un dossier par ligne, UTF-8 ; l'interface graphique
-    l'utilise pour ne pas dépasser la longueur maximale d'une ligne de
-    commande avec de nombreux dossiers), ou None si aucune des deux options
-    n'est donnée (toutes les photos). Un fichier vide = aucun dossier
-    retenu, donc aucune photo."""
+    """Subfolders requested by --include-dir (repeatable) and/or
+    --include-dirs-file (one folder per line, UTF-8; the graphical interface
+    uses it to avoid exceeding the maximum command-line length with many
+    folders), or None if neither option is given (all photos). An empty
+    file = no folder selected, hence no photos."""
     if not args.include_dir and args.include_dirs_file is None:
         return None
     dirs = list(args.include_dir or [])
@@ -131,31 +130,31 @@ def _include_dirs_from_args(args):
 
 
 def _generate_preview_sheet(args, profile_kwargs):
-    """Génère une planche unique pour la prévisualisation (--preview-output)
-    et rien d'autre - voir le commentaire de l'argument ci-dessus.
+    """Generates a single sheet for the preview (--preview-output)
+    and nothing else - see the argument's comment above.
 
-    Volontairement un chemin de code à part, indépendant du reste de
-    main() : ne crée jamais le dossier de sortie réel, ne configure pas de
-    logging dedans, ne nettoie/écrase rien d'une génération précédente, et
-    ne produit ni PDF, ni CSV, ni galerie HTML - seulement l'image PNG de
-    la planche demandée.
+    Deliberately a separate code path, independent of the rest of
+    main(): never creates the real output folder, configures no logging
+    in it, cleans/overwrites nothing from a previous generation, and
+    produces no PDF, CSV or HTML gallery - only the PNG image of the
+    requested sheet.
 
-    Isolement en sous-processus (plutôt qu'un simple appel direct depuis
-    l'interface graphique, dans un fil d'arrière-plan de l'application
-    GTK) : constat empirique (tests sous GTK4 réel) qu'un rendu de texte
-    Pillow (titre/numéro de page de la planche - voir
-    ContactSheetGenerator._draw_header()/_draw_page_number()) exécuté en
-    concurrence avec Pango - qui s'appuie, lui aussi, sur FreeType, pour
-    l'affichage des widgets de la boucle GTK principale restée active -
-    peut corrompre l'initialisation interne de FreeType et produire un
-    masque de glyphe de taille aberrante, jusqu'à faire échouer le rendu
-    (PIL.Image.DecompressionBombError). Un sous-processus séparé, sans la
-    moindre fenêtre ni boucle GTK, élimine structurellement cette
-    concurrence plutôt que de tenter de la fiabiliser."""
+    Isolation in a subprocess (rather than a simple direct call from the
+    graphical interface, in a background thread of the GTK application):
+    empirical finding (tests under real GTK4) that Pillow text rendering
+    (sheet title/page number - see
+    ContactSheetGenerator._draw_header()/_draw_page_number()) run
+    concurrently with Pango - which also relies on FreeType, to display the
+    widgets of the main GTK loop that stays active - can corrupt FreeType's
+    internal initialisation and produce a glyph mask of aberrant size, to
+    the point of making the rendering fail
+    (PIL.Image.DecompressionBombError). A separate subprocess, without any
+    window or GTK loop, structurally eliminates this concurrency rather than
+    trying to make it reliable."""
     config = Config(
         input_dir=args.input,
-        # Jamais créé ni écrit : ce mode ne génère qu'un PNG autonome, au
-        # chemin --preview-output fourni par l'appelant.
+        # Never created nor written: this mode only generates a standalone PNG,
+        # at the --preview-output path supplied by the caller.
         output_dir=args.input,
         recursive=args.recursive,
         sort_by=args.sort,
@@ -191,8 +190,8 @@ def main():
     args = parse_args()
     start = time.time()
 
-    # Arguments de Config qui ne viennent pas des options « simples » :
-    # le profil (--profile) et les sous-dossiers retenus (--include-dir...).
+    # Config arguments that do not come from the "simple" options:
+    # the profile (--profile) and the selected subfolders (--include-dir...).
     profile_kwargs = {}
     if args.profile is not None:
         profile_kwargs["profile"] = load_profile(args.profile)
@@ -201,10 +200,9 @@ def main():
         profile_kwargs["include_dirs"] = include_dirs
 
     if args.preview_output is not None:
-        # Mode prévisualisation : voir _generate_preview_sheet() - un
-        # chemin de code totalement séparé du reste de cette fonction, qui
-        # retourne avant la moindre création/modification du dossier de
-        # sortie réel.
+        # Preview mode: see _generate_preview_sheet() - an entirely separate
+        # code path from the rest of this function, which returns before any
+        # creation/modification of the real output folder.
         _generate_preview_sheet(args, profile_kwargs)
         return
 
@@ -216,19 +214,17 @@ def main():
 
     logger.info(_("cli.log_starting", input=args.input))
 
-    # Profil JSON optionnel (cahier des charges §2/§4.4, --profile) : un
-    # fichier absent/illisible/invalide retombe silencieusement sur le
-    # profil par défaut (voir presentation.load_profile(), jamais
-    # d'exception) - aucun argument "profile=" n'est alors passé à Config
-    # ci-dessous, pour laisser sa propre valeur par défaut
-    # (default_profile()) s'appliquer normalement. Quand un profil EST
-    # fourni, Config.__post_init__() arbitre lui-même la précédence avec
-    # --format/--num quand les deux sont donnés à la fois (voir son
-    # docstring pour la limite actuelle de cette heuristique) : --format/
-    # --num ne l'emportent que s'ils ont été explicitement changés par
-    # rapport à leur valeur par défaut ET que le profil n'a, lui, pas déjà
-    # personnalisé ce même réglage. (profile_kwargs est calculé plus haut,
-    # avant même l'embranchement vers le mode prévisualisation.)
+    # Optional JSON profile (specification §2/§4.4, --profile): a
+    # missing/unreadable/invalid file silently falls back to the default
+    # profile (see presentation.load_profile(), never an exception) - no
+    # "profile=" argument is then passed to Config below, to let its own
+    # default value (default_profile()) apply normally. When a profile IS
+    # supplied, Config.__post_init__() itself arbitrates the precedence with
+    # --format/--num when both are given at once (see its docstring for the
+    # current limit of this heuristic): --format/--num prevail only if they
+    # were explicitly changed from their default value AND the profile has
+    # not already customised that same setting. (profile_kwargs is computed
+    # above, even before the branch to preview mode.)
     config = Config(
         input_dir=args.input,
         output_dir=output_dir,
@@ -250,10 +246,10 @@ def main():
         **profile_kwargs,
     )
 
-    # Les originaux joints à la galerie sont copiés tels quels : ils ne
-    # portent donc pas le filigrane, qui perdrait son sens si l'utilisateur
-    # ne le savait pas. L'avertissement est écrit dans le journal ET sur la
-    # console (donc dans le journal de l'interface graphique).
+    # The originals attached to the gallery are copied as-is: they
+    # therefore carry no watermark, which would lose its meaning if the
+    # user did not know it. The warning is written to the log AND to the
+    # console (hence to the graphical interface's log).
     if config.generate_html and config.html_include_originals and config.watermark_text:
         logger.warning(_("cli.warn_originals_watermark"))
 
@@ -268,24 +264,23 @@ def main():
         print(f"PROGRESS:100/100 {_('cli.progress_done_empty')}", flush=True)
         return
 
-    # Le modèle "grandes vignettes" ("large_thumbs") peut réduire lui-même
-    # le nombre de photos tenant sur UNE page, pour garantir de grandes
-    # vignettes quel que soit le nombre demandé (voir
-    # presentation.layout_engine.compute_effective_per_page) - les autres
-    # modèles renvoient `config.num_per_sheet` inchangé. Paginer sur cette
-    # valeur EFFECTIVE (plutôt que sur `config.num_per_sheet` directement)
-    # garantit que les photos excédentaires d'une page "large_thumbs"
-    # trop chargée se retrouvent sur une page supplémentaire plutôt que
-    # d'être silencieusement ignorées (ContactSheetGenerator ne dessine de
-    # toute façon jamais plus de cellules que cette même valeur - voir
-    # contactsheet.py).
+    # The "large thumbnails" template ("large_thumbs") can itself reduce
+    # the number of photos fitting on ONE page, to guarantee large
+    # thumbnails whatever the number requested (see
+    # presentation.layout_engine.compute_effective_per_page) - the other
+    # templates return `config.num_per_sheet` unchanged. Paginating on this
+    # EFFECTIVE value (rather than on `config.num_per_sheet` directly)
+    # guarantees that the excess photos of an overcrowded "large_thumbs"
+    # page end up on an additional page rather than being silently ignored
+    # (ContactSheetGenerator never draws more cells than this same value
+    # anyway - see contactsheet.py).
     n = compute_effective_per_page(config.profile)
     total_pages = (len(images) + n - 1) // n
 
     thumb_gen = ThumbnailGenerator(config)
     cs_gen = ContactSheetGenerator(config, thumb_gen)
 
-    # === Nettoyage avant génération ===
+    # === Cleanup before generation ===
     planches_dir = output_dir / "planches"
     if planches_dir.exists():
         shutil.rmtree(planches_dir)
@@ -296,7 +291,7 @@ def main():
         pdf_path.unlink()
 
     planche_files = []
-    # Textes dessinés sur chaque planche, pour le texte sélectionnable du PDF.
+    # Texts drawn on each sheet, for the PDF's selectable text.
     text_runs = {}
 
     # Phase 2: Contact sheets
@@ -313,10 +308,10 @@ def main():
                 planche_files.append(p)
                 text_runs[p] = list(cs_gen.last_text_runs)
                 progress = 15 + int(55 * (page_num / total_pages))
-                # "PROGRESS:X/100" est le seul marqueur lu par l'interface
-                # graphique (voir planche-contact-gtk.py, _run_cli) :
-                # volontairement jamais traduit, pour rester valable dans
-                # toutes les langues sans dépendre d'un texte humain.
+                # "PROGRESS:X/100" is the only marker read by the graphical
+                # interface (see planche-contact-gtk.py, _run_cli):
+                # deliberately never translated, so that it stays valid in
+                # all languages without depending on human-readable text.
                 print(_("cli.sheet_generated", page=page_num, total=total_pages), flush=True)
                 print(f"PROGRESS:{progress}/100", flush=True)
         except Exception as e:
@@ -348,9 +343,9 @@ def main():
 
 
 if __name__ == "__main__":
-    # Voir le commentaire équivalent dans planche-contact-gtk.py : nécessaire
-    # pour que multiprocessing.ProcessPoolExecutor fonctionne correctement
-    # dans un contexte gelé (PyInstaller). Sans effet depuis les sources.
+    # See the equivalent comment in planche-contact-gtk.py: needed so that
+    # multiprocessing.ProcessPoolExecutor works correctly in a frozen
+    # context (PyInstaller). No effect when run from source.
     import multiprocessing
     multiprocessing.freeze_support()
     main()

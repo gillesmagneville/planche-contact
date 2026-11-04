@@ -10,29 +10,28 @@ from .presentation import (
 from .i18n import _
 from .textlayer import TextRun
 
-#: Nombre maximal de lignes de légende que la mise en page ajoute d'elle-même
-#: quand le texte, une fois passé à la ligne dans la largeur d'une vignette,
-#: dépasse captions.lines (voir ContactSheetGenerator._plan_page()). Borne
-#: de sécurité contre une boucle de réajustement sans fin sur des vignettes
-#: extrêmement étroites : au-delà, _draw_caption() borne de toute façon le
-#: texte à la hauteur réservée, jamais de débordement dans la photo suivante.
+#: Maximum number of caption lines that the layout adds by itself when
+#: the text, once wrapped to the width of a thumbnail, exceeds
+#: captions.lines (see ContactSheetGenerator._plan_page()). A safety
+#: bound against an endless readjustment loop on extremely narrow
+#: thumbnails: beyond it, _draw_caption() clamps the text to the reserved
+#: height anyway, so it never overflows into the next photo.
 MAX_AUTO_CAPTION_LINES = 10
 
 
 def _fit_text_to_width(draw, text, font, max_width):
-    """Tronque `text` avec une ellipsis ("…") si sa largeur rendue dépasse
-    `max_width`, sinon le renvoie inchangé. Dernier filet de sécurité de
-    ContactSheetGenerator._draw_caption() : les légendes sont normalement
-    déjà passées à la ligne dans la largeur disponible
-    (presentation.captions.layout_caption_lines()), de sorte que cette
-    troncature ne s'applique plus qu'à un MOT isolé plus large que la
-    cellule (ex : nom de fichier interminable sur une vignette minuscule) -
-    jamais à une légende ordinaire composée de plusieurs champs. Voir
-    CHANGELOG.md.
+    """Truncates `text` with an ellipsis ("…") if its rendered width exceeds
+    `max_width`, otherwise returns it unchanged. Last safety net of
+    ContactSheetGenerator._draw_caption(): captions are normally already
+    wrapped to the available width
+    (presentation.captions.layout_caption_lines()), so that this truncation
+    now only applies to a single WORD wider than the cell (e.g. an endless
+    file name on a tiny thumbnail) - never to an ordinary caption made of
+    several fields. See CHANGELOG.md.
 
-    Recherche linéaire (retranche un caractère à la fois) : suffisant ici,
-    une légende ne dépassant jamais quelques dizaines de caractères et
-    cette fonction n'étant appelée qu'une fois par ligne/par photo."""
+    Linear search (removes one character at a time): sufficient here, since
+    a caption never exceeds a few dozen characters and this function is only
+    called once per line/per photo."""
     if max_width <= 0:
         return ""
     bbox = draw.textbbox((0, 0), text, font=font)
@@ -42,9 +41,9 @@ def _fit_text_to_width(draw, text, font, max_width):
     ellipsis = "…"
     bbox = draw.textbbox((0, 0), ellipsis, font=font)
     if bbox[2] - bbox[0] > max_width:
-        # Même l'ellipsis seule ne tient pas (cellule extrêmement
-        # étroite) : rien d'affichable ne rentre, mieux vaut ne rien
-        # dessiner qu'un fragment trompeur.
+        # Even the ellipsis alone does not fit (extremely narrow cell):
+        # nothing displayable fits, better to draw nothing than a misleading
+        # fragment.
         return ""
 
     truncated = text
@@ -58,35 +57,34 @@ def _fit_text_to_width(draw, text, font, max_width):
 
 
 def _thumb_offset(caption_position, alignment, thumb_wh, cell_size):
-    """Décalage (dx, dy), en pixels, de la vignette À L'INTÉRIEUR de sa
-    cellule carrée `cell_size x cell_size`, pour que la photo soit collée
-    à sa légende au lieu de rester en haut à gauche de la cellule.
+    """Offset (dx, dy), in pixels, of the thumbnail INSIDE its square cell
+    `cell_size x cell_size`, so that the photo is stuck to its caption
+    instead of staying at the top left of the cell.
 
-    Une vignette garde ses proportions (`Image.thumbnail`) : une photo en
-    paysage 4:3 n'occupe que les trois quarts de la hauteur de la cellule,
-    et la légende, placée sous la cellule (voir
-    layout_engine.compute_page_layout()), était donc séparée de sa photo
-    par un vide - d'autant plus visible que la légende fait plusieurs
-    lignes. Le vide se retrouve maintenant du côté opposé à la légende,
-    ce qui regroupe visuellement chaque photo avec sa légende ET garde les
-    légendes alignées d'une photo à l'autre (la zone de légende, elle,
-    n'a pas bougé) :
+    A thumbnail keeps its proportions (`Image.thumbnail`): a 4:3 landscape
+    photo only occupies three quarters of the cell's height, and the caption,
+    placed below the cell (see layout_engine.compute_page_layout()), was
+    therefore separated from its photo by a gap - all the more visible when
+    the caption runs to several lines. The gap now ends up on the side
+    opposite the caption, which visually groups each photo with its caption
+    AND keeps the captions aligned from one photo to the next (the caption
+    area itself has not moved):
 
-    - "below" : photo posée sur sa légende (alignée en bas) ;
-    - "above" : photo collée sous sa légende (alignée en haut) ;
-    - "right" : photo collée contre sa légende (alignée à droite) ;
-    - horizontalement, pour "below"/"above", la photo suit l'alignement du
-      texte (gauche/centre/droite) - auparavant toujours à gauche, alors
-      que la légende était centrée sous la cellule.
+    - "below": photo resting on its caption (bottom-aligned);
+    - "above": photo stuck under its caption (top-aligned);
+    - "right": photo stuck against its caption (right-aligned);
+    - horizontally, for "below"/"above", the photo follows the text
+      alignment (left/centre/right) - previously always left, whereas the
+      caption was centred under the cell.
 
-    Sans légende (`caption_position` autre que ces trois valeurs, y compris
-    "none" - la valeur à passer quand aucun champ n'est configuré) : photo
-    CENTRÉE dans sa cellule, dans les deux sens. Elle était auparavant
-    collée en haut à gauche de la cellule (décalage (0, 0)), ce qui
-    laissait un vide à droite d'une photo portrait et sous une photo
-    paysage : l'ensemble des photos paraissait décalé vers le haut et la
-    gauche de la page, même une fois la grille elle-même centrée (voir
-    layout_engine.compute_page_layout() et create_contact_sheet())."""
+    Without a caption (`caption_position` other than these three values,
+    including "none" - the value to pass when no field is configured): photo
+    CENTRED in its cell, in both directions. It used to be stuck at the top
+    left of the cell (offset (0, 0)), which left a gap to the right of a
+    portrait photo and below a landscape photo: all the photos looked shifted
+    towards the top and left of the page, even once the grid itself was
+    centred (see layout_engine.compute_page_layout() and
+    create_contact_sheet())."""
     width, height = thumb_wh
     free_w = max(0, cell_size - width)
     free_h = max(0, cell_size - height)
@@ -107,15 +105,15 @@ def _thumb_offset(caption_position, alignment, thumb_wh, cell_size):
 
 
 def _fit_header_text(draw, text, size, bold, max_width, min_size):
-    """Police et texte de l'en-tête (titre/auteur) tenant dans `max_width` :
-    la plus grande taille <= `size` (par pas de 2 px, jamais sous
-    `min_size`) pour laquelle `text` tient ; si même `min_size` ne suffit
-    pas, le texte est tronqué avec "…" (_fit_text_to_width) en dernier
-    recours. Un texte qui tient déjà garde exactement sa police d'origine.
+    """Font and text of the header (title/author) fitting within `max_width`:
+    the largest size <= `size` (in steps of 2 px, never below `min_size`)
+    for which `text` fits; if even `min_size` is not enough, the text is
+    truncated with "…" (_fit_text_to_width) as a last resort. A text that
+    already fits keeps exactly its original font.
 
-    Sans cette garde, un titre long débordait de la page - sans conséquence
-    visible tant qu'il était centré (rogné symétriquement), mais un titre
-    aligné à droite aurait commencé HORS de la page."""
+    Without this guard, a long title overflowed the page - with no visible
+    consequence as long as it was centred (clipped symmetrically), but a
+    right-aligned title would have started OUTSIDE the page."""
     font = get_font(size, bold=bold)
     for candidate in range(size, min_size - 1, -2):
         font = get_font(candidate, bold=bold)
@@ -126,12 +124,11 @@ def _fit_header_text(draw, text, size, bold, max_width, min_size):
 
 
 def _text_run(draw, xy, text, font, bold=False, copy_text=None):
-    """`TextRun` décrivant un texte que `draw.text(xy, text, font=font)` vient
-    de dessiner (ancre PIL par défaut : bord gauche, haut de la ligne), pour
-    la couche de texte invisible du PDF (voir textlayer.py). Renvoie None si
-    la police ne permet pas de mesurer le texte : la planche est alors
-    dessinée normalement, simplement sans texte sélectionnable pour cette
-    ligne."""
+    """`TextRun` describing a text that `draw.text(xy, text, font=font)` has
+    just drawn (default PIL anchor: left edge, top of the line), for the
+    PDF's invisible text layer (see textlayer.py). Returns None if the font
+    does not allow measuring the text: the sheet is then drawn normally,
+    simply without selectable text for that line."""
     if not text:
         return None
     try:
@@ -147,9 +144,10 @@ def _text_run(draw, xy, text, font, bold=False, copy_text=None):
 
 
 def _header_x(position, canvas_w, margin_px, text_w):
-    """Abscisse du texte d'en-tête selon HEADER_POSITIONS : aligné sur la
-    marge de page à gauche/à droite, centré sinon (formule d'origine,
-    inchangée : le centrage n'a jamais tenu compte des marges)."""
+    """X coordinate of the header text according to HEADER_POSITIONS:
+    aligned on the page margin on the left/right, centred otherwise
+    (original formula, unchanged: centring never took the margins into
+    account)."""
     if position == "top_left":
         return margin_px
     if position == "top_right":
@@ -161,26 +159,25 @@ class ContactSheetGenerator:
     def __init__(self, config, thumbnail_generator):
         self.config = config
         self.thumb_gen = thumbnail_generator
-        # Le Profil (portfolio/presentation/profile.py) est désormais la
-        # source unique de vérité pour la mise en page, les légendes et le
-        # thème - voir Config.__post_init__() pour la synchronisation
-        # rétrocompatible avec page_format/num_per_sheet quand aucun
-        # Profil explicite n'a été fourni.
+        # The Profile (portfolio/presentation/profile.py) is now the single
+        # source of truth for layout, captions and theme - see
+        # Config.__post_init__() for the backward-compatible synchronisation
+        # with page_format/num_per_sheet when no explicit Profile was supplied.
         self.profile = config.profile
         self.page_format = self.profile.layout.page_format
         self.project_title = getattr(config, 'title', None)
         self.author = getattr(config, 'author', None)
         self.input_dir = getattr(config, 'input_dir', None)
         self.num_per_sheet = self.profile.layout.per_page
-        #: Textes dessinés sur la DERNIÈRE planche créée (liste de TextRun,
-        #: dans l'ordre de lecture : en-tête, légendes, pied de page) : le
-        #: PDF s'en sert pour poser un texte sélectionnable sur l'image.
+        #: Texts drawn on the LAST sheet created (list of TextRun, in reading
+        #: order: header, captions, footer): the PDF uses them to lay selectable
+        #: text over the image.
         self.last_text_runs = []
 
     def _put_text(self, draw, xy, text, fill, font, bold=False, copy_text=None):
-        """`draw.text()` + enregistrement du texte dans `last_text_runs`.
-        `copy_text` : texte à copier depuis le PDF quand il diffère de celui
-        affiché (ligne tronquée par « … » : le PDF garde la version complète)."""
+        """`draw.text()` + recording of the text in `last_text_runs`.
+        `copy_text`: text to copy from the PDF when it differs from the one
+        displayed (line truncated with "…": the PDF keeps the full version)."""
         draw.text(xy, text, fill=fill, font=font)
         run = _text_run(draw, xy, text, font, bold=bold, copy_text=copy_text)
         if run is not None:
@@ -196,29 +193,27 @@ class ContactSheetGenerator:
 
         profile = self.profile
         palette = resolve_theme(profile.theme)
-        # La géométrie dépend du TEXTE des légendes (leur nombre de lignes
-        # une fois passées à la ligne dans la largeur d'une vignette
-        # détermine la hauteur à réserver, donc la taille des vignettes) :
-        # voir _plan_page().
+        # The geometry depends on the TEXT of the captions (their number of
+        # lines once wrapped to the width of a thumbnail determines the height
+        # to reserve, hence the size of the thumbnails): see _plan_page().
         page, caption_lines_by_idx = self._plan_page(images)
 
         canvas_w, canvas_h = page.canvas_w, page.canvas_h
         margin = page.margin_px
         thumb_size = page.thumb_size
-        # "large_thumbs" peut avoir réduit lui-même le nombre de photos
-        # tenant sur UNE page (voir layout_engine.compute_effective_per_page) :
-        # la répartition réelle des photos EXCÉDENTAIRES sur des pages
-        # supplémentaires reste à câbler en amont, dans la boucle de
-        # pagination de portfolio.py (qui ignore encore cette réduction et
-        # continue de répartir par lots de config.num_per_sheet) - une
-        # étape ultérieure séparée. En attendant, on ne dessine ici jamais
-        # plus de cellules que ce que la géométrie calculée prévoit
-        # réellement (page.cells en contient au plus autant), pour ne
-        # jamais déborder de la grille.
+        # "large_thumbs" may itself have reduced the number of photos fitting
+        # on ONE page (see layout_engine.compute_effective_per_page): the
+        # actual distribution of the EXCESS photos over additional pages
+        # remains to be wired upstream, in portfolio.py's pagination loop
+        # (which still ignores this reduction and keeps distributing in batches
+        # of config.num_per_sheet) - a separate later step. Meanwhile, we never
+        # draw here more cells than what the computed geometry actually
+        # provides (page.cells contains at most as many), so as never to
+        # overflow the grid.
         effective_per_page = page.effective_per_page
 
-        # Mode d'ajustement (Profil, "Remplir" dans l'interface) : "cover"
-        # recadre chaque photo en carré pour remplir toute sa cellule.
+        # Fit mode (Profile, "Fill" in the interface): "cover" crops each photo
+        # to a square to fill its whole cell.
         thumbnails = self.thumb_gen.generate_parallel(
             images, thumb_size, fit_mode=profile.layout.fit_mode,
         )
@@ -227,48 +222,45 @@ class ContactSheetGenerator:
         draw = ImageDraw.Draw(sheet)
 
         header_bottom_y = self._draw_header(draw, canvas_w, margin, palette)
-        # Espace entre le bas de l'en-tête et la grille de vignettes : plus
-        # généreux que la version précédente, aligné sur la même valeur que
-        # les marges latérales/basse pour une composition équilibrée.
+        # Space between the bottom of the header and the thumbnail grid: more
+        # generous than the previous version, aligned on the same value as the
+        # side/bottom margins for a balanced composition.
         content_gap = margin
         y_start = header_bottom_y + content_gap
 
-        # Décalage vertical RIGIDE appliqué à TOUTES les cellules calculées
-        # par le moteur de mise en page (photos ET légendes) : le moteur
-        # suppose un début de grille à une hauteur d'en-tête FIXE
-        # (page.content_top_px), alors que contactsheet.py calcule la
-        # sienne dynamiquement selon le texte réellement affiché (titre/
-        # auteur) - voir _draw_header() ci-dessus - pour un rendu du
-        # modèle "grid" strictement identique à avant l'introduction de ce
-        # moteur (cahier des charges : aucune régression du comportement
-        # existant). Un décalage CONSTANT préserve exactement l'espacement
-        # RELATIF calculé par le moteur entre toutes les cellules d'une
-        # même page (y compris l'espace réservé aux légendes, qui s'ajoute
-        # à la hauteur de chaque ligne - voir compute_page_layout()) :
-        # reconstruire ce calcul à la main ici dupliquerait une règle déjà
-        # centralisée, avec le risque réel de la refaire INCORRECTEMENT
-        # (un premier essai de ce correctif l'a d'ailleurs fait : les
-        # légendes empiétaient sur la ligne de vignettes suivante, faute
-        # de retrancher l'espace de légende de l'écart entre lignes).
+        # RIGID vertical offset applied to ALL the cells computed by the
+        # layout engine (photos AND captions): the engine assumes a grid start
+        # at a FIXED header height (page.content_top_px), whereas contactsheet.py
+        # computes its own dynamically according to the text actually displayed
+        # (title/author) - see _draw_header() above - for a rendering of the
+        # "grid" template strictly identical to before this engine was
+        # introduced (specification: no regression of existing behaviour). A
+        # CONSTANT offset exactly preserves the RELATIVE spacing computed by the
+        # engine between all the cells of a same page (including the space
+        # reserved for captions, which is added to the height of each row - see
+        # compute_page_layout()): rebuilding this computation by hand here would
+        # duplicate a rule that is already centralised, with the real risk of
+        # redoing it INCORRECTLY (a first attempt at this fix did so, in fact:
+        # captions encroached on the next row of thumbnails, for want of
+        # subtracting the caption space from the gap between rows).
         y_shift = y_start - page.content_top_px
 
-        # Centrage VERTICAL de la grille dans l'espace réellement libre sous
-        # l'en-tête (jusqu'à la marge basse) : la taille de vignette est
-        # limitée par la largeur OU par la hauteur, donc la grille laisse
-        # presque toujours un vide d'un seul côté - en bas de page, jusqu'à
-        # plusieurs centimètres. Le vide restant est réparti à parts égales
-        # au-dessus et au-dessous. Calculé sur la grille d'une page PLEINE
-        # (page.grid_h) : toutes les pages d'une génération - dernière page
-        # incomplète comprise - gardent leurs photos exactement aux mêmes
-        # endroits. Jamais de décalage négatif (la grille ne remonte pas sous
-        # l'en-tête) ; le centrage horizontal est fait par le moteur
+        # VERTICAL centring of the grid in the space actually free under the
+        # header (down to the bottom margin): the thumbnail size is limited by
+        # the width OR by the height, so the grid almost always leaves a gap on
+        # one side only - at the bottom of the page, up to several centimetres.
+        # The remaining gap is split equally above and below. Computed on the
+        # grid of a FULL page (page.grid_h): all the pages of a generation -
+        # incomplete last page included - keep their photos at exactly the same
+        # places. Never a negative offset (the grid does not move up under the
+        # header); horizontal centring is done by the engine
         # (layout_engine.compute_page_layout()).
         free_h = page.content_bottom_px - y_start
         y_shift += max(0, free_h - page.grid_h) // 2
 
-        # Position de légende réellement DESSINÉE : sans aucun champ
-        # configuré, la zone est réservée mais reste vide - on garde alors
-        # les vignettes exactement où elles étaient (voir _thumb_offset()).
+        # Caption position actually DRAWN: with no field configured, the area is
+        # reserved but stays empty - the thumbnails are then kept exactly where
+        # they were (see _thumb_offset()).
         drawn_caption_position = (
             profile.layout.caption_position if profile.captions.effective_fields() else "none"
         )
@@ -308,33 +300,29 @@ class ContactSheetGenerator:
         return sheet
 
     def _plan_page(self, images):
-        """Calcule la géométrie de la page ET le texte (déjà passé à la
-        ligne) des légendes de chaque photo - renvoie
-        `(PageLayout, {index_photo: [lignes]})`.
+        """Computes the page geometry AND the text (already wrapped) of each
+        photo's captions - returns `(PageLayout, {photo_index: [lines]})`.
 
-        Sans légende sous/sur la photo (cas par défaut), strictement
-        équivalent à un simple `compute_page_layout()` : aucune métadonnée
-        EXIF n'est lue (coûteux, un ou plusieurs accès fichier par photo -
-        voir utils.get_exif_metadata()), aucun coût supplémentaire.
+        Without a caption below/above the photo (default case), strictly
+        equivalent to a plain `compute_page_layout()`: no EXIF metadata is read
+        (costly, one or more file accesses per photo - see
+        utils.get_exif_metadata()), no extra cost.
 
-        Avec une légende, les lignes à réserver dépendent du texte réel,
-        lui-même dépendant de la largeur de la vignette, qui dépend à son
-        tour de la hauteur réservée (plus de lignes -> vignettes plus
-        petites -> légendes plus étroites -> parfois encore plus de
-        lignes) : on part de captions.lines, on mesure le texte réel
-        passé à la ligne dans la largeur d'une vignette
-        (presentation.captions.layout_caption_lines()), et si une photo
-        demande plus de lignes que celles réservées, on recalcule la
-        géométrie avec ce nombre-là jusqu'à stabilité - au plus
-        MAX_AUTO_CAPTION_LINES lignes, le nombre de lignes ne faisant que
-        croître d'une itération à l'autre. Les légendes "à droite" n'ont
-        pas besoin de cette boucle : leur largeur est fixe
-        (caption_area_mm) et leur hauteur suit déjà celle de la vignette.
+        With a caption, the lines to reserve depend on the actual text, itself
+        depending on the thumbnail width, which in turn depends on the reserved
+        height (more lines -> smaller thumbnails -> narrower captions ->
+        sometimes even more lines): we start from captions.lines, measure the
+        actual text wrapped to the width of a thumbnail
+        (presentation.captions.layout_caption_lines()), and if a photo needs
+        more lines than those reserved, we recompute the geometry with that
+        number until stable - at most MAX_AUTO_CAPTION_LINES lines, the number
+        of lines only ever growing from one iteration to the next. "Right"
+        captions do not need this loop: their width is fixed (caption_area_mm)
+        and their height already follows that of the thumbnail.
 
-        Conséquence assumée : chaque PAGE ajuste la hauteur de légende à
-        SES propres photos (une page dont une photo a un nom d'objectif
-        très long peut avoir des vignettes légèrement plus petites que la
-        précédente)."""
+        Accepted consequence: each PAGE adjusts the caption height to ITS own
+        photos (a page where one photo has a very long lens name may have
+        slightly smaller thumbnails than the previous one)."""
         profile = self.profile
         caption_fields = profile.captions.effective_fields()
         position = profile.layout.caption_position
@@ -369,25 +357,24 @@ class ContactSheetGenerator:
             n_lines = min(needed, max_lines)
 
     def _draw_header(self, draw, canvas_w, margin_px, palette):
-        """Titre puis auteur, l'un SOUS l'autre, chacun aligné selon
-        LayoutSettings.title_position/author_position (gauche/centre/droite
-        sur les marges de page, ou "none" pour le masquer). Renvoie
-        l'ordonnée du bas de l'en-tête (la grille de vignettes démarre
-        dessous). Positions par défaut (centrées) : rendu strictement
-        identique à avant l'introduction de ces réglages."""
+        """Title then author, one UNDER the other, each aligned according to
+        LayoutSettings.title_position/author_position (left/centre/right on the
+        page margins, or "none" to hide it). Returns the y coordinate of the
+        bottom of the header (the thumbnail grid starts below it). Default
+        positions (centred): rendering strictly identical to before these
+        settings were introduced."""
         layout = self.profile.layout
         max_width = canvas_w - 2 * margin_px
 
-        # Marge haute réduite avant l'en-tête (6 mm, contre ~9,5 mm
-        # auparavant) : le titre démarre nettement plus près du haut de la
-        # planche/page.
+        # Reduced top margin before the header (6 mm, against ~9.5 mm
+        # previously): the title starts noticeably closer to the top of the
+        # sheet/page.
         y = int(6 * 300 / 25.4)
 
-        # Si aucun champ (titre, auteur, filigrane) n'a été renseigné, la
-        # planche serait totalement anonyme : on affiche alors par défaut
-        # le nom du dossier source (sans son chemin complet) en guise de
-        # titre. Jamais quand l'utilisateur a explicitement masqué le titre
-        # (title_position == "none").
+        # If no field (title, author, watermark) has been filled in, the sheet
+        # would be completely anonymous: the name of the source folder (without
+        # its full path) is then displayed by default as the title. Never when
+        # the user has explicitly hidden the title (title_position == "none").
         watermark_text = getattr(self.config, 'watermark_text', None)
         display_title = self.project_title
         if not display_title and not self.author and not watermark_text and self.input_dir:
@@ -414,39 +401,37 @@ class ContactSheetGenerator:
         return y
 
     def _draw_caption(self, draw, lines, x, y, width, height, caption_settings, palette):
-        """Dessine les lignes de légende d'UNE photo (cahier des charges
-        §1), déjà résolues ET passées à la ligne par _plan_page()
-        (presentation.captions.layout_caption_lines()) - cette méthode ne
-        fait QUE les positionner/dessiner, aucune règle de formatage ni de
-        retour à la ligne n'est dupliquée ici. `x`/`y` : coin haut-gauche
-        de la zone de légende réservée pour cette photo ; `width`/`height` :
-        dimensions utiles de cette zone, pour le centrage/alignement
-        horizontal et pour borner le nombre de lignes dessinées.
+        """Draws the caption lines of ONE photo (specification §1), already
+        resolved AND wrapped by _plan_page()
+        (presentation.captions.layout_caption_lines()) - this method ONLY
+        positions/draws them, no formatting or wrapping rule is duplicated
+        here. `x`/`y`: top-left corner of the caption area reserved for this
+        photo; `width`/`height`: usable dimensions of this area, for the
+        horizontal centring/alignment and to bound the number of lines drawn.
 
-        Deux filets de sécurité, jamais un débordement dans les cellules
-        voisines (bug signalé : légendes qui se chevauchaient, illisibles) :
-        - une ligne plus large que `width` (un MOT isolé trop long) est
-          tronquée avec "…" ;
-        - s'il y a plus de lignes que `height` n'en peut contenir (légende
-          "à droite" sur une petite vignette, ou plafond
-          MAX_AUTO_CAPTION_LINES atteint), les lignes en trop sont
-          supprimées et la dernière se termine par "…".
-        Dans le cas ordinaire (plusieurs champs sur une vignette de taille
-        normale), aucun des deux ne s'applique : tout le texte est visible.
-        Voir CHANGELOG.md."""
+        Two safety nets, never an overflow into the neighbouring cells (reported
+        bug: captions overlapping, unreadable):
+        - a line wider than `width` (a single WORD that is too long) is
+          truncated with "…";
+        - if there are more lines than `height` can hold ("right" caption on a
+          small thumbnail, or MAX_AUTO_CAPTION_LINES ceiling reached), the
+          excess lines are removed and the last one ends with "…".
+        In the ordinary case (several fields on a normal-sized thumbnail),
+        neither applies: all the text is visible.
+        See CHANGELOG.md."""
         font_px = max(6, pt_to_px(caption_settings.font_size))
         font = get_font(font_px)
-        # CAPTION_LINE_SPACING_PX : même constante que
-        # layout_engine._reserve_caption_px(), qui calcule la hauteur à
-        # réserver à partir de cette formule - jamais une valeur dupliquée
-        # en dur ici, pour qu'une ligne dessinée ne puisse pas un jour
-        # redevenir plus haute que l'espace réellement réservé.
+        # CAPTION_LINE_SPACING_PX: same constant as
+        # layout_engine._reserve_caption_px(), which computes the height to
+        # reserve from this formula - never a hard-coded duplicated value here,
+        # so that a drawn line can never again become taller than the space
+        # actually reserved.
         line_height = font_px + CAPTION_LINE_SPACING_PX
 
         max_lines = max(1, height // line_height)
-        # Texte complet de chaque ligne pour le PDF (couche de texte
-        # invisible, voir textlayer.py) : les lignes supprimées faute de place
-        # sont recopiées à la suite de la dernière ligne visible.
+        # Full text of each line for the PDF (invisible text layer, see
+        # textlayer.py): the lines removed for lack of room are appended
+        # after the last visible line.
         full_lines = list(lines)
         if len(lines) > max_lines:
             full_lines = list(lines[:max_lines - 1]) + [" ".join(lines[max_lines - 1:])]
@@ -471,13 +456,13 @@ class ContactSheetGenerator:
 
     def _draw_page_number(self, draw, canvas_w, canvas_h, page_num, total_pages, palette,
                           show_page_number=True):
-        """Pied de page, trois lignes centrées : numéro de planche
-        ("Planche 1/3"), « Planche générée par Planche-Contact », puis la
-        mention du développeur et de la licence (la même que celle du pied
-        de la galerie HTML). Le numéro seul est optionnel
-        (LayoutSettings.page_numbering) ; les deux mentions restent toujours
-        affichées. Les positions viennent de layout_engine.FOOTER_*_OFFSET_PX,
-        qui réserve aussi la place correspondante sous la grille."""
+        """Footer, three centred lines: sheet number ("Planche 1/3"),
+        "Planche générée par Planche-Contact" (generated-by notice), then the
+        developer and licence credit (the same as the HTML gallery's footer).
+        The number alone is optional (LayoutSettings.page_numbering); the two
+        credits are always displayed. The positions come from
+        layout_engine.FOOTER_*_OFFSET_PX, which also reserves the corresponding
+        space below the grid."""
         font = get_font(26)
         font_small = get_font(20)
 

@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-Tests de portfolio.utils.get_exif_metadata() - extraction des métadonnées
-EXIF utilisées par les légendes personnalisables par photo (cahier des
-charges §1, voir aussi tests/test_captions.py pour leur mise en forme).
+Tests of portfolio.utils.get_exif_metadata() - extraction of the EXIF
+metadata used by the per-photo customisable captions (specification §1,
+see also tests/test_captions.py for their formatting).
 
-Les images de test sont de vrais JPEG produits par Pillow, avec de vraies
-métadonnées EXIF écrites via PIL.Image.Exif (IFD0 + sous-IFD Exif/GPS) -
-pas des mocks - pour vérifier un véritable aller-retour d'écriture/lecture
-EXIF, cohérent avec la culture de vérification empirique du projet.
+The test images are real JPEGs produced by Pillow, with real EXIF
+metadata written via PIL.Image.Exif (IFD0 + Exif/GPS sub-IFD) - not
+mocks - to verify a genuine EXIF write/read round trip, consistent with
+the project's culture of empirical verification.
 
-Le chemin RAW (exifread) n'est, lui, vérifié ici que pour sa RÉSILIENCE
-(fichier absent/corrompu ne doit jamais lever d'exception) : fabriquer un
-vrai fichier RAW (.cr2/.nef/.dng...) avec des tags EXIF contrôlés
-dépasserait largement la portée de ce module de test ; le mapping exact
-des tags exifread (EXIF FocalLength, GPS GPSLatitude...) suit néanmoins
-exactement la même logique que le chemin Pillow ci-dessous, déjà vérifié.
+The RAW path (exifread) is only verified here for its RESILIENCE
+(missing/corrupted file must never raise an exception): building a real
+RAW file (.cr2/.nef/.dng...) with controlled EXIF tags would go far
+beyond the scope of this test module; the exact mapping of the exifread
+tags (EXIF FocalLength, GPS GPSLatitude...) nevertheless follows exactly
+the same logic as the Pillow path below, already verified.
 """
 from datetime import datetime
 
@@ -29,9 +29,8 @@ def _make_jpeg_with_exif(path, *, make=None, model=None, lens=None,
                           focal_length=None, focal_35mm=None, aperture=None,
                           shutter_speed=None, iso=None, date_original=None,
                           gps=None, size=(800, 600)):
-    """Crée un JPEG de test avec les tags EXIF fournis - voir le docstring
-    du module pour la justification de cette approche (vrais fichiers,
-    pas de mocks)."""
+    """Creates a test JPEG with the supplied EXIF tags - see the module
+    docstring for the rationale of this approach (real files, no mocks)."""
     img = Image.new("RGB", size, (120, 80, 200))
     exif = Image.Exif()
 
@@ -76,8 +75,8 @@ def _decimal_to_dms(value):
 
 
 def test_filename_always_present(tmp_path):
-    """filename est renseigné même pour une image sans aucun EXIF - jamais
-    une clé manquante, contrairement aux autres champs."""
+    """filename is set even for an image with no EXIF at all - never a
+    missing key, unlike the other fields."""
     path = tmp_path / "sans_exif.jpg"
     Image.new("RGB", (100, 100)).save(path, format="JPEG")
 
@@ -86,8 +85,8 @@ def test_filename_always_present(tmp_path):
 
 
 def test_missing_metadata_fields_are_none_not_raised(tmp_path):
-    """Cahier des charges §1 : jamais d'erreur pour les champs EXIF
-    absents - ils valent simplement None, les autres restent exploitables."""
+    """Specification §1: never an error for absent EXIF fields - they are
+    simply None, the others remain usable."""
     path = tmp_path / "partiel.jpg"
     _make_jpeg_with_exif(path, make="Fujifilm", model="X-T5")
 
@@ -96,15 +95,15 @@ def test_missing_metadata_fields_are_none_not_raised(tmp_path):
     assert metadata.get("lens") is None
     assert metadata.get("aperture") is None
     assert metadata.get("gps") is None
-    # Les dimensions, elles, restent toujours disponibles (lues via
-    # rawloader, indépendamment de l'EXIF).
+    # The dimensions, for their part, are always available (read via
+    # rawloader, independently of the EXIF).
     assert metadata["dimensions"] == (800, 600)
 
 
 def test_camera_combines_make_and_model_without_duplication():
-    """Un modèle qui répète déjà le fabricant (convention Nikon : Make =
-    "NIKON CORPORATION", Model = "NIKON D850") ne doit pas produire une
-    chaîne doublée."""
+    """A model that already repeats the make (Nikon convention: Make =
+    "NIKON CORPORATION", Model = "NIKON D850") must not produce a
+    doubled string."""
     from portfolio.utils import _combine_camera
 
     assert _combine_camera("Canon", "Canon EOS R5") == "Canon EOS R5"
@@ -116,9 +115,9 @@ def test_camera_combines_make_and_model_without_duplication():
 
 
 def test_full_metadata_round_trip(tmp_path):
-    """Vérifie un aller-retour complet écriture -> lecture EXIF pour
-    chaque champ pris en charge, y compris focale, ouverture, vitesse,
-    ISO, focale équivalente 24x36 et date de prise de vue."""
+    """Checks a complete EXIF write -> read round trip for each supported
+    field, including focal length, aperture, shutter speed, ISO, 35mm
+    equivalent focal length and shooting date."""
     path = tmp_path / "complete.jpg"
     _make_jpeg_with_exif(
         path,
@@ -140,11 +139,11 @@ def test_full_metadata_round_trip(tmp_path):
 
 
 def test_gps_round_trip_and_hemisphere_signs(tmp_path):
-    """Les coordonnées GPS doivent revenir en degrés décimaux SIGNÉS
-    (positif = Nord/Est), peu importe l'hémisphère - vérifié dans les
-    quatre cas (N/E, N/W, S/E, S/W)."""
+    """GPS coordinates must come back as SIGNED decimal degrees
+    (positive = North/East), whatever the hemisphere - verified in all
+    four cases (N/E, N/W, S/E, S/W)."""
     cases = [
-        ((48.8566, 2.3522), (48.8566, 2.3522)),     # Paris : N, E
+        ((48.8566, 2.3522), (48.8566, 2.3522)),     # Paris: N, E
         ((48.8566, -122.3522), (48.8566, -122.3522)),  # N, W
         ((-33.8688, 151.2093), (-33.8688, 151.2093)),  # S, E
         ((-33.8688, -70.6693), (-33.8688, -70.6693)),  # S, W
@@ -159,9 +158,9 @@ def test_gps_round_trip_and_hemisphere_signs(tmp_path):
 
 
 def test_nonexistent_file_never_raises(tmp_path):
-    """Un fichier qui n'existe plus (supprimé entre le scan et la
-    génération, par exemple) ne doit jamais faire planter l'extraction -
-    seulement produire des métadonnées vides au-delà du nom de fichier."""
+    """A file that no longer exists (deleted between the scan and the
+    generation, for example) must never crash the extraction - it should
+    only produce empty metadata beyond the file name."""
     path = tmp_path / "introuvable.jpg"
     metadata = get_exif_metadata(path)
     assert metadata["filename"] == "introuvable.jpg"
@@ -169,22 +168,22 @@ def test_nonexistent_file_never_raises(tmp_path):
 
 
 def test_corrupted_file_never_raises(tmp_path):
-    """Un fichier portant une extension image mais au contenu corrompu ne
-    doit jamais lever d'exception."""
+    """A file with an image extension but corrupted content must never
+    raise an exception."""
     path = tmp_path / "corrompu.jpg"
-    path.write_bytes(b"ceci n'est pas un JPEG valide")
+    path.write_bytes(b"this is not a valid JPEG")
     metadata = get_exif_metadata(path)
     assert metadata["filename"] == "corrompu.jpg"
     assert metadata.get("camera") is None
 
 
 def test_raw_extension_never_raises_even_without_valid_raw_content(tmp_path):
-    """Résilience du chemin RAW (exifread) : un fichier à extension RAW
-    mais au contenu invalide (pas un vrai capteur RAW) ne doit jamais
-    lever d'exception - voir le docstring du module pour la portée réelle
-    de ce test."""
+    """Resilience of the RAW path (exifread): a file with a RAW extension
+    but invalid content (not a real RAW sensor file) must never raise an
+    exception - see the module docstring for the real scope of this
+    test."""
     path = tmp_path / "fake.nef"
-    path.write_bytes(b"pas un vrai fichier RAW")
+    path.write_bytes(b"not a real RAW file")
     metadata = get_exif_metadata(path)
     assert metadata["filename"] == "fake.nef"
     assert metadata.get("camera") is None

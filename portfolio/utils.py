@@ -14,14 +14,14 @@ except ImportError:
     EXIFREAD_AVAILABLE = False
 
 
-#: Nom du développeur cité dans les mentions « Développé par {name}, sous
-#: licence GNU GPL v3 » (pied de page des planches contact/PDF, de la galerie
-#: HTML et onglet « À propos ») - défini ici une seule fois.
+#: Name of the developer cited in the "Developed by {name}, under the
+#: GNU GPL v3 licence" credits (footer of the contact sheets/PDF, of the HTML
+#: gallery and the "About" tab) - defined here only once.
 AUTHOR_NAME = "Gilles MAGNEVILLE"
 
 
 def setup_logging(log_path: Path) -> None:
-    """Configure le logging (fichier + console)."""
+    """Configures logging (file + console)."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -32,23 +32,23 @@ def setup_logging(log_path: Path) -> None:
     )
 
 
-# Police embarquée avec le projet (portfolio/fonts/, licence Bitstream Vera
-# - voir portfolio/fonts/LICENSE.txt), utilisée en priorité : garantit un
-# rendu strictement identique sur toutes les plateformes, plutôt que de
-# dépendre d'une police système trouvée à un chemin devinable (ex:
-# C:/Windows/Fonts/arial.ttf), qui peut échouer silencieusement selon la
-# machine et faire retomber sur la police minuscule intégrée à Pillow.
+# Font bundled with the project (portfolio/fonts/, Bitstream Vera licence
+# - see portfolio/fonts/LICENSE.txt), used first: guarantees strictly
+# identical rendering on all platforms, rather than depending on a system
+# font found at a guessable path (e.g. C:/Windows/Fonts/arial.ttf), which
+# may fail silently depending on the machine and fall back to Pillow's
+# tiny built-in font.
 _BUNDLED_FONTS_DIR = Path(__file__).parent / "fonts"
 
 
 @functools.lru_cache(maxsize=32)
 def get_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     """
-    Charge une police TrueType de manière cross-platform.
-    Retourne la police par défaut si aucune police système n'est trouvée.
-    Mise en cache : évite de relire/reparser le fichier de police à chaque
-    appel (des centaines de fois sur une galerie de centaines de photos
-    avec filigrane).
+    Loads a TrueType font in a cross-platform way.
+    Returns the default font if no system font is found.
+    Cached: avoids re-reading/re-parsing the font file on every call
+    (hundreds of times on a gallery of hundreds of photos with a
+    watermark).
     """
     suffix = "-Bold" if bold else ""
     candidates = [
@@ -73,19 +73,19 @@ def apply_watermark(
     orientation: str = "Horizontal"
 ) -> Image.Image:
     """
-    Filigrane en mosaïque répétée, utilisé de façon identique par les
-    planches contact (et donc le PDF, qui réutilise ces mêmes images) et la
-    galerie HTML - une seule implémentation, pour garantir un rendu
-    strictement identique partout.
+    Tiled, repeated watermark, used identically by the contact sheets (and
+    therefore the PDF, which reuses those same images) and the HTML
+    gallery - a single implementation, to guarantee strictly identical
+    rendering everywhere.
 
-    `opacity` est un pourcentage (0-100), converti ici en canal alpha
+    `opacity` is a percentage (0-100), converted here into an alpha channel
     (0-255).
     """
     if not text:
         return image
 
-    # Ajout automatique du symbole copyright (comportement des deux
-    # implémentations d'origine, conservé ici).
+    # Automatic addition of the copyright symbol (behaviour of both
+    # original implementations, kept here).
     if not text.startswith("©"):
         text = "© " + text
 
@@ -99,9 +99,9 @@ def apply_watermark(
         alpha = max(0, min(255, int(255 * (opacity / 100))))
         text_color = (255, 255, 255, alpha)
 
-        # Gestion de l'orientation. PIL fait pivoter dans le sens
-        # anti-horaire pour un angle positif : "horaire" correspond donc à
-        # un angle négatif, et inversement.
+        # Orientation handling. PIL rotates counter-clockwise for a positive
+        # angle: "clockwise" therefore corresponds to a negative angle, and
+        # vice versa.
         if orientation == "Diagonale horaire":
             angle = -32
         elif orientation == "Diagonale anti-horaire":
@@ -113,7 +113,7 @@ def apply_watermark(
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
 
-        # Espacement (identique aux planches)
+        # Spacing (identical to the sheets)
         x_spacing = text_width + 220
         y_spacing = text_height + 160
 
@@ -122,7 +122,7 @@ def apply_watermark(
                 offset_x = (y // y_spacing) * 50 if angle != 0 else 0
                 draw.text((x + offset_x, y), text, font=font, fill=text_color)
 
-        # Rotation si besoin
+        # Rotate if needed
         if angle != 0:
             overlay = overlay.rotate(angle, resample=Image.BICUBIC, expand=False, center=(img.width / 2, img.height / 2))
 
@@ -134,10 +134,9 @@ def apply_watermark(
 
 
 def get_exif_date(path: Path) -> Optional[datetime]:
-    """Extrait la date EXIF la plus pertinente (prise de vue), RAW compris.
-    Centralisé ici : utilisé à la fois pour le tri des photos
-    (scanner.py) et pour les informations affichées dans la visionneuse
-    de la galerie HTML (htmlgallery.py)."""
+    """Extracts the most relevant EXIF date (shooting date), RAW included.
+    Centralised here: used both for sorting the photos (scanner.py) and for
+    the information shown in the HTML gallery viewer (htmlgallery.py)."""
     path = Path(path)
     if is_raw_file(path):
         if not EXIFREAD_AVAILABLE:
@@ -159,11 +158,10 @@ def get_exif_date(path: Path) -> Optional[datetime]:
     try:
         with Image.open(path) as img:
             exif = img.getexif()
-            # DateTimeOriginal (0x9003) et DateTimeDigitized (0x9004) vivent
-            # dans le sous-IFD Exif, jamais dans l'IFD0 principal : exif.get()
-            # direct ne les trouve pas, il faut passer par get_ifd(). Seul
-            # DateTime (0x0132, date de MODIFICATION du fichier, moins
-            # pertinente qu'une date de prise de vue) vit dans l'IFD0.
+            # DateTimeOriginal (0x9003) and DateTimeDigitized (0x9004) live in the
+            # Exif sub-IFD, never in the main IFD0: a direct exif.get() does not
+            # find them, get_ifd() is needed. Only DateTime (0x0132, the file's
+            # MODIFICATION date, less relevant than a shooting date) lives in IFD0.
             exif_ifd = exif.get_ifd(0x8769)  # ExifTags.IFD.Exif
             for tag in (0x9003, 0x9004):
                 date_str = exif_ifd.get(tag)
@@ -183,10 +181,10 @@ def get_exif_date(path: Path) -> Optional[datetime]:
     return None
 
 
-#: Clés du dictionnaire renvoyé par get_exif_metadata() - correspondent
-#: EXACTEMENT à portfolio.presentation.profile.CAPTION_FIELDS, pour un
-#: usage direct par portfolio/presentation/captions.py (lookup par nom de
-#: champ, sans table de correspondance intermédiaire).
+#: Keys of the dictionary returned by get_exif_metadata() - match
+#: EXACTLY portfolio.presentation.profile.CAPTION_FIELDS, for direct use
+#: by portfolio/presentation/captions.py (lookup by field name, without
+#: an intermediate mapping table).
 _EXIF_TAG_MAKE = 0x010F
 _EXIF_TAG_MODEL = 0x0110
 _EXIF_TAG_LENS_MODEL = 0xA434
@@ -204,9 +202,9 @@ _GPS_TAG_LON = 4
 
 
 def _combine_camera(make: Optional[str], model: Optional[str]) -> Optional[str]:
-    """Combine fabricant + modèle en un seul champ "camera" lisible,
-    évitant une répétition quand le modèle inclut déjà le fabricant (ex :
-    Nikon rapporte souvent "NIKON D850" comme Model, Make valant
+    """Combines make + model into a single readable "camera" field,
+    avoiding a repetition when the model already includes the make (e.g.
+    Nikon often reports "NIKON D850" as Model, with Make being
     "NIKON CORPORATION")."""
     make = make.strip() if make else None
     model = model.strip() if model else None
@@ -218,9 +216,9 @@ def _combine_camera(make: Optional[str], model: Optional[str]) -> Optional[str]:
 
 
 def _rational_to_float(value: Any) -> Optional[float]:
-    """Convertit une valeur EXIF potentiellement rationnelle (IFDRational
-    de Pillow, nombre déjà décimal, ou tout objet exposant .num/.den comme
-    exifread.utils.Ratio) en float. Ne lève jamais d'exception."""
+    """Converts a potentially rational EXIF value (Pillow's IFDRational, an
+    already decimal number, or any object exposing .num/.den such as
+    exifread.utils.Ratio) to a float. Never raises an exception."""
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -232,9 +230,9 @@ def _rational_to_float(value: Any) -> Optional[float]:
 
 
 def _dms_to_decimal(dms: Any) -> Optional[float]:
-    """Convertit un triplet (degrés, minutes, secondes) GPS - chaque
-    composante potentiellement rationnelle - en degrés décimaux. Ne lève
-    jamais d'exception ; renvoie None si le triplet est inexploitable."""
+    """Converts a GPS (degrees, minutes, seconds) triplet - each component
+    potentially rational - to decimal degrees. Never raises an exception;
+    returns None if the triplet is unusable."""
     try:
         degrees, minutes, seconds = dms
     except (TypeError, ValueError):
@@ -267,9 +265,9 @@ def _gps_from_pil_ifd(gps_ifd: Any) -> Optional[tuple[float, float]]:
 
 
 def _fill_from_pil(path: Path, metadata: dict) -> None:
-    """Remplit `metadata` (en place) à partir des tags EXIF d'une image
-    standard (JPEG/PNG/TIFF...) lue par Pillow. Toute métadonnée absente
-    ou mal formée est simplement omise - jamais d'exception propagée."""
+    """Fills `metadata` (in place) from the EXIF tags of a standard image
+    (JPEG/PNG/TIFF...) read by Pillow. Any missing or malformed metadata is
+    simply omitted - no exception is ever propagated."""
     try:
         with Image.open(path) as img:
             exif = img.getexif()
@@ -285,9 +283,9 @@ def _fill_from_pil(path: Path, metadata: dict) -> None:
             if camera:
                 metadata["camera"] = camera
 
-            # Objectif, focale, ouverture, vitesse, ISO vivent tous dans le
-            # sous-IFD Exif (0x8769), jamais dans l'IFD0 principal - comme
-            # DateTimeOriginal (voir get_exif_date() ci-dessus).
+            # Lens, focal length, aperture, shutter speed and ISO all live in the
+            # Exif sub-IFD (0x8769), never in the main IFD0 - like
+            # DateTimeOriginal (see get_exif_date() above).
             exif_ifd = exif.get_ifd(_EXIF_IFD_EXIF)
 
             lens = exif_ifd.get(_EXIF_TAG_LENS_MODEL)
@@ -378,9 +376,9 @@ def _gps_from_exifread(tags: dict) -> Optional[tuple[float, float]]:
 
 
 def _fill_from_exifread(path: Path, metadata: dict) -> None:
-    """Équivalent de _fill_from_pil() pour les fichiers RAW, via exifread
-    (Pillow seul ne décode pas les RAW - voir rawloader.py). Toute
-    métadonnée absente ou mal formée est simplement omise."""
+    """Equivalent of _fill_from_pil() for RAW files, via exifread
+    (Pillow alone does not decode RAW - see rawloader.py). Any missing or
+    malformed metadata is simply omitted."""
     if not EXIFREAD_AVAILABLE:
         return
     try:
@@ -425,37 +423,37 @@ def _fill_from_exifread(path: Path, metadata: dict) -> None:
 
 
 def get_exif_metadata(path: Path) -> dict:
-    """Extrait un ensemble large de métadonnées EXIF d'UNE photo (RAW
-    compris), pour les légendes personnalisables par photo (cahier des
-    charges §1). Les clés du dictionnaire renvoyé correspondent EXACTEMENT
-    à portfolio.presentation.profile.CAPTION_FIELDS, pour un usage direct
-    par portfolio/presentation/captions.py :
+    """Extracts a wide set of EXIF metadata from ONE photo (RAW
+    included), for the per-photo customisable captions (specification §1).
+    The keys of the returned dictionary match EXACTLY
+    portfolio.presentation.profile.CAPTION_FIELDS, for direct use
+    by portfolio/presentation/captions.py:
 
         filename (str), datetime (datetime), camera (str), lens (str),
-        focal_length (float, mm), focal_35mm (int, mm équivalent 24x36),
-        aperture (float, f/N), shutter_speed (float, secondes), iso (int),
-        dimensions (tuple[int, int]), gps (tuple[float, float] - latitude/
-        longitude décimales SIGNÉES, positif = Nord/Est).
+        focal_length (float, mm), focal_35mm (int, mm 24x36 equivalent),
+        aperture (float, f/N), shutter_speed (float, seconds), iso (int),
+        dimensions (tuple[int, int]), gps (tuple[float, float] - SIGNED
+        decimal latitude/longitude, positive = North/East).
 
-    Ne lève JAMAIS d'exception et ne garantit la présence d'AUCUNE clé
-    autre que "filename" : toute métadonnée absente, illisible ou mal
-    formée vaut simplement None - jamais une génération interrompue pour
-    une photo dont certaines métadonnées manquent (cahier des charges §1).
+    NEVER raises an exception and does not guarantee the presence of ANY key
+    other than "filename": any missing, unreadable or malformed metadata is
+    simply None - never a generation interrupted for a photo with some
+    metadata missing (specification §1).
 
-    Les valeurs renvoyées restent BRUTES (nombres, tuples) : leur mise en
-    forme textuelle (unités, arrondis, gabarit personnalisé par
-    l'utilisateur) est du ressort de portfolio/presentation/captions.py,
-    jamais de cette fonction - même séparation extraction/formatage que le
-    reste du module (voir apply_watermark() ci-dessus pour le rendu, par
-    opposition à get_exif_date() pour l'extraction).
+    The returned values stay UNPROCESSED (numbers, tuples): their textual
+    formatting (units, rounding, user-defined template) is the job of
+    portfolio/presentation/captions.py, never of this function - the same
+    extraction/formatting separation as the rest of the module (see
+    apply_watermark() above for rendering, as opposed to get_exif_date() for
+    extraction).
 
-    Note de performance : cette fonction réutilise get_exif_date() et
-    rawloader.get_original_dimensions() (chacun déjà utilisé ailleurs dans
-    le projet) plutôt que de dupliquer leur logique, au prix de plusieurs
-    lectures d'en-tête du même fichier - un compromis déjà présent avant
-    cette fonction (ces deux lectures existaient déjà séparément) et sans
-    impact mesurable : ce sont des lectures de MÉTADONNÉES seules, jamais
-    un décodage complet de l'image."""
+    Performance note: this function reuses get_exif_date() and
+    rawloader.get_original_dimensions() (each already used elsewhere in the
+    project) rather than duplicating their logic, at the cost of several
+    header reads of the same file - a trade-off that already existed before
+    this function (those two reads already existed separately) and with no
+    measurable impact: they are METADATA-only reads, never a full decode of
+    the image."""
     path = Path(path)
     metadata: dict = {"filename": path.name, "datetime": get_exif_date(path)}
 
@@ -472,13 +470,13 @@ def get_exif_metadata(path: Path) -> dict:
 
 
 def format_file_size(num_bytes: int) -> str:
-    """Taille de fichier lisible (ex: "4,2 Mo" en français, "4.2 MB" en
-    anglais), utilisée pour les informations affichées dans la
-    visionneuse de la galerie HTML. Unité ET séparateur décimal suivent
-    la langue active (`portfolio.i18n`, pilotée par --language/l'onglet
-    "À propos") - ce calcul a lieu APRÈS la génération de la galerie
-    HTML elle-même (voir htmlgallery.py), donc la langue active à cet
-    instant est toujours la bonne."""
+    """Human-readable file size (e.g. "4,2 Mo" in French, "4.2 MB" in
+    English), used for the information shown in the HTML gallery viewer.
+    Unit AND decimal separator follow the active language
+    (`portfolio.i18n`, driven by --language/the "About" tab) - this
+    computation happens AFTER the HTML gallery itself is generated (see
+    htmlgallery.py), so the active language at that moment is always the
+    right one."""
     from .i18n import _, get_language
 
     size = float(num_bytes)

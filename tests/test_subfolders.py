@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Choix des sous-dossiers d'un dossier principal.
+Choice of the subfolders of a main folder.
 
-`Config.include_dirs` restreint le scan aux photos situées DIRECTEMENT dans
-les dossiers listés (chemins relatifs POSIX, "." = le dossier d'entrée) ;
-`scanner.list_image_folders()` fournit la liste des dossiers possibles (celle
-que l'interface graphique propose) ; la ligne de commande expose le tout par
---include-dir (répétable) et --include-dirs-file (un dossier par ligne).
-Sans ces options, rien ne change : toutes les photos sont traitées.
+`Config.include_dirs` restricts the scan to the photos located DIRECTLY in
+the listed folders (POSIX relative paths, "." = the input folder);
+`scanner.list_image_folders()` provides the list of possible folders (the
+one the graphical interface offers); the command line exposes it all through
+--include-dir (repeatable) and --include-dirs-file (one folder per line).
+Without these options, nothing changes: all the photos are processed.
 """
 import sys
 from pathlib import Path
@@ -40,7 +40,7 @@ def tree(tmp_path):
                 "Paris/Louvre/d.jpg", "été 2026/e.jpg"):
         _photo(root / rel)
     (root / "vide").mkdir()
-    (root / "vide" / "notes.txt").write_text("pas une photo")
+    (root / "vide" / "notes.txt").write_text("not a photo")
     return root
 
 
@@ -64,7 +64,7 @@ def test_only_the_selected_folders_are_scanned_even_without_the_recursive_option
 
 
 def test_only_photos_directly_inside_a_selected_folder_are_kept(tree, tmp_path):
-    """Cocher « Paris » ne coche pas « Paris/Louvre » : chaque dossier se choisit à part."""
+    """Ticking "Paris" does not tick "Paris/Louvre": each folder is chosen separately."""
     found = _scan(tree, tmp_path, include_dirs=("Paris",))
     assert "Paris/Louvre/d.jpg" not in found
     found = _scan(tree, tmp_path, include_dirs=("Paris", "Paris/Louvre"))
@@ -73,7 +73,7 @@ def test_only_photos_directly_inside_a_selected_folder_are_kept(tree, tmp_path):
 
 def test_the_main_folder_itself_is_selected_with_a_dot(tree, tmp_path):
     assert _scan(tree, tmp_path, include_dirs=(".",)) == ["racine1.jpg", "racine2.jpg"]
-    # Tri par NOM DE FICHIER (sort_by="name"), tous dossiers confondus.
+    # Sorted by FILE NAME (sort_by="name"), all folders mixed together.
     assert _scan(tree, tmp_path, include_dirs=(".", "été 2026")) == [
         "été 2026/e.jpg", "racine1.jpg", "racine2.jpg"]
 
@@ -125,7 +125,7 @@ def test_normalize_include_dir():
 
 
 # ---------------------------------------------------------------------------
-# Liste des dossiers proposés
+# List of the proposed folders
 # ---------------------------------------------------------------------------
 
 def test_list_image_folders_gives_every_folder_with_photos_and_their_count(tree):
@@ -162,7 +162,7 @@ def test_list_image_folders_hides_the_output_of_a_previous_generation(tree):
     _photo(out / "gallery" / "thumbs" / "x.jpg")
     names = [name for name, _count in list_image_folders(tree, output_dir=out)]
     assert not any(name.startswith("Portfolio") for name in names)
-    # Sans cette précision le dossier de sortie serait, lui, proposé.
+    # Without this clarification the output folder would, for its part, be proposed.
     assert any(name.startswith("Portfolio") for name, _count in list_image_folders(tree))
 
 
@@ -176,7 +176,7 @@ def test_every_listed_folder_selects_exactly_its_own_photos(tree, tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Ligne de commande
+# Command line
 # ---------------------------------------------------------------------------
 
 def _run_cli(monkeypatch, tree, out, *extra):
@@ -255,4 +255,4 @@ def test_cli_preview_honours_the_selection(tree, tmp_path, monkeypatch):
         "--include-dir", "n-existe-pas",
     ])
     cli_module.main()
-    assert not nothing.exists(), "aucune photo retenue : aucune planche d'aperçu"
+    assert not nothing.exists(), "no photo selected: no preview sheet"
