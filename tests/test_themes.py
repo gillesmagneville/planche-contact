@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Tests de portfolio.presentation.themes (cahier des charges §4 : thèmes
-Light/Dark/Neutral/System, personnalisation de couleurs).
+Tests of portfolio.presentation.themes (specification §4: Light/Dark/
+Neutral/System themes, colour customisation).
 """
 from portfolio.presentation import (
     ThemeSettings, ThemeCustomColors, Palette, get_palette, resolve_theme,
@@ -10,11 +10,11 @@ from portfolio.presentation import (
 
 
 def test_light_theme_matches_current_hardcoded_contactsheet_colors():
-    """Rétrocompatibilité stricte (cahier des charges §2/§4/§8) : le thème
-    "light" (celui du Profil par défaut) doit reproduire EXACTEMENT les
-    couleurs actuellement codées en dur dans
-    ContactSheetGenerator._draw_header()/_draw_page_number() - fond
-    "white", texte "black", texte secondaire "#555555"."""
+    """Strict backward compatibility (specification §2/§4/§8): the "light"
+    theme (that of the default Profile) must reproduce EXACTLY the colours
+    currently hard-coded in
+    ContactSheetGenerator._draw_header()/_draw_page_number() - "white"
+    background, "black" text, "#555555" secondary text."""
     palette = resolve_theme(ThemeSettings())
     assert palette.background == "#ffffff"
     assert palette.text == "#000000"
@@ -46,10 +46,10 @@ def test_resolve_theme_system_mode_uses_prefer_dark_flag():
 
 
 def test_resolve_theme_system_defaults_to_light_without_a_graphical_context():
-    """Un appelant sans contexte graphique (le CLI, notamment) n'a aucun
-    moyen de connaître le thème du système : à défaut d'indication
-    explicite, "system" doit se comporter comme "light" - cohérent avec
-    la règle de rétrocompatibilité stricte."""
+    """A caller without a graphical context (the CLI, notably) has no way
+    of knowing the system theme: lacking an explicit indication, "system"
+    must behave like "light" - consistent with the strict backward
+    compatibility rule."""
     assert resolve_theme(ThemeSettings(mode="system")) == get_palette("light")
 
 
@@ -60,20 +60,20 @@ def test_custom_colors_override_individual_fields_only():
 
     assert palette.background == "#112233"
     assert palette.accent == "#ff0000"
-    # Les champs non personnalisés restent ceux de la palette de base.
+    # The non-customised fields stay those of the base palette.
     assert palette.text == "#000000"
     assert palette.border == "#dddddd"
-    # text_secondary n'est jamais personnalisable (pas de champ
-    # correspondant dans ThemeCustomColors).
+    # text_secondary is never customisable (no corresponding field in
+    # ThemeCustomColors).
     assert palette.text_secondary == "#555555"
 
 
 def test_invalid_custom_color_falls_back_to_base_palette_value():
-    """Une couleur personnalisée mal formée (ex : un profil édité à la
-    main avec une faute de frappe) ne doit jamais produire une couleur
-    cassée ni une exception - repli silencieux sur la valeur de base."""
+    """A malformed custom colour (e.g. a hand-edited profile with a typo)
+    must never produce a broken colour nor an exception - silent fallback
+    to the base value."""
     base = get_palette("dark")
-    custom = ThemeCustomColors(background="pas-une-couleur", text="#zzzzzz", accent="#ab")
+    custom = ThemeCustomColors(background="not-a-colour", text="#zzzzzz", accent="#ab")
     resolved = apply_custom_colors(base, custom)
     assert resolved.background == base.background
     assert resolved.text == base.text

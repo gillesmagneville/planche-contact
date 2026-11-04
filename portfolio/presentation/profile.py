@@ -1,31 +1,31 @@
 # -*- coding: utf-8 -*-
 """
-portfolio/presentation/profile.py - Modèle de données "Profil" (mise en
-page + légendes + thème) et sa (dé)sérialisation JSON.
+portfolio/presentation/profile.py - "Profile" data model (layout +
+captions + theme) and its JSON (de)serialisation.
 
-Un Profil regroupe tous les réglages des évolutions légendes/modèles de
-mise en page/thèmes (cahier des charges §2, §4.4) :
+A Profile groups all the settings of the captions/layout templates/themes
+enhancements (specification §2, §4.4):
 
-- LayoutSettings  : modèle de mise en page, grille, marges, format de page...
-- CaptionSettings : champs de légende affichés, ordre, format, police...
-- ThemeSettings   : thème prédéfini + personnalisation des couleurs.
+- LayoutSettings  : layout template, grid, margins, page format...
+- CaptionSettings : displayed caption fields, order, format, font...
+- ThemeSettings   : preset theme + colour customisation.
 
-Un Profil peut être enregistré par l'utilisateur sous forme de fichier JSON
-réutilisable et rechargé plus tard (interface graphique), ou pointé
-directement en ligne de commande (--profile fichier.json).
+A Profile can be saved by the user as a reusable JSON file and reloaded
+later (graphical interface), or pointed to directly on the command line
+(--profile file.json).
 
-Règle de rétrocompatibilité STRICTE (cahier des charges §2, §4.4, §8) :
-l'absence totale de profil doit produire un rendu strictement identique au
-comportement actuel de l'application (avant ces fonctionnalités). Chaque
-valeur par défaut ci-dessous a donc été choisie pour correspondre
-EXACTEMENT à ce qui est aujourd'hui codé en dur dans contactsheet.py (fond
-blanc, texte noir, pas de légende par photo, grille par recherche du
-meilleur nombre de colonnes, marge 12 mm, espacement 5 mm) et
-htmlgallery.py (pas de légende par photo, palette claire actuelle). Un
-champ absent ou invalide dans un JSON chargé retombe silencieusement sur
-cette même valeur par défaut - jamais d'exception, jamais de génération
-interrompue pour un fichier de profil corrompu ou produit par une version
-antérieure du projet ne connaissant pas encore tel ou tel champ.
+STRICT backward-compatibility rule (specification §2, §4.4, §8): the
+total absence of a profile must produce a rendering strictly identical to
+the application's current behaviour (before these features). Each
+default value below has therefore been chosen to match EXACTLY what is
+hard-coded today in contactsheet.py (white background, black text, no
+per-photo caption, grid by searching for the best number of columns,
+12 mm margin, 5 mm spacing) and htmlgallery.py (no per-photo caption,
+current light palette). A missing or invalid field in a loaded JSON
+silently falls back to that same default value - never an exception,
+never a generation interrupted for a profile file that is corrupted or
+produced by an earlier version of the project that does not yet know
+this or that field.
 """
 
 from __future__ import annotations
@@ -40,57 +40,57 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Constantes de validation
+# Validation constants
 # ---------------------------------------------------------------------------
 
-#: Modèles de mise en page (cahier des charges §2). "grid" correspond au
-#: seul algorithme existant aujourd'hui dans contactsheet.py (recherche du
-#: nombre de colonnes maximisant la taille des vignettes) ; les quatre
-#: autres sont de nouvelles stratégies du futur layout_engine.py.
+#: Layout templates (specification §2). "grid" corresponds to the only
+#: algorithm existing today in contactsheet.py (search for the number of
+#: columns maximising the thumbnail size); the other four are new
+#: strategies of the future layout_engine.py.
 LAYOUT_TEMPLATES = ("grid", "landscape", "portrait", "large_thumbs", "free")
 
-#: Mode d'adaptation d'une photo à sa cellule (cahier des charges §2).
+#: How a photo fits its cell (specification §2).
 FIT_MODES = ("contain", "cover")
 
-#: Formats de page pris en charge - doit rester synchronisé avec
+#: Supported page formats - must stay in sync with
 #: ContactSheetGenerator._get_canvas_size() (contactsheet.py).
 PAGE_FORMATS = ("A5", "A4", "A3", "A2", "Letter")
 
 ORIENTATIONS = ("portrait", "landscape")
 
-#: Positions possibles pour le titre/auteur en en-tête de planche.
+#: Possible positions for the title/author in the sheet header.
 HEADER_POSITIONS = ("top_left", "top_center", "top_right", "none")
 
-#: Positions possibles pour la légende d'une photo par rapport à celle-ci.
+#: Possible positions for a photo's caption relative to the photo.
 CAPTION_POSITIONS = ("below", "above", "right", "none")
 
-#: Alignement du texte des légendes.
+#: Alignment of the caption text.
 CAPTION_ALIGNMENTS = ("left", "center", "right")
 
-#: Champs de légende disponibles (cahier des charges §1). L'ordre réel
-#: d'affichage choisi par l'utilisateur vit dans CaptionSettings.fields,
-#: pas ici - ce tuple ne sert qu'à valider qu'une clé est reconnue.
-#: "gps" est délibérément un champ comme un autre ici : c'est
-#: CaptionSettings.show_gps qui agit comme interrupteur de confidentialité
-#: explicite, voir plus bas.
+#: Available caption fields (specification §1). The actual display
+#: order chosen by the user lives in CaptionSettings.fields, not here -
+#: this tuple only serves to validate that a key is recognised.
+#: "gps" is deliberately a field like any other here: it is
+#: CaptionSettings.show_gps that acts as the explicit privacy switch,
+#: see below.
 CAPTION_FIELDS = (
     "filename", "datetime", "camera", "lens", "focal_length", "focal_35mm",
     "aperture", "shutter_speed", "iso", "dimensions", "gps",
 )
 
-#: Thèmes prédéfinis (cahier des charges §4.1). "light" correspond aux
-#: couleurs actuellement codées en dur (fond blanc, texte noir, gris
-#: #555555 pour le texte secondaire) - c'est le thème par défaut, pour ne
-#: rien changer visuellement tant qu'aucun thème n'est choisi explicitement.
+#: Preset themes (specification §4.1). "light" corresponds to the
+#: currently hard-coded colours (white background, black text, grey
+#: #555555 for secondary text) - it is the default theme, so as to change
+#: nothing visually as long as no theme is explicitly chosen.
 THEME_MODES = ("light", "dark", "neutral", "system")
 
 
 def _coerce(value: Any, expected_type: type, default: Any, field_name: str) -> Any:
-    """Renvoie `value` si son type correspond à `expected_type`, sinon
-    `default` (avec un message de log) - jamais d'exception. `bool` est
-    exclu de la coercition int/float implicite de Python (un bool est
-    aussi un int) pour éviter qu'une valeur comme `true` soit acceptée là
-    où un nombre est attendu, ou inversement."""
+    """Returns `value` if its type matches `expected_type`, otherwise
+    `default` (with a log message) - never an exception. `bool` is excluded
+    from Python's implicit int/float coercion (a bool is also an int) to
+    prevent a value such as `true` from being accepted where a number is
+    expected, or vice versa."""
     if expected_type is float and isinstance(value, (int, float)) and not isinstance(value, bool):
         return float(value)
     if isinstance(value, expected_type) and not (expected_type in (int, float) and isinstance(value, bool)):
@@ -121,20 +121,20 @@ def _coerce_optional_int(value: Any, default: Optional[int], field_name: str) ->
 
 
 # ---------------------------------------------------------------------------
-# Mise en page
+# Layout
 # ---------------------------------------------------------------------------
 
 @dataclass
 class LayoutSettings:
-    #: Modèle de mise en page - voir LAYOUT_TEMPLATES.
+    #: Layout template - see LAYOUT_TEMPLATES.
     template: str = "grid"
-    #: Nombre de colonnes/lignes imposé par l'utilisateur (modèle "free"
-    #: notamment) - None laisse le moteur de mise en page les déterminer
-    #: automatiquement, comme aujourd'hui.
+    #: Number of columns/rows imposed by the user ("free" template
+    #: notably) - None lets the layout engine determine them
+    #: automatically, as today.
     columns: Optional[int] = None
     rows: Optional[int] = None
-    #: Nombre de photos par page - reprend le nom interne historique
-    #: "num_per_sheet" de Config, mais vit désormais ici.
+    #: Number of photos per page - takes over the historical internal name
+    #: "num_per_sheet" of Config, but now lives here.
     per_page: int = 12
     margin_mm: float = 12.0
     spacing_mm: float = 5.0
@@ -144,7 +144,7 @@ class LayoutSettings:
     title_position: str = "top_center"
     author_position: str = "top_center"
     page_numbering: bool = True
-    #: "none" = pas de légende sous les photos - comportement actuel.
+    #: "none" = no caption under the photos - current behaviour.
     caption_position: str = "none"
     caption_area_mm: float = 8.0
 
@@ -172,28 +172,27 @@ class LayoutSettings:
 
 
 # ---------------------------------------------------------------------------
-# Légendes
+# Captions
 # ---------------------------------------------------------------------------
 
 @dataclass
 class CaptionSettings:
-    #: Champs affichés, DANS L'ORDRE choisi par l'utilisateur. Liste vide
-    #: par défaut = aucune légende, comportement actuel.
+    #: Displayed fields, IN THE ORDER chosen by the user. Empty list by
+    #: default = no caption, current behaviour.
     fields: list[str] = field(default_factory=list)
-    #: Format d'affichage par champ (ex: {"aperture": "f/{value}"}) - les
-    #: champs non présents ici utilisent un format par défaut raisonnable
-    #: (voir captions.py, à venir).
+    #: Display format per field (e.g. {"aperture": "f/{value}"}) - fields
+    #: not present here use a reasonable default format (see captions.py,
+    #: to come).
     format_overrides: dict[str, str] = field(default_factory=dict)
-    #: Répartition sur plusieurs lignes (cahier des charges §1).
+    #: Distribution over several lines (specification §1).
     lines: int = 1
     font_size: int = 9
     alignment: str = "center"
     separator: str = " · "
-    #: Interrupteur de confidentialité EXPLICITE pour les coordonnées GPS
-    #: (cahier des charges §1 : "option permettant explicitement de les
-    #: masquer"). Même si "gps" figure dans `fields`, le champ n'est
-    #: effectivement affiché QUE si show_gps vaut True - défaut à False
-    #: pour ne jamais exposer une localisation par accident.
+    #: EXPLICIT privacy switch for the GPS coordinates (specification §1:
+    #: "option explicitly allowing them to be hidden"). Even if "gps" appears
+    #: in `fields`, the field is actually displayed ONLY if show_gps is True
+    #: - defaults to False so as never to expose a location by accident.
     show_gps: bool = False
 
     @classmethod
@@ -231,25 +230,25 @@ class CaptionSettings:
         )
 
     def effective_fields(self) -> list[str]:
-        """Champs réellement à afficher, GPS filtré tant que `show_gps`
-        n'est pas explicitement activé - à utiliser par captions.py plutôt
-        que `fields` directement, pour qu'il soit structurellement
-        impossible d'afficher un GPS « par erreur »."""
+        """Fields actually to display, GPS filtered out as long as `show_gps`
+        is not explicitly enabled - to be used by captions.py rather than
+        `fields` directly, so that it is structurally impossible to display a
+        GPS location "by mistake"."""
         if self.show_gps:
             return list(self.fields)
         return [f for f in self.fields if f != "gps"]
 
 
 # ---------------------------------------------------------------------------
-# Thèmes
+# Themes
 # ---------------------------------------------------------------------------
 
 @dataclass
 class ThemeCustomColors:
-    """Couleurs personnalisées (cahier des charges §4.3), toutes
-    optionnelles : une couleur à None laisse le thème prédéfini choisi
-    inchangé pour cette couleur précise. Valeurs attendues en hexadécimal
-    ("#rrggbb"), validées par themes.py (à venir) plutôt qu'ici."""
+    """Custom colours (specification §4.3), all optional: a colour set to
+    None leaves the chosen preset theme unchanged for that particular
+    colour. Expected values in hexadecimal ("#rrggbb"), validated by
+    themes.py (to come) rather than here."""
     background: Optional[str] = None
     text: Optional[str] = None
     accent: Optional[str] = None
@@ -277,9 +276,9 @@ class ThemeCustomColors:
 
 @dataclass
 class ThemeSettings:
-    #: Thème prédéfini - voir THEME_MODES. "light" = couleurs actuellement
-    #: codées en dur, donc aucun changement visuel tant qu'aucun thème
-    #: n'est choisi explicitement.
+    #: Preset theme - see THEME_MODES. "light" = the currently hard-coded
+    #: colours, hence no visual change as long as no theme is explicitly
+    #: chosen.
     mode: str = "light"
     custom: ThemeCustomColors = field(default_factory=ThemeCustomColors)
 
@@ -295,15 +294,15 @@ class ThemeSettings:
 
 
 # ---------------------------------------------------------------------------
-# Profil
+# Profile
 # ---------------------------------------------------------------------------
 
 @dataclass
 class Profile:
-    """Un profil complet : nom (pour l'affichage dans l'interface
-    graphique) + les trois groupes de réglages. `default_profile()` est le
-    profil "vide" dont le rendu doit être strictement identique au
-    comportement actuel de l'application."""
+    """A complete profile: name (for display in the graphical interface) +
+    the three groups of settings. `default_profile()` is the "empty" profile
+    whose rendering must be strictly identical to the application's
+    current behaviour."""
     name: Optional[str] = None
     layout: LayoutSettings = field(default_factory=LayoutSettings)
     captions: CaptionSettings = field(default_factory=CaptionSettings)
@@ -327,23 +326,23 @@ class Profile:
 
 
 def default_profile() -> Profile:
-    """Profil "vide" dont le rendu est strictement identique au
-    comportement actuel de l'application, avant légendes/modèles de mise
-    en page/thèmes - utilisé quand aucun profil n'est fourni (ni
-    --profile en CLI, ni profil chargé dans l'interface graphique)."""
+    """The "empty" profile whose rendering is strictly identical to the
+    application's current behaviour, before captions/layout templates/themes
+    - used when no profile is supplied (neither --profile on the CLI, nor a
+    profile loaded in the graphical interface)."""
     return Profile()
 
 
 def interface_default_profile() -> Profile:
-    """Profil que l'INTERFACE GRAPHIQUE présente au démarrage et à
-    « Réinitialiser » : celui de default_profile() avec, en plus, le nom du
-    fichier sous chaque photo (légende « Nom du fichier » cochée).
+    """Profile that the GRAPHICAL INTERFACE presents at startup and on
+    "Reset": that of default_profile() with, in addition, the file name under
+    each photo (the "File name" caption ticked).
 
-    Volontairement distinct de default_profile(), qui reste ce que la ligne
-    de commande applique sans --profile (aucune légende : rendu strictement
-    identique à celui d'avant les légendes, dont dépendent les scripts
-    existants) - l'interface, elle, transmet toujours son profil au CLI dès
-    qu'il diffère de default_profile() (voir planche-contact-gtk.py)."""
+    Deliberately distinct from default_profile(), which remains what the
+    command line applies without --profile (no caption: rendering strictly
+    identical to that of before the captions, which existing scripts depend
+    on) - the interface, for its part, always passes its profile to the CLI
+    as soon as it differs from default_profile() (see planche-contact-gtk.py)."""
     return Profile(
         layout=LayoutSettings(caption_position="below"),
         captions=CaptionSettings(fields=["filename"]),
@@ -351,11 +350,11 @@ def interface_default_profile() -> Profile:
 
 
 def load_profile(path: "str | Path") -> Profile:
-    """Charge un profil depuis un fichier JSON. Jamais d'exception : un
-    fichier absent, illisible, mal formé, ou partiellement reconnu (champs
-    manquants ou d'une version plus récente/ancienne du projet) retombe
-    sur les valeurs par défaut pour les champs concernés, avec un message
-    de log - jamais une génération interrompue à cause d'un profil."""
+    """Loads a profile from a JSON file. Never an exception: a missing,
+    unreadable, malformed or partially recognised file (missing fields or
+    from a newer/older version of the project) falls back to the default
+    values for the fields concerned, with a log message - never a generation
+    interrupted because of a profile."""
     path = Path(path)
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -370,16 +369,15 @@ def load_profile(path: "str | Path") -> Profile:
     try:
         return Profile.from_dict(data)
     except Exception as e:
-        # Filet de sécurité final : même une erreur inattendue dans
-        # from_dict() ne doit jamais interrompre une génération pour un
-        # simple problème de profil.
+        # Final safety net: even an unexpected error in from_dict() must
+        # never interrupt a generation over a mere profile problem.
         logger.warning(f"Profil invalide ({path}) : {e} - valeurs par défaut utilisées.")
         return default_profile()
 
 
 def save_profile(profile: Profile, path: "str | Path") -> None:
-    """Enregistre un profil au format JSON, lisible/modifiable à la main
-    et rechargeable par load_profile() ou utilisable via --profile."""
+    """Saves a profile as JSON, readable/editable by hand and reloadable
+    by load_profile() or usable via --profile."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:

@@ -1,28 +1,27 @@
 # -*- coding: utf-8 -*-
 """
-portfolio/presentation/captions.py - Résolution des légendes personnalisables
-par photo (cahier des charges §1), à partir des métadonnées EXIF extraites
-par portfolio.utils.get_exif_metadata() et des réglages CaptionSettings
-d'un Profil.
+portfolio/presentation/captions.py - Resolution of the per-photo
+customisable captions (specification §1), from the EXIF metadata
+extracted by portfolio.utils.get_exif_metadata() and the CaptionSettings
+of a Profile.
 
-Séparation stricte des responsabilités, cohérente avec le reste du
-package : utils.get_exif_metadata() extrait des valeurs BRUTES (nombres,
-tuples, datetime) sans aucune mise en forme textuelle ; ce module décide
-de la représentation par défaut "raisonnable" de chaque champ (unités,
-arrondis, gabarit "{value}") et applique l'éventuelle personnalisation de
-l'utilisateur (CaptionSettings.format_overrides). Les générateurs de
-sortie (contactsheet.py/pdfexport.py pour le rendu PIL, htmlgallery.py
-pour le HTML, et la future prévisualisation GTK) consomment donc TOUS la
-même fonction - aucune règle de formatage de légende n'est dupliquée
-entre eux (cahier des charges §5).
+Strict separation of responsibilities, consistent with the rest of the
+package: utils.get_exif_metadata() extracts UNPROCESSED values (numbers,
+tuples, datetime) with no textual formatting; this module decides the
+"reasonable" default representation of each field (units, rounding,
+"{value}" template) and applies any customisation by the user
+(CaptionSettings.format_overrides). The output generators
+(contactsheet.py/pdfexport.py for PIL rendering, htmlgallery.py for the
+HTML, and the future GTK preview) therefore ALL consume the same function
+- no caption formatting rule is duplicated between them (specification
+§5).
 
-Ne lève jamais d'exception : une métadonnée absente est simplement omise
-de la légende (jamais une chaîne vide affichée, jamais une génération
-interrompue) - cahier des charges §1 : "ne jamais produire d'erreur pour
-les photos dont certaines métadonnées sont absentes". Le filtrage GPS
-(show_gps) est déjà garanti en amont par CaptionSettings.effective_fields()
-- ce module ne fait que le réutiliser, jamais une seconde vérification
-redondante qui pourrait diverger.
+Never raises an exception: a missing metadata item is simply omitted from
+the caption (never an empty string displayed, never a generation
+interrupted) - specification §1: "never produce an error for photos with
+some metadata missing". The GPS filtering (show_gps) is already
+guaranteed upstream by CaptionSettings.effective_fields() - this module
+merely reuses it, never a second redundant check that could diverge.
 """
 
 from __future__ import annotations
@@ -34,8 +33,8 @@ from .profile import Profile
 
 
 def _format_number(value: float, decimals: int = 1) -> str:
-    """Nombre lisible, sans décimale inutile (ex: 50.0 -> "50", 2.8 ->
-    "2.8")."""
+    """Readable number, without unnecessary decimals (e.g. 50.0 -> "50",
+    2.8 -> "2.8")."""
     rounded = round(value, decimals)
     if rounded == int(rounded):
         return str(int(rounded))
@@ -43,9 +42,8 @@ def _format_number(value: float, decimals: int = 1) -> str:
 
 
 def _format_shutter_speed(seconds: float) -> str:
-    """Convention photographique habituelle : fraction pour les vitesses
-    rapides ("1/250"), décimal pour les poses longues (>= 1 s, ex:
-    "2.5")."""
+    """Usual photographic convention: fraction for fast speeds ("1/250"),
+    decimal for long exposures (>= 1 s, e.g. "2.5")."""
     if seconds <= 0:
         return "0"
     if seconds >= 1:
@@ -63,10 +61,10 @@ def _format_gps(lat: float, lon: float) -> str:
 
 
 def _default_display(field: str, value: Any) -> Optional[str]:
-    """Représentation par défaut, "raisonnable", d'une valeur brute de
-    métadonnée - voir le docstring du module. Renvoie None si la valeur
-    n'est pas exploitable (type inattendu pour ce champ), plutôt que de
-    lever une exception ou d'afficher une valeur absurde."""
+    """Default, "reasonable" representation of a raw metadata value - see
+    the module docstring. Returns None if the value is unusable (unexpected
+    type for this field), rather than raising an exception or displaying an
+    absurd value."""
     try:
         if field == "filename":
             text = str(value)
@@ -109,20 +107,18 @@ def _format_field(field: str, metadata: dict, overrides: dict) -> Optional[str]:
         try:
             return template.format(value=display)
         except (KeyError, IndexError, ValueError):
-            # Gabarit utilisateur invalide (ex: accolade non échappée,
-            # référence à un nom absent) : on retombe sur l'affichage par
-            # défaut plutôt que d'interrompre toute la génération pour une
-            # faute de frappe dans un profil enregistré.
+            # Invalid user template (e.g. unescaped brace, reference to a missing
+            # name): we fall back to the default display rather than interrupting the
+            # whole generation over a typo in a saved profile.
             return display
     return display
 
 
 def _chunk_evenly(items: list[str], n: int) -> list[list[str]]:
-    """Répartit `items` en au plus `n` groupes consécutifs aussi égaux que
-    possible, dans l'ordre d'origine (les premiers groupes reçoivent
-    l'élément supplémentaire en cas de division inégale). Les groupes
-    vides (n > len(items)) sont omis plutôt que de produire des lignes de
-    légende vides."""
+    """Splits `items` into at most `n` consecutive groups as equal as
+    possible, in the original order (the first groups receive the extra
+    element in case of uneven division). Empty groups (n > len(items)) are
+    omitted rather than producing empty caption lines."""
     if n <= 1 or len(items) <= 1:
         return [items] if items else []
     base, extra = divmod(len(items), n)
@@ -138,14 +134,13 @@ def _chunk_evenly(items: list[str], n: int) -> list[list[str]]:
 
 
 def resolve_caption_parts(profile: Profile, metadata: dict) -> list[str]:
-    """Textes mis en forme des champs de légende d'UNE photo, dans l'ordre
-    configuré, SANS les avoir encore répartis sur des lignes ni joints par
-    le séparateur - uniquement les champs réellement présents dans les
-    métadonnées (liste vide sinon, jamais d'exception). Étape commune à
-    resolve_caption_lines() (répartition simple, utilisée par la galerie
-    HTML, dont le navigateur gère lui-même le retour à la ligne) et à
-    layout_caption_lines() (répartition tenant compte d'une largeur en
-    pixels, utilisée par le rendu JPEG/PDF)."""
+    """Formatted texts of the caption fields of ONE photo, in the
+    configured order, WITHOUT having yet split them into lines or joined
+    them with the separator - only the fields actually present in the
+    metadata (empty list otherwise, never an exception). Step shared by
+    resolve_caption_lines() (simple split, used by the HTML gallery, whose
+    browser handles line wrapping itself) and layout_caption_lines() (split
+    taking a pixel width into account, used by the JPEG/PDF rendering)."""
     captions = profile.captions
     fields = captions.effective_fields()
     if not fields or not metadata:
@@ -160,18 +155,17 @@ def resolve_caption_parts(profile: Profile, metadata: dict) -> list[str]:
 
 
 def resolve_caption_lines(profile: Profile, metadata: dict) -> list[str]:
-    """Résout la ou les lignes de légende d'UNE photo, à partir de ses
-    métadonnées (voir portfolio.utils.get_exif_metadata()) et des réglages
-    CaptionSettings.fields/lines/format_overrides/separator du Profil.
+    """Resolves the caption line(s) of ONE photo, from its metadata (see
+    portfolio.utils.get_exif_metadata()) and the Profile's
+    CaptionSettings.fields/lines/format_overrides/separator.
 
-    Renvoie une liste de chaînes (une par ligne réellement non vide) -
-    liste VIDE si aucun champ n'est configuré ou si aucune métadonnée n'a
-    pu être extraite pour les champs demandés (ex: photo sans EXIF) : dans
-    ce cas, l'appelant ne doit rien dessiner, jamais une légende vide ou
-    une exception.
+    Returns a list of strings (one per really non-empty line) - EMPTY list
+    if no field is configured or if no metadata could be extracted for the
+    requested fields (e.g. photo without EXIF): in that case, the caller must
+    draw nothing, never an empty caption or an exception.
 
-    Ne tient PAS compte d'une largeur disponible : voir
-    layout_caption_lines() pour un rendu en pixels fixes (JPEG/PDF)."""
+    Does NOT take an available width into account: see
+    layout_caption_lines() for a rendering in fixed pixels (JPEG/PDF)."""
     parts = resolve_caption_parts(profile, metadata)
     if not parts:
         return []
@@ -181,12 +175,12 @@ def resolve_caption_lines(profile: Profile, metadata: dict) -> list[str]:
 
 
 def _wrap_words(text: str, max_width: int, measure: Callable[[str], int]) -> list[str]:
-    """Dernier recours pour un champ À LUI SEUL plus large que la zone
-    (ex: un nom d'objectif très long) : retour à la ligne aux espaces,
-    glouton. Un mot isolé plus large que `max_width` reste seul sur sa
-    ligne, intact - c'est alors à l'appelant de le borner à l'affichage
-    (voir contactsheet._fit_text_to_width()), jamais ce module qui ne
-    connaît ni la police ni le rendu."""
+    """Last resort for a field that ALONE is wider than the area (e.g. a
+    very long lens name): greedy line wrapping at spaces. A single word
+    wider than `max_width` stays alone on its line, intact - it is then up
+    to the caller to bound it at display time (see
+    contactsheet._fit_text_to_width()), never this module, which knows
+    neither the font nor the rendering."""
     if measure(text) <= max_width:
         return [text]
     lines: list[str] = []
@@ -205,11 +199,11 @@ def _wrap_words(text: str, max_width: int, measure: Callable[[str], int]) -> lis
 
 def _wrap_chunk(chunk: list[str], separator: str, max_width: int,
                 measure: Callable[[str], int]) -> list[str]:
-    """Remplit des lignes de gauche à droite avec les champs de `chunk`,
-    en passant à la ligne AVANT le champ qui ferait dépasser `max_width` :
-    un champ n'est donc jamais coupé en deux tant qu'il tient seul sur une
-    ligne, et le séparateur n'apparaît jamais en fin ni en début de ligne
-    (uniquement ENTRE deux champs d'une même ligne)."""
+    """Fills lines from left to right with the fields of `chunk`, wrapping
+    BEFORE the field that would exceed `max_width`: a field is therefore
+    never split in two as long as it fits alone on a line, and the separator
+    never appears at the end or beginning of a line (only BETWEEN two fields
+    of the same line)."""
     lines: list[str] = []
     current = ""
     for part in chunk:
@@ -229,23 +223,23 @@ def _wrap_chunk(chunk: list[str], separator: str, max_width: int,
 
 def layout_caption_lines(profile: Profile, metadata: dict, max_width: int,
                          measure: Callable[[str], int]) -> list[str]:
-    """Comme resolve_caption_lines(), mais pour un rendu en pixels fixes :
-    aucune ligne renvoyée ne dépasse `max_width` (mesurée par `measure`,
-    fournie par l'appelant - ce module reste donc indépendant de PIL et de
-    toute police), tant que chaque MOT tient seul dans cette largeur.
+    """Like resolve_caption_lines(), but for a rendering in fixed pixels:
+    no returned line exceeds `max_width` (measured by `measure`, supplied by
+    the caller - this module thus stays independent of PIL and of any font),
+    as long as each WORD fits alone in that width.
 
-    CaptionSettings.lines est le nombre de lignes sur lequel les champs
-    sont d'abord répartis (voir resolve_caption_lines()) ; une ligne trop
-    large pour la zone passe ensuite à la ligne, aux frontières de champs
-    (voir _wrap_chunk()), au lieu d'être tronquée ("…") ou de déborder dans
-    les cellules voisines - correctif d'un bug signalé : avec plusieurs
-    champs cochés et "Lignes de texte" = 1, tout tenait sur une seule
-    ligne, bien plus large qu'une vignette. Le nombre de lignes réellement
-    nécessaire peut donc dépasser CaptionSettings.lines : c'est à l'appelant
-    de réserver la hauteur correspondante dans la mise en page (voir
-    contactsheet.py, `compute_page_layout(..., caption_lines=...)`).
+    CaptionSettings.lines is the number of lines over which the fields are
+    first split (see resolve_caption_lines()); a line too wide for the area
+    then wraps, at field boundaries (see _wrap_chunk()), instead of being
+    truncated ("…") or overflowing into the neighbouring cells - fix for a
+    reported bug: with several fields ticked and "Text lines" = 1,
+    everything fit on a single line, much wider than a thumbnail. The number
+    of lines actually needed can therefore exceed CaptionSettings.lines: it
+    is up to the caller to reserve the corresponding height in the layout
+    (see contactsheet.py, `compute_page_layout(..., caption_lines=...)`).
 
-    `max_width` <= 0 (zone dégénérée) : repli sur resolve_caption_lines()."""
+    `max_width` <= 0 (degenerate area): fall back to
+    resolve_caption_lines()."""
     if max_width <= 0:
         return resolve_caption_lines(profile, metadata)
 

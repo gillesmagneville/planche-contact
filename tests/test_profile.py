@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Tests du modèle de données Profil (portfolio/presentation/profile.py).
+Tests of the Profile data model (portfolio/presentation/profile.py).
 
-Couvre en particulier l'exigence de rétrocompatibilité du cahier des
-charges : absence de profil, profil partiel, ou profil invalide doivent
-toujours retomber sur un comportement identique à l'actuel, sans jamais
-lever d'exception.
+In particular covers the backward-compatibility requirement of the
+specification: the absence of a profile, a partial profile or an invalid
+profile must always fall back to a behaviour identical to the current
+one, without ever raising an exception.
 """
 import json
 
@@ -23,14 +23,14 @@ from portfolio.presentation import (
 
 
 # ---------------------------------------------------------------------------
-# Valeurs par défaut = comportement actuel
+# Default values = current behaviour
 # ---------------------------------------------------------------------------
 
 def test_default_profile_matches_current_behavior():
-    """Les valeurs par défaut doivent correspondre exactement à ce qui est
-    aujourd'hui codé en dur dans contactsheet.py/htmlgallery.py : thème
-    clair, aucune légende, modèle "grille", marge 12 mm / espacement 5 mm
-    (voir ContactSheetGenerator.create_contact_sheet)."""
+    """The default values must match exactly what is hard-coded today in
+    contactsheet.py/htmlgallery.py: light theme, no caption, "grid"
+    template, 12 mm margin / 5 mm spacing (see
+    ContactSheetGenerator.create_contact_sheet)."""
     p = default_profile()
     assert p.theme.mode == "light"
     assert p.captions.fields == []
@@ -44,8 +44,8 @@ def test_default_profile_matches_current_behavior():
 
 
 def test_default_profile_is_independent_instance():
-    """Deux appels renvoient des objets indépendants (pas un singleton
-    mutable partagé par mégarde entre deux générations successives)."""
+    """Two calls return independent objects (not a mutable singleton
+    shared by accident between two successive generations)."""
     a = default_profile()
     b = default_profile()
     a.layout.per_page = 99
@@ -53,7 +53,7 @@ def test_default_profile_is_independent_instance():
 
 
 # ---------------------------------------------------------------------------
-# Aller-retour JSON
+# JSON round trip
 # ---------------------------------------------------------------------------
 
 def test_save_then_load_roundtrip(tmp_path):
@@ -76,9 +76,8 @@ def test_save_then_load_roundtrip(tmp_path):
 
 
 def test_save_produces_readable_json(tmp_path):
-    """Le fichier produit doit être du JSON standard, lisible/éditable à
-    la main (cahier des charges §2 : profils "de préférence au format
-    JSON")."""
+    """The produced file must be standard JSON, readable/editable by hand
+    (specification §2: profiles "preferably in JSON format")."""
     path = tmp_path / "profil.json"
     save_profile(default_profile(), path)
     with open(path, encoding="utf-8") as f:
@@ -88,7 +87,7 @@ def test_save_produces_readable_json(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Résilience : jamais d'exception, toujours un profil utilisable
+# Resilience: never an exception, always a usable profile
 # ---------------------------------------------------------------------------
 
 def test_load_missing_file_returns_default(tmp_path):
@@ -98,15 +97,14 @@ def test_load_missing_file_returns_default(tmp_path):
 
 def test_load_malformed_json_returns_default(tmp_path):
     path = tmp_path / "corrompu.json"
-    path.write_text("{ceci n'est pas du JSON valide", encoding="utf-8")
+    path.write_text("{this is not valid JSON", encoding="utf-8")
     loaded = load_profile(path)
     assert loaded == default_profile()
 
 
 def test_load_json_array_instead_of_object_returns_default(tmp_path):
-    """Un profil "d'une version plus ancienne/récente du projet" qui
-    n'est même pas structurellement un objet ne doit pas faire planter la
-    génération."""
+    """A profile "from an older/newer version of the project" that is not
+    even structurally an object must not crash the generation."""
     path = tmp_path / "tableau.json"
     path.write_text("[1, 2, 3]", encoding="utf-8")
     loaded = load_profile(path)
@@ -114,22 +112,22 @@ def test_load_json_array_instead_of_object_returns_default(tmp_path):
 
 
 def test_partial_profile_merges_with_defaults(tmp_path):
-    """Un profil ne renseignant qu'un sous-ensemble des champs (ex :
-    produit par une version antérieure de l'application, avant l'ajout
-    d'un nouveau champ) doit compléter silencieusement avec les valeurs
-    par défaut, jamais lever d'exception ni ignorer tout le profil."""
+    """A profile that only sets a subset of the fields (e.g. produced by an
+    earlier version of the application, before a new field was added) must
+    silently be completed with the default values, never raise an exception
+    nor ignore the whole profile."""
     path = tmp_path / "partiel.json"
     path.write_text(json.dumps({"layout": {"per_page": 20}}), encoding="utf-8")
     loaded = load_profile(path)
     assert loaded.layout.per_page == 20
-    assert loaded.layout.template == "grid"  # valeur par défaut, non renseignée
-    assert loaded.theme.mode == "light"      # groupe absent -> valeurs par défaut
+    assert loaded.layout.template == "grid"  # default value, not set
+    assert loaded.theme.mode == "light"      # missing group -> default values
 
 
 def test_unknown_top_level_and_nested_keys_are_ignored(tmp_path):
-    """Avant-compatibilité : un profil produit par une version FUTURE du
-    projet (champs encore inconnus ici) doit être accepté sans erreur,
-    les champs inconnus étant simplement ignorés."""
+    """Forward compatibility: a profile produced by a FUTURE version of the
+    project (fields still unknown here) must be accepted without error, the
+    unknown fields simply being ignored."""
     path = tmp_path / "futur.json"
     path.write_text(json.dumps({
         "layout": {"per_page": 10, "champ_du_futur": 42},
@@ -146,17 +144,17 @@ def test_invalid_layout_template_falls_back_to_default(bad_template):
 
 
 def test_invalid_page_format_falls_back_to_default():
-    settings = LayoutSettings.from_dict({"page_format": "A0"})  # non pris en charge
+    settings = LayoutSettings.from_dict({"page_format": "A0"})  # not supported
     assert settings.page_format == "A4"
 
 
 def test_negative_or_wrong_type_numeric_values_fall_back():
     settings = LayoutSettings.from_dict({"margin_mm": "beaucoup", "per_page": -5})
     assert settings.margin_mm == 12.0
-    # per_page : un entier négatif n'est pas rejeté par le coercteur générique
-    # (seul le type est vérifié ici, la borne métier est du ressort du futur
-    # layout_engine.py), mais une chaîne ou un None doivent bien retomber au
-    # défaut :
+    # per_page: a negative integer is not rejected by the generic coercer
+    # (only the type is checked here, the business bound is up to the
+    # future layout_engine.py), but a string or a None must indeed fall
+    # back to the default:
     settings2 = LayoutSettings.from_dict({"per_page": "douze"})
     assert settings2.per_page == 12
 
@@ -168,13 +166,13 @@ def test_profile_from_dict_with_non_dict_input_returns_default():
 
 
 # ---------------------------------------------------------------------------
-# Légendes : confidentialité GPS
+# Captions: GPS privacy
 # ---------------------------------------------------------------------------
 
 def test_gps_is_excluded_unless_explicitly_enabled():
-    """Cahier des charges §1 : les coordonnées GPS doivent pouvoir être
-    masquées explicitement - par défaut (show_gps=False), même si "gps"
-    figure dans la liste des champs, il ne doit jamais être affiché."""
+    """Specification §1: GPS coordinates must be explicitly hideable - by
+    default (show_gps=False), even if "gps" appears in the list of fields,
+    it must never be displayed."""
     settings = CaptionSettings(fields=["filename", "gps", "camera"], show_gps=False)
     assert "gps" not in settings.effective_fields()
     assert settings.effective_fields() == ["filename", "camera"]
@@ -196,11 +194,11 @@ def test_duplicate_caption_fields_are_deduplicated():
 
 
 # ---------------------------------------------------------------------------
-# Thème : couleurs personnalisées
+# Theme: custom colours
 # ---------------------------------------------------------------------------
 
 def test_invalid_custom_color_is_ignored():
-    theme = ThemeSettings.from_dict({"mode": "dark", "custom": {"background": "pas-une-couleur"}})
+    theme = ThemeSettings.from_dict({"mode": "dark", "custom": {"background": "not-a-colour"}})
     assert theme.mode == "dark"
     assert theme.custom.background is None
 
