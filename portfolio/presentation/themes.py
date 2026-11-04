@@ -1,38 +1,37 @@
 # -*- coding: utf-8 -*-
 """
-portfolio/presentation/themes.py - Palettes de couleurs pour les planches
-contact/PDF, les portfolios et la galerie HTML (cahier des charges §4).
+portfolio/presentation/themes.py - Colour palettes for the contact
+sheets/PDF, the portfolios and the HTML gallery (specification §4).
 
-Comme layout_engine.py (géométrie) et captions.py (légendes), ce module
-est INDÉPENDANT de tout moteur de rendu : il ne connaît ni PIL ni le HTML,
-seulement des couleurs (chaînes hexadécimales "#rrggbb") - charge à
-chaque générateur de sortie (contactsheet.py/pdfexport.py via PIL,
-htmlgallery.py via CSS, la future prévisualisation GTK) de les appliquer
-dans son propre format. Un seul jeu de palettes, jamais une redéfinition
-divergente par renderer (cahier des charges §5).
+Like layout_engine.py (geometry) and captions.py (captions), this module
+is INDEPENDENT of any rendering engine: it knows neither PIL nor HTML,
+only colours (hexadecimal "#rrggbb" strings) - it is up to each output
+generator (contactsheet.py/pdfexport.py via PIL, htmlgallery.py via CSS,
+the future GTK preview) to apply them in its own format. A single set of
+palettes, never a divergent redefinition per renderer (specification §5).
 
-Le thème "light" reproduit EXACTEMENT les couleurs actuellement codées en
-dur dans ContactSheetGenerator (fond "white", texte "black", texte
-secondaire "#555555" - voir _draw_header()/_draw_page_number()) : c'est
-le thème par défaut (ThemeSettings.mode == "light"), pour que l'absence de
-personnalisation de thème ne change rien au rendu actuel une fois ce
-module câblé (étape ultérieure séparée - rien n'est encore branché dans
-contactsheet.py/htmlgallery.py à ce stade, comme pour le reste de ce
+The "light" theme reproduces EXACTLY the colours currently hard-coded in
+ContactSheetGenerator ("white" background, "black" text, "#555555"
+secondary text - see _draw_header()/_draw_page_number()): it is the
+default theme (ThemeSettings.mode == "light"), so that the absence of
+theme customisation changes nothing in the current rendering once this
+module is wired in (a separate later step - nothing is hooked up yet in
+contactsheet.py/htmlgallery.py at this stage, as for the rest of this
 package).
 
-Le mode "system" (cahier des charges : "avec prise en charge de
-prefers-color-scheme pour le HTML") n'est pas une palette en soi, mais une
-STRATÉGIE de résolution : une planche JPEG/PDF est une image statique qui
-ne peut pas réagir après coup au thème du système, donc resolve_theme()
-exige un choix explicite (`prefer_dark`) fourni par l'appelant (l'interface
-graphique peut interroger le thème GTK courant ; le CLI, sans contexte
-graphique, passe la valeur par défaut `False`, donc "light" - cohérent
-avec la règle de rétrocompatibilité). La galerie HTML, elle, n'a pas besoin
-de choisir à la génération : son étape d'intégration (ultérieure) peut
-récupérer les DEUX palettes via get_palette("light") et get_palette("dark")
-et les placer de part et d'autre d'une media query CSS
-`prefers-color-scheme`, pour un choix fait par le NAVIGATEUR du visiteur,
-en toute cohérence avec les couleurs qu'utilisent déjà les planches/PDF.
+The "system" mode (specification: "with support for prefers-color-scheme
+for the HTML") is not a palette in itself, but a resolution STRATEGY: a
+JPEG/PDF sheet is a static image that cannot react afterwards to the
+system theme, so resolve_theme() requires an explicit choice
+(`prefer_dark`) supplied by the caller (the graphical interface can query
+the current GTK theme; the CLI, with no graphical context, passes the
+default value `False`, hence "light" - consistent with the backward
+compatibility rule). The HTML gallery, for its part, does not need to
+choose at generation time: its integration step (later) can fetch BOTH
+palettes via get_palette("light") and get_palette("dark") and place them
+on either side of a `prefers-color-scheme` CSS media query, for a choice
+made by the visitor's BROWSER, in full consistency with the colours the
+sheets/PDF already use.
 """
 
 from __future__ import annotations
@@ -48,10 +47,9 @@ _HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
 @dataclass(frozen=True)
 class Palette:
-    """Un jeu de couleurs résolu, prêt à l'emploi par un renderer. Les
-    valeurs sont toujours des chaînes hexadécimales valides ("#rrggbb" ou
-    "#rgb") - jamais None, jamais un nom de couleur CSS/PIL ambigu entre
-    bibliothèques."""
+    """A resolved set of colours, ready for use by a renderer. The values
+    are always valid hexadecimal strings ("#rrggbb" or "#rgb") - never None,
+    never a CSS/PIL colour name that is ambiguous between libraries."""
     background: str
     text: str
     text_secondary: str
@@ -59,12 +57,12 @@ class Palette:
     border: str
 
 
-#: Palettes prédéfinies (cahier des charges §4.1). "light" doit rester
-#: identique aux couleurs actuellement codées en dur dans contactsheet.py
-#: - voir le docstring du module. "dark" et "neutral" sont de nouvelles
-#: palettes, choisies pour rester lisibles (contraste suffisant
-#: texte/fond) sans prétendre à une charte graphique figée - librement
-#: ajustables par l'utilisateur via ThemeCustomColors.
+#: Preset palettes (specification §4.1). "light" must stay identical to
+#: the colours currently hard-coded in contactsheet.py - see the module
+#: docstring. "dark" and "neutral" are new palettes, chosen to stay
+#: readable (sufficient text/background contrast) without claiming to be
+#: a fixed visual identity - freely adjustable by the user via
+#: ThemeCustomColors.
 THEME_PALETTES: dict[str, Palette] = {
     "light": Palette(
         background="#ffffff", text="#000000", text_secondary="#555555",
@@ -80,29 +78,26 @@ THEME_PALETTES: dict[str, Palette] = {
     ),
 }
 
-#: Palette de repli pour un mode inconnu (profil corrompu ou d'une
-#: version future du projet introduisant un mode non reconnu ici) -
-#: jamais une exception, toujours un rendu exploitable.
+#: Fallback palette for an unknown mode (corrupted profile or one from a
+#: future version of the project introducing a mode not recognised here)
+#: - never an exception, always a usable rendering.
 _FALLBACK_MODE = "light"
 
 
 def get_palette(mode: str) -> Palette:
-    """Palette prédéfinie pour un mode LITTÉRAL ("light"/"dark"/"neutral"
-    uniquement - jamais "system", qui n'est pas une palette mais une
-    stratégie de résolution, voir resolve_theme()). Un mode inconnu
-    retombe silencieusement sur "light"."""
+    """Preset palette for a LITERAL mode ("light"/"dark"/"neutral" only -
+    never "system", which is not a palette but a resolution strategy, see
+    resolve_theme()). An unknown mode silently falls back to "light"."""
     return THEME_PALETTES.get(mode, THEME_PALETTES[_FALLBACK_MODE])
 
 
 def _valid_hex(value: Optional[str]) -> Optional[str]:
-    """Valide qu'une couleur personnalisée est un hexadécimal CSS
-    bien formé - une vérification plus stricte que celle, purement
-    syntaxique (juste "commence par #"), déjà faite par
-    ThemeCustomColors.from_dict() lors du chargement JSON (qui ne
-    connaît, lui, rien à la validité réelle d'une couleur). Une valeur
-    invalide est ignorée (repli sur la couleur de la palette de base),
-    jamais une exception ni une couleur cassée transmise à PIL ou au
-    HTML."""
+    """Validates that a custom colour is a well-formed CSS hexadecimal - a
+    stricter check than the purely syntactic one (just "starts with #")
+    already done by ThemeCustomColors.from_dict() when loading the JSON
+    (which knows nothing about the actual validity of a colour). An invalid
+    value is ignored (fallback to the base palette's colour), never an
+    exception nor a broken colour passed on to PIL or the HTML."""
     if not isinstance(value, str):
         return None
     candidate = value.strip()
@@ -110,12 +105,12 @@ def _valid_hex(value: Optional[str]) -> Optional[str]:
 
 
 def apply_custom_colors(base: Palette, custom: ThemeCustomColors) -> Palette:
-    """Applique les couleurs personnalisées (cahier des charges §4.3,
-    toutes optionnelles) par-dessus une palette de base, champ par champ -
-    une couleur absente ou invalide laisse la couleur de la palette de
-    base inchangée pour CE champ précis. `text_secondary` n'est pas
-    personnalisable (ThemeCustomColors n'expose pas ce champ - réglage
-    volontairement plus simple, cohérent avec son schéma JSON actuel)."""
+    """Applies the custom colours (specification §4.3, all optional) on top
+    of a base palette, field by field - a missing or invalid colour leaves
+    the base palette's colour unchanged for THAT particular field.
+    `text_secondary` is not customisable (ThemeCustomColors does not expose
+    this field - a deliberately simpler setting, consistent with its current
+    JSON schema)."""
     return Palette(
         background=_valid_hex(custom.background) or base.background,
         text=_valid_hex(custom.text) or base.text,
@@ -126,22 +121,20 @@ def apply_custom_colors(base: Palette, custom: ThemeCustomColors) -> Palette:
 
 
 def resolve_theme(theme: ThemeSettings, *, prefer_dark: bool = False) -> Palette:
-    """Résout un ThemeSettings complet (mode prédéfini + personnalisation
-    éventuelle) en UNE palette concrète, prête à appliquer par un
-    renderer produisant une sortie statique (planche JPEG, PDF, future
-    prévisualisation GTK à un instant donné).
+    """Resolves a complete ThemeSettings (preset mode + possible
+    customisation) into ONE concrete palette, ready to be applied by a
+    renderer producing a static output (JPEG sheet, PDF, future GTK preview
+    at a given instant).
 
-    `prefer_dark` ne sert qu'à résoudre le mode "system" (voir le
-    docstring du module) : à défaut d'un contexte graphique capable de le
-    déterminer, l'appelant doit passer explicitement sa meilleure
-    estimation - la valeur par défaut `False` (donc "light") préserve le
-    rendu actuel pour tout appelant qui ne se soucie pas du thème système
-    (CLI notamment), cohérent avec la règle de rétrocompatibilité stricte
-    du Profil.
+    `prefer_dark` only serves to resolve the "system" mode (see the module
+    docstring): lacking a graphical context able to determine it, the caller
+    must explicitly pass its best estimate - the default value `False`
+    (hence "light") preserves the current rendering for any caller that does
+    not care about the system theme (the CLI notably), consistent with the
+    Profile's strict backward-compatibility rule.
 
-    Ne lève jamais d'exception : un mode inconnu ou des couleurs
-    personnalisées invalides retombent sur des valeurs par défaut
-    exploitables."""
+    Never raises an exception: an unknown mode or invalid custom colours
+    fall back to usable default values."""
     mode = theme.mode
     if mode == "system":
         mode = "dark" if prefer_dark else "light"

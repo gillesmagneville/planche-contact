@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Tests de portfolio.presentation.captions.resolve_caption_lines() - mise en
-forme des légendes personnalisables par photo (cahier des charges §1),
-indépendamment de l'extraction EXIF elle-même (voir tests/test_utils.py).
-Les métadonnées utilisées ici sont donc des dictionnaires construits à la
-main (déjà au format renvoyé par portfolio.utils.get_exif_metadata()),
-pas de vraies photos - ce module ne teste que le FORMATAGE.
+Tests of portfolio.presentation.captions.resolve_caption_lines() -
+formatting of the per-photo customisable captions (specification §1),
+independently of the EXIF extraction itself (see tests/test_utils.py).
+The metadata used here are therefore hand-built dictionaries (already in
+the format returned by portfolio.utils.get_exif_metadata()), not real
+photos - this module only tests the FORMATTING.
 """
 from datetime import datetime
 
@@ -13,8 +13,8 @@ from portfolio.presentation import Profile, CaptionSettings, resolve_caption_lin
 
 
 def test_no_fields_configured_returns_empty_list():
-    """Comportement actuel (aucune légende) : CaptionSettings par défaut
-    a `fields` vide - ne doit jamais rien afficher ni planter."""
+    """Current behaviour (no caption): the default CaptionSettings has an
+    empty `fields` - must never display anything nor crash."""
     profile = Profile(captions=CaptionSettings())
     metadata = {"filename": "photo.jpg", "camera": "Canon EOS R5"}
     assert resolve_caption_lines(profile, metadata) == []
@@ -26,11 +26,11 @@ def test_empty_metadata_returns_empty_list():
 
 
 def test_missing_individual_field_is_silently_omitted():
-    """Cahier des charges §1 : un champ sans métadonnée correspondante
-    (ex : pas d'objectif renseigné) est omis, jamais une erreur ni un
-    texte vide visible dans la légende."""
+    """Specification §1: a field with no corresponding metadata (e.g. no
+    lens recorded) is omitted, never an error nor visible empty text in the
+    caption."""
     profile = Profile(captions=CaptionSettings(fields=["filename", "lens", "camera"]))
-    metadata = {"filename": "photo.jpg", "camera": "Canon EOS R5"}  # pas de "lens"
+    metadata = {"filename": "photo.jpg", "camera": "Canon EOS R5"}  # no "lens"
 
     lines = resolve_caption_lines(profile, metadata)
     assert lines == ["photo.jpg · Canon EOS R5"]
@@ -51,9 +51,8 @@ def test_custom_separator_is_used():
 
 
 def test_default_formatting_for_each_field_type():
-    """Vérifie le gabarit par défaut "raisonnable" de chaque type de champ
-    (cahier des charges §1), un par un pour rester lisible en cas
-    d'échec."""
+    """Checks the default "reasonable" template of each field type
+    (specification §1), one by one to stay readable on failure."""
     base_metadata = {
         "filename": "IMG_0001.jpg",
         "datetime": datetime(2024, 5, 1, 12, 30, 0),
@@ -95,11 +94,10 @@ def test_shutter_speed_long_exposure_uses_decimal_not_fraction():
 
 
 def test_gps_hidden_by_default_even_if_listed_in_fields():
-    """Garantie de confidentialité (cahier des charges §1) : même si "gps"
-    figure explicitement dans `fields`, il n'apparaît pas tant que
-    show_gps n'est pas activé - cette garantie vient de
-    CaptionSettings.effective_fields(), que resolve_caption_lines()
-    utilise plutôt que `fields` directement."""
+    """Privacy guarantee (specification §1): even if "gps" is explicitly in
+    `fields`, it does not appear as long as show_gps is not enabled - this
+    guarantee comes from CaptionSettings.effective_fields(), which
+    resolve_caption_lines() uses rather than `fields` directly."""
     profile = Profile(captions=CaptionSettings(fields=["filename", "gps"], show_gps=False))
     metadata = {"filename": "photo.jpg", "gps": (48.8566, 2.3522)}
     assert resolve_caption_lines(profile, metadata) == ["photo.jpg"]
@@ -120,9 +118,9 @@ def test_format_override_wraps_default_display():
 
 
 def test_invalid_format_override_falls_back_to_default_display():
-    """Un gabarit utilisateur invalide (clé de substitution inconnue, par
-    exemple issu d'un profil corrompu ou mal édité à la main) ne doit
-    jamais interrompre la génération : repli sur l'affichage par défaut."""
+    """An invalid user template (unknown substitution key, for example from
+    a corrupted or badly hand-edited profile) must never interrupt the
+    generation: fall back to the default display."""
     profile = Profile(captions=CaptionSettings(
         fields=["iso"], format_overrides={"iso": "{valeur_invalide}"},
     ))
@@ -141,28 +139,27 @@ def test_lines_distributes_fields_evenly_in_order():
 
 
 def test_lines_greater_than_available_fields_drops_empty_lines():
-    """Demander plus de lignes que de champs réellement affichables (ex :
-    3 lignes configurées mais un seul champ disponible pour cette photo)
-    ne doit jamais produire de lignes vides - juste moins de lignes que
-    demandé."""
+    """Asking for more lines than there are really displayable fields (e.g.
+    3 lines configured but only one field available for this photo) must
+    never produce empty lines - just fewer lines than requested."""
     profile = Profile(captions=CaptionSettings(fields=["filename"], lines=3))
     metadata = {"filename": "p.jpg"}
     assert resolve_caption_lines(profile, metadata) == ["p.jpg"]
 
 
 def test_unknown_or_malformed_field_value_is_omitted_not_raised():
-    """Une métadonnée du mauvais type (ex : profil chargé après un
-    changement de schéma, ou valeur corrompue) ne doit jamais faire
-    planter la légende - le champ est simplement omis."""
+    """A metadata item of the wrong type (e.g. a profile loaded after a
+    schema change, or a corrupted value) must never crash the caption - the
+    field is simply omitted."""
     profile = Profile(captions=CaptionSettings(fields=["filename", "dimensions", "gps"]))
-    metadata = {"filename": "p.jpg", "dimensions": "pas un tuple", "gps": (1,)}
+    metadata = {"filename": "p.jpg", "dimensions": "not a tuple", "gps": (1,)}
     assert resolve_caption_lines(profile, metadata) == ["p.jpg"]
 
 
 # ---------------------------------------------------------------------------
-# layout_caption_lines() : retour à la ligne dans une largeur en pixels
-# (rendu JPEG/PDF) - correctif du bug "informations tronquées par « … »
-# sous les photos" (voir CHANGELOG.md).
+# layout_caption_lines(): wrapping within a width in pixels
+# (JPEG/PDF rendering) - fix for the bug "information truncated by "…"
+# under the photos" (see CHANGELOG.md).
 # ---------------------------------------------------------------------------
 
 from portfolio.presentation import layout_caption_lines  # noqa: E402
@@ -176,16 +173,16 @@ _FULL_METADATA = {
 
 
 def _measure(text):
-    """Police fictive à chasse fixe : 10 px par caractère - rend les
-    largeurs prévisibles sans dépendre d'une vraie police."""
+    """Fixed-width fake font: 10 px per character - makes widths
+    predictable without depending on a real font."""
     return len(text) * 10
 
 
 def test_layout_caption_lines_wraps_at_field_boundaries_instead_of_overflowing():
-    """Avec plusieurs champs et lines=1, tout tenait sur UNE ligne bien plus
-    large qu'une vignette. Les champs doivent maintenant passer à la ligne
-    AVANT de dépasser la largeur, sans jamais couper un champ en deux ni
-    laisser le séparateur en début/fin de ligne."""
+    """With several fields and lines=1, everything used to fit on ONE line
+    much wider than a thumbnail. The fields must now wrap BEFORE exceeding
+    the width, without ever splitting a field in two nor leaving the
+    separator at the start/end of a line."""
     profile = Profile(captions=CaptionSettings(
         fields=["filename", "camera", "lens", "dimensions"], lines=1,
     ))
@@ -201,9 +198,9 @@ def test_layout_caption_lines_wraps_at_field_boundaries_instead_of_overflowing()
 
 
 def test_layout_caption_lines_is_identical_to_resolve_caption_lines_when_everything_fits():
-    """Aucune régression pour le cas ordinaire : quand la largeur suffit,
-    le résultat est exactement celui de resolve_caption_lines(), y compris
-    la répartition explicite sur `lines` lignes."""
+    """No regression for the ordinary case: when the width is sufficient,
+    the result is exactly that of resolve_caption_lines(), including the
+    explicit split over `lines` lines."""
     for n_lines in (1, 2, 3):
         profile = Profile(captions=CaptionSettings(
             fields=["filename", "camera", "lens", "dimensions"], lines=n_lines,
@@ -215,8 +212,8 @@ def test_layout_caption_lines_is_identical_to_resolve_caption_lines_when_everyth
 
 
 def test_layout_caption_lines_wraps_inside_a_single_field_that_is_too_wide():
-    """Un champ À LUI SEUL plus large que la zone (nom d'objectif long)
-    passe à la ligne aux espaces, plutôt que d'être tronqué."""
+    """A field that ALONE is wider than the area (long lens name) wraps at
+    spaces, rather than being truncated."""
     profile = Profile(captions=CaptionSettings(fields=["lens"], lines=1))
 
     lines = layout_caption_lines(profile, _FULL_METADATA, max_width=150, measure=_measure)
@@ -225,9 +222,9 @@ def test_layout_caption_lines_wraps_inside_a_single_field_that_is_too_wide():
 
 
 def test_layout_caption_lines_keeps_a_single_oversized_word_intact():
-    """Un mot sans espace plus large que la zone n'est jamais découpé ici
-    (ce module ne connaît pas le rendu) : c'est contactsheet._draw_caption()
-    qui le borne à l'affichage."""
+    """A word without spaces wider than the area is never split here (this
+    module does not know the rendering): it is contactsheet._draw_caption()
+    that bounds it at display time."""
     profile = Profile(captions=CaptionSettings(fields=["filename", "camera"], lines=1))
     metadata = {"filename": "a_very_long_filename_without_any_space.jpg", "camera": "Canon"}
 

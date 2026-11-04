@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-Tests du moteur de mise en page (portfolio/presentation/layout_engine.py).
+Tests of the layout engine (portfolio/presentation/layout_engine.py).
 
-La partie la plus importante de ce fichier est la non-régression du modèle
-"grid" : une copie fidèle de l'algorithme ACTUEL (corrigé - voir
-CHANGELOG.md) de ContactSheetGenerator.create_contact_sheet() sert de
-référence, et doit produire exactement les mêmes valeurs (thumb_size,
-cols) que compute_page_layout() pour un Profil par défaut, sur toute la
-plage de réglages existants (8 à 48 images/planche, par pas de 4 - valeurs
-réellement proposées par le curseur de l'interface graphique - et les 5
-formats de page pris en charge). Si cette référence diverge un jour de
-contactsheet.py, les deux doivent être mis à jour ensemble.
+The most important part of this file is the non-regression of the "grid"
+template: a faithful copy of the CURRENT (fixed - see CHANGELOG.md)
+algorithm of ContactSheetGenerator.create_contact_sheet() serves as the
+reference, and must produce exactly the same values (thumb_size, cols) as
+compute_page_layout() for a default Profile, over the whole range of
+existing settings (8 to 48 images/sheet, in steps of 4 - values actually
+offered by the graphical interface's slider - and the 5 supported page
+formats). If this reference ever diverges from contactsheet.py, both must
+be updated together.
 """
 import math
 
@@ -29,11 +29,11 @@ from portfolio.presentation.layout_engine import (
 
 
 def _reference_grid_fit(num_per_sheet: int, page_format: str = "A4") -> tuple[int, int]:
-    """Copie fidèle, pour comparaison, de l'algorithme actuellement codé
-    en dur dans ContactSheetGenerator.create_contact_sheet() - voir
-    portfolio/contactsheet.py (y compris son correctif du débordement
-    vertical, voir CHANGELOG.md : l'espacement entre cellules est
-    retranché aussi bien de la hauteur disponible que de la largeur)."""
+    """Faithful copy, for comparison, of the algorithm currently
+    hard-coded in ContactSheetGenerator.create_contact_sheet() - see
+    portfolio/contactsheet.py (including its vertical overflow fix, see
+    CHANGELOG.md: the spacing between cells is subtracted from the
+    available height as well as from the width)."""
     DPI = 300
     width_mm, height_mm = PAPER_SIZES_MM.get(page_format, PAPER_SIZES_MM["A4"])
     canvas_w, canvas_h = int(width_mm * DPI / 25.4), int(height_mm * DPI / 25.4)
@@ -66,10 +66,10 @@ def _reference_grid_fit(num_per_sheet: int, page_format: str = "A4") -> tuple[in
 @pytest.mark.parametrize("per_page", list(range(8, 49, 4)))
 @pytest.mark.parametrize("page_format", list(PAPER_SIZES_MM.keys()))
 def test_grid_template_matches_current_contactsheet_algorithm(per_page, page_format):
-    """Non-régression : un Profil par défaut (modèle "grid", pas de
-    légende) doit reproduire EXACTEMENT thumb_size et cols de l'algorithme
-    actuel, pour tous les réglages réellement proposés par l'interface
-    graphique (curseur 8 à 48 par pas de 4) et tous les formats de page."""
+    """Non-regression: a default Profile ("grid" template, no caption) must
+    reproduce EXACTLY the thumb_size and cols of the current algorithm, for
+    all the settings actually offered by the graphical interface (slider 8 to
+    48 in steps of 4) and all the page formats."""
     expected_thumb_size, expected_cols = _reference_grid_fit(per_page, page_format)
 
     profile = Profile(layout=LayoutSettings(template="grid", per_page=per_page, page_format=page_format))
@@ -80,11 +80,10 @@ def test_grid_template_matches_current_contactsheet_algorithm(per_page, page_for
 
 
 def test_grid_cells_count_matches_actual_photo_count_not_per_page():
-    """La dernière page d'une série (moins de photos que per_page) ne doit
-    produire que des cellules réellement occupées - la géométrie (taille
-    de vignette, colonnes) reste en revanche celle de per_page, pour que
-    toutes les pages d'une génération aient des cellules de taille
-    identique (comportement actuel)."""
+    """The last page of a series (fewer photos than per_page) must only
+    produce cells that are really occupied - the geometry (thumbnail size,
+    columns) stays that of per_page, however, so that all the pages of a
+    generation have cells of identical size (current behaviour)."""
     profile = Profile(layout=LayoutSettings(template="grid", per_page=12))
     full_page = compute_page_layout(profile, photo_count=12)
     last_page = compute_page_layout(profile, photo_count=5)
@@ -96,12 +95,12 @@ def test_grid_cells_count_matches_actual_photo_count_not_per_page():
 
 
 def test_cells_do_not_overlap_and_stay_within_canvas():
-    """Vérification géométrique générique, indépendante de contactsheet.py :
-    quel que soit le modèle, aucune cellule ne doit déborder horizontalement
-    NI verticalement du canevas, ni en chevaucher une autre. Le débordement
-    vertical est désormais vérifié pour "grid" comme pour les autres
-    modèles, puisque contactsheet.py lui-même a été corrigé (voir
-    CHANGELOG.md) et que ce module reproduit son comportement corrigé."""
+    """Generic geometric check, independent of contactsheet.py: whatever
+    the template, no cell must overflow the canvas horizontally NOR
+    vertically, nor overlap another. The vertical overflow is now checked
+    for "grid" as for the other templates, since contactsheet.py itself was
+    fixed (see CHANGELOG.md) and this module reproduces its fixed
+    behaviour."""
     for template in ("grid", "landscape", "portrait", "large_thumbs"):
         profile = Profile(layout=LayoutSettings(template=template, per_page=24, page_format="A4"))
         page = compute_page_layout(profile, photo_count=24)
@@ -117,13 +116,13 @@ def test_cells_do_not_overlap_and_stay_within_canvas():
 
 
 def test_grid_vertical_overflow_bug_is_fixed():
-    """Non-régression du correctif apporté à contactsheet.py (voir
-    CHANGELOG.md) : le cas ayant révélé le débordement vertical (24 images
-    en A4) ne doit plus déborder du bas physique de la planche, pour le
-    modèle "grid" comme pour les autres. Avant le correctif, ce même test
-    (alors nommé test_grid_known_preexisting_vertical_overflow_bug)
-    vérifiait l'inverse - voir l'historique Git pour l'ancienne
-    caractérisation du défaut."""
+    """Non-regression of the fix made to contactsheet.py (see
+    CHANGELOG.md): the case that revealed the vertical overflow (24 images
+    on A4) must no longer overflow the physical bottom of the sheet, for the
+    "grid" template as for the others. Before the fix, this same test (then
+    named test_grid_known_preexisting_vertical_overflow_bug) checked the
+    opposite - see the Git history for the old characterisation of the
+    defect."""
     profile = Profile(layout=LayoutSettings(template="grid", per_page=24, page_format="A4"))
     page = compute_page_layout(profile, photo_count=24)
     last_cell = page.cells[-1]
@@ -131,11 +130,10 @@ def test_grid_vertical_overflow_bug_is_fixed():
 
 
 def test_caption_position_below_reserves_vertical_space():
-    """Une légende "below" doit réduire thumb_size par rapport à l'absence
-    de légende (l'espace réservé est retranché de la cellule AVANT le
-    calcul de la taille de vignette - voir docstring du module), et
-    chaque cellule doit avoir une zone de légende positionnée sous la
-    photo."""
+    """A "below" caption must reduce thumb_size compared with no caption
+    (the reserved space is subtracted from the cell BEFORE computing the
+    thumbnail size - see the module docstring), and each cell must have a
+    caption area positioned below the photo."""
     no_caption = Profile(layout=LayoutSettings(template="grid", per_page=12, caption_position="none"))
     with_caption = Profile(layout=LayoutSettings(
         template="grid", per_page=12, caption_position="below", caption_area_mm=10,
@@ -159,13 +157,13 @@ def test_caption_position_above_places_caption_before_photo():
 
 
 def test_caption_position_right_reserves_horizontal_space():
-    """Une seule colonne (modèle "free", columns=1) pour garantir que la
-    largeur est bien le facteur limitant : une légende "right" doit alors
-    strictement réduire thumb_size. Avec plusieurs colonnes, selon le
-    format de page, c'est parfois la hauteur qui limite déjà la taille de
-    vignette - retrancher de la largeur ne changerait alors rien, sans que
-    ce soit un bug (voir l'autre test, plus générique, qui vérifie
-    uniquement le NON-dépassement, jamais une stricte diminution)."""
+    """A single column ("free" template, columns=1) to guarantee that the
+    width is indeed the limiting factor: a "right" caption must then
+    strictly reduce thumb_size. With several columns, depending on the page
+    format, it is sometimes the height that already limits the thumbnail
+    size - subtracting from the width would then change nothing, without
+    that being a bug (see the other, more generic test, which only checks
+    NON-overflow, never a strict decrease)."""
     no_caption = Profile(layout=LayoutSettings(template="free", per_page=1, columns=1, rows=1, caption_position="none"))
     with_caption = Profile(layout=LayoutSettings(template="free", per_page=1, columns=1, rows=1,
                                                   caption_position="right", caption_area_mm=15))
@@ -180,14 +178,13 @@ def test_caption_position_right_reserves_horizontal_space():
 
 
 def test_caption_area_grows_to_fit_configured_lines_and_font_size():
-    """Non-régression : avec caption_area_mm laissé à une valeur par
-    défaut/trop petite, mais plusieurs lignes de légende et/ou une grande
-    police configurées, la hauteur RÉSERVÉE devait auparavant rester
-    bornée à caption_area_mm - les dernières lignes dessinées par
-    contactsheet.py._draw_caption() débordaient alors dans la photo de la
-    rangée suivante (bug signalé, voir CHANGELOG.md). La hauteur réservée
-    doit maintenant être le plus grand des deux : jamais plus petite que
-    ce que contactsheet.py va réellement dessiner."""
+    """Non-regression: with caption_area_mm left at a default/too small
+    value, but several caption lines and/or a large font configured, the
+    RESERVED height used to stay bounded to caption_area_mm - the last
+    lines drawn by contactsheet.py._draw_caption() then overflowed into the
+    photo of the next row (reported bug, see CHANGELOG.md). The reserved
+    height must now be the larger of the two: never smaller than what
+    contactsheet.py will actually draw."""
     profile = Profile(layout=LayoutSettings(
         template="grid", per_page=12, caption_position="below", caption_area_mm=8,
     ), captions=CaptionSettings(fields=["filename"], lines=3, font_size=14))
@@ -196,12 +193,12 @@ def test_caption_area_grows_to_fit_configured_lines_and_font_size():
     cell = page.cells[0]
 
     needed_h = 3 * (pt_to_px(14) + CAPTION_LINE_SPACING_PX)
-    assert needed_h > mm_to_px(8), "le scénario doit bien dépasser caption_area_mm pour être significatif"
+    assert needed_h > mm_to_px(8), "the scenario must exceed caption_area_mm to be meaningful"
     assert cell.caption_h == needed_h
 
-    # Et la propriété inverse : quand caption_area_mm est déjà suffisant,
-    # il continue de piloter la hauteur réservée (comportement actuel
-    # inchangé pour la configuration par défaut - lines=1, font_size=9).
+    # And the converse property: when caption_area_mm is already sufficient,
+    # it keeps driving the reserved height (current behaviour unchanged for
+    # the default configuration - lines=1, font_size=9).
     default_profile = Profile(layout=LayoutSettings(
         template="grid", per_page=12, caption_position="below", caption_area_mm=20,
     ))
@@ -210,9 +207,8 @@ def test_caption_area_grows_to_fit_configured_lines_and_font_size():
 
 
 def test_caption_never_increases_thumb_size():
-    """Propriété générique, plus faible mais toujours vraie : réserver de
-    l'espace pour une légende ne peut jamais AGRANDIR la vignette,
-    quelle que soit la configuration."""
+    """Generic property, weaker but always true: reserving space for a
+    caption can never ENLARGE the thumbnail, whatever the configuration."""
     for position in ("below", "above", "right"):
         no_caption = Profile(layout=LayoutSettings(template="grid", per_page=12, caption_position="none"))
         with_caption = Profile(layout=LayoutSettings(template="grid", per_page=12,
@@ -230,9 +226,9 @@ def test_free_template_honors_explicit_columns_and_rows():
 
 
 def test_free_template_without_any_override_behaves_like_grid():
-    """Un modèle "libre" sans aucun réglage explicite doit rester
-    utilisable (pas de page vide, pas d'exception) - repli sur le même
-    calcul que "grid"."""
+    """A "free" template with no explicit setting must remain usable (no
+    empty page, no exception) - fall back to the same computation as
+    "grid"."""
     free_profile = Profile(layout=LayoutSettings(template="free", per_page=12))
     grid_profile = Profile(layout=LayoutSettings(template="grid", per_page=12))
 
@@ -244,8 +240,8 @@ def test_free_template_without_any_override_behaves_like_grid():
 
 
 def test_large_thumbs_never_exceeds_its_column_cap():
-    """Le nombre de colonnes ne dépasse jamais
-    LARGE_THUMBS_MAX_COLUMNS_TESTED, quel que soit per_page."""
+    """The number of columns never exceeds
+    LARGE_THUMBS_MAX_COLUMNS_TESTED, whatever per_page."""
     for per_page in (8, 12, 24, 48):
         profile = Profile(layout=LayoutSettings(template="large_thumbs", per_page=per_page))
         page = compute_page_layout(profile, photo_count=per_page)
@@ -253,12 +249,11 @@ def test_large_thumbs_never_exceeds_its_column_cap():
 
 
 def test_large_thumbs_reduces_effective_per_page_above_its_cap():
-    """Cahier des charges : "pour le modèle « grandes vignettes », qu'il
-    réduise lui-même ce nombre pour garantir de grandes vignettes dans
-    tous les cas." compute_effective_per_page() doit donc plafonner le
-    nombre de photos réellement placées par page à
-    LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE dès que per_page le dépasse, et
-    laisser per_page inchangé en-deçà."""
+    """Specification: "for the 'large thumbnails' template, that it itself
+    reduce this number to guarantee large thumbnails in all cases."
+    compute_effective_per_page() must therefore cap the number of photos
+    actually placed per page at LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE as soon
+    as per_page exceeds it, and leave per_page unchanged below it."""
     for per_page in (8, 12, 24, 48):
         profile = Profile(layout=LayoutSettings(template="large_thumbs", per_page=per_page))
         expected = min(per_page, LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE)
@@ -270,13 +265,12 @@ def test_large_thumbs_reduces_effective_per_page_above_its_cap():
 
 
 def test_large_thumbs_guarantees_same_thumb_size_whatever_per_page_is_configured():
-    """LA garantie recherchée par le cahier des charges : contrairement à
-    l'ancienne conception (qui ne bridait que le nombre de colonnes
-    testées, donc ne garantissait rien dès que per_page forçait beaucoup
-    de lignes - voir l'historique Git), la taille de vignette de
-    "large_thumbs" ne dépend plus QUE du format de page une fois per_page
-    au-delà de LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE : demander 12, 24 ou 48
-    photos par planche produit alors exactement la même géométrie."""
+    """THE guarantee sought by the specification: unlike the old design
+    (which only bounded the number of columns tested, hence guaranteed
+    nothing as soon as per_page forced many rows - see the Git history),
+    the thumbnail size of "large_thumbs" now depends ONLY on the page format
+    once per_page is beyond LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE: asking for
+    12, 24 or 48 photos per sheet then produces exactly the same geometry."""
     pages = []
     for per_page in (LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE, 24, 48):
         profile = Profile(layout=LayoutSettings(template="large_thumbs", per_page=per_page, page_format="A4"))
@@ -299,14 +293,13 @@ def test_large_thumbs_never_overflows_canvas_regardless_of_per_page():
 
 
 def test_large_thumbs_matches_grid_columns_when_per_page_is_already_modest():
-    """Dans le cas d'usage réellement visé (peu de photos par page, sous le
-    plafond LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE), la réduction d'effectif
-    de "large_thumbs" ne change rien (per_page déjà sous le plafond) : seule
-    la restriction de colonnes testées distingue encore ce modèle de "grid"
-    - avec un per_page assez petit pour que les deux recherches aboutissent
-    au même nombre de colonnes, les deux produisent une géométrie identique
-    (les deux appliquent désormais le même clampage d'espacement, voir
-    CHANGELOG.md)."""
+    """In the use case actually targeted (few photos per page, under the
+    LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE cap), the per-page reduction of
+    "large_thumbs" changes nothing (per_page already under the cap): only
+    the restriction of the tested columns still distinguishes this template
+    from "grid" - with a per_page small enough for both searches to end up
+    at the same number of columns, both produce an identical geometry (both
+    now apply the same spacing clamping, see CHANGELOG.md)."""
     per_page = min(8, LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE)
     profile_grid = Profile(layout=LayoutSettings(template="grid", per_page=per_page))
     profile_large = Profile(layout=LayoutSettings(template="large_thumbs", per_page=per_page))
@@ -335,11 +328,11 @@ def test_edge_case_small_photo_counts_do_not_crash(photo_count):
 
 
 def test_caption_lines_override_reserves_the_height_of_that_many_lines():
-    """`caption_lines` permet à contactsheet.py de réserver la hauteur des
-    lignes RÉELLEMENT nécessaires une fois les légendes passées à la ligne
-    (voir ContactSheetGenerator._plan_page()), qui peut dépasser le réglage
-    captions.lines : sans cela, les légendes plus hautes que prévu
-    déborderaient dans la rangée suivante."""
+    """`caption_lines` lets contactsheet.py reserve the height of the lines
+    REALLY needed once the captions are wrapped (see
+    ContactSheetGenerator._plan_page()), which may exceed the
+    captions.lines setting: without it, captions taller than expected would
+    overflow into the next row."""
     profile = Profile(layout=LayoutSettings(
         template="grid", per_page=12, caption_position="below", caption_area_mm=8,
     ), captions=CaptionSettings(fields=["filename"], lines=1, font_size=9))
@@ -348,20 +341,20 @@ def test_caption_lines_override_reserves_the_height_of_that_many_lines():
     five_lines_page = compute_page_layout(profile, photo_count=12, caption_lines=5)
 
     line_h = pt_to_px(9) + CAPTION_LINE_SPACING_PX
-    assert 5 * line_h > mm_to_px(8), "le scénario doit bien dépasser caption_area_mm pour être significatif"
+    assert 5 * line_h > mm_to_px(8), "the scenario must exceed caption_area_mm to be meaningful"
     assert five_lines_page.cells[0].caption_h == 5 * line_h
     assert five_lines_page.cells[0].caption_h > default_page.cells[0].caption_h
-    # Plus de place pour le texte = vignettes plus petites, jamais l'inverse.
+    # More room for the text = smaller thumbnails, never the opposite.
     assert five_lines_page.thumb_size < default_page.thumb_size
-    # Sans argument : strictement identique à captions.lines (compatibilité).
+    # Without an argument: strictly identical to captions.lines (compatibility).
     assert compute_page_layout(profile, photo_count=12, caption_lines=1).cells[0].caption_h == \
         default_page.cells[0].caption_h
 
 
 def test_caption_lines_override_is_ignored_for_right_captions():
-    """Pour "right", la largeur est fixe (caption_area_mm) et la hauteur
-    suit déjà celle de la vignette : le nombre de lignes ne change rien à
-    la géométrie."""
+    """For "right", the width is fixed (caption_area_mm) and the height
+    already follows that of the thumbnail: the number of lines changes
+    nothing in the geometry."""
     profile = Profile(layout=LayoutSettings(
         template="grid", per_page=12, caption_position="right", caption_area_mm=20,
     ), captions=CaptionSettings(fields=["filename"]))
@@ -375,11 +368,11 @@ def test_caption_lines_override_is_ignored_for_right_captions():
 
 
 def test_photo_caption_gap_is_reserved_on_top_of_the_text_zone():
-    """L'écart entre une photo et sa légende (CAPTION_PHOTO_GAP_PX) ne doit
-    jamais être pris SUR la zone de texte réglée par l'utilisateur
-    (caption_h reste « Zone de légende (mm) ») : il s'ajoute au pas entre
-    deux rangées, sinon la dernière ligne d'une légende pourrait toucher
-    la photo de la rangée suivante."""
+    """The gap between a photo and its caption (CAPTION_PHOTO_GAP_PX) must
+    never be taken FROM the text area set by the user (caption_h stays
+    "Caption area (mm)"): it is added to the step between two rows,
+    otherwise the last line of a caption could touch the photo of the next
+    row."""
     profile = Profile(layout=LayoutSettings(
         template="grid", per_page=12, caption_position="below", caption_area_mm=10,
     ))
@@ -395,8 +388,8 @@ def test_photo_caption_gap_is_reserved_on_top_of_the_text_zone():
 
 
 def test_no_gap_is_reserved_without_a_caption():
-    """Sans légende, la géométrie reste exactement celle d'origine - aucun
-    écart fantôme réservé."""
+    """Without a caption, the geometry stays exactly the original one - no
+    phantom gap reserved."""
     page = compute_page_layout(Profile(), photo_count=12)
     first, below_first = page.cells[0], page.cells[page.cols]
     assert below_first.photo_y - first.photo_y == page.thumb_size + page.spacing_px
@@ -426,14 +419,15 @@ def test_caption_zone_never_overlaps_another_photo_nor_leaves_the_page(position,
 
 
 # ---------------------------------------------------------------------------
-# Centrage horizontal de la grille sur la page. La taille de vignette est
-# limitée par la largeur OU la hauteur : la grille est presque toujours moins
-# large que la zone utile, et tout le vide restait à droite (jusqu'à ~6 cm).
+# Horizontal centring of the grid on the page. The thumbnail size is
+# limited by the width OR the height: the grid is almost always narrower
+# than the usable area, and all the gap used to stay on the right (up to
+# ~6 cm).
 # ---------------------------------------------------------------------------
 
 def _horizontal_margins(page, caption_position, caption_w_px):
-    """(marge gauche, marge droite) réelles de la grille, zones de légende
-    à droite comprises."""
+    """Real (left margin, right margin) of the grid, caption areas on the
+    right included."""
     reserved_w = (caption_w_px + CAPTION_PHOTO_GAP_PX) if caption_position == "right" else 0
     first = page.cells[0].photo_x
     last_right = page.cells[page.cols - 1].photo_x + page.thumb_size + reserved_w
@@ -458,7 +452,7 @@ def test_grid_is_centered_horizontally_between_the_page_margins(
     caption_w = page.cells[0].caption_w or 0
     left, right = _horizontal_margins(page, caption_position, caption_w)
 
-    assert left >= page.margin_px, "la grille ne doit jamais empiéter sur la marge gauche"
+    assert left >= page.margin_px, "the grid must never encroach on the left margin"
     assert right >= page.margin_px or page.grid_w > page.canvas_w - 2 * page.margin_px
     assert abs(left - right) <= 1, f"marge gauche {left} px, marge droite {right} px"
 
@@ -467,7 +461,7 @@ def test_known_case_a4_portrait_8_photos_used_to_leave_all_the_empty_space_on_th
     page = compute_page_layout(Profile(layout=LayoutSettings(per_page=8)), 8)
     left, right = _horizontal_margins(page, "none", 0)
 
-    # Avant : 141 px à gauche (la marge), 846 px à droite.
+    # Before: 141 px on the left (the margin), 846 px on the right.
     assert left == 493 and right == 494
 
 
@@ -490,8 +484,8 @@ def test_grid_extent_includes_caption_zones():
 
 
 def test_centering_does_not_depend_on_the_number_of_photos_on_the_page():
-    """Une page incomplète (dernière page) garde la même grille, donc les
-    mêmes positions pour ses photos, que les pages pleines."""
+    """An incomplete page (last page) keeps the same grid, hence the same
+    positions for its photos, as the full pages."""
     profile = Profile(layout=LayoutSettings(per_page=12))
     full = compute_page_layout(profile, 12)
     short = compute_page_layout(profile, 5)
@@ -502,18 +496,18 @@ def test_centering_does_not_depend_on_the_number_of_photos_on_the_page():
 
 
 # ---------------------------------------------------------------------------
-# Pied de page des planches (numéro, crédit, développeur/licence) : la
-# grille ne doit jamais descendre dessus, quelle que soit la marge choisie.
+# Sheet footer (number, credit, developer/licence): the grid must never
+# go down onto it, whatever the chosen margin.
 # ---------------------------------------------------------------------------
 
 def test_footer_lines_are_ordered_and_spaced_for_their_font_sizes():
-    """Valeurs de référence (police 26 px pour le numéro, 20 px pour les
-    deux mentions) : trois lignes distinctes, du haut vers le bas, sans
-    chevauchement, et la dernière à distance du bord de la planche."""
+    """Reference values (26 px font for the number, 20 px for the two
+    credits): three distinct lines, from top to bottom, without overlap, and
+    the last one at a distance from the sheet edge."""
     assert FOOTER_PAGE_NUMBER_OFFSET_PX > FOOTER_CREDIT_OFFSET_PX > FOOTER_LICENSE_OFFSET_PX
-    assert FOOTER_PAGE_NUMBER_OFFSET_PX - FOOTER_CREDIT_OFFSET_PX >= 34   # 26 px + interligne
-    assert FOOTER_CREDIT_OFFSET_PX - FOOTER_LICENSE_OFFSET_PX >= 24       # 20 px + interligne
-    assert FOOTER_LICENSE_OFFSET_PX >= 40                                  # texte + bord de planche
+    assert FOOTER_PAGE_NUMBER_OFFSET_PX - FOOTER_CREDIT_OFFSET_PX >= 34   # 26 px + line spacing
+    assert FOOTER_CREDIT_OFFSET_PX - FOOTER_LICENSE_OFFSET_PX >= 24       # 20 px + line spacing
+    assert FOOTER_LICENSE_OFFSET_PX >= 40                                  # text + sheet edge
     assert FOOTER_RESERVED_PX == FOOTER_PAGE_NUMBER_OFFSET_PX + FOOTER_CLEARANCE_PX
     assert FOOTER_CLEARANCE_PX >= 10
 
@@ -530,19 +524,19 @@ def test_grid_stops_above_the_footer_when_the_margin_is_smaller_than_the_footer(
     assert page.content_bottom_px == page.canvas_h - FOOTER_RESERVED_PX
     grid_bottom = page.content_top_px + page.grid_h
     assert grid_bottom <= page.content_bottom_px, (
-        f"la grille descend à {grid_bottom} px, le pied de page commence à {page.content_bottom_px} px"
+        f"the grid goes down to {grid_bottom} px, the footer starts at {page.content_bottom_px} px"
     )
 
 
 @pytest.mark.parametrize("margin_mm", [11, 12, 15, 20, 30])
 def test_footer_reservation_changes_nothing_when_the_margin_is_large_enough(margin_mm):
-    """À partir de ~10,7 mm de marge (la marge par défaut est de 12 mm), la
-    marge basse l'emporte sur le pied de page : zone utile, emplacement et
-    taille des vignettes strictement identiques à ceux d'avant l'ajout de
-    la troisième ligne."""
+    """From ~10.7 mm of margin onwards (the default margin is 12 mm), the
+    bottom margin prevails over the footer: usable area, location and size
+    of the thumbnails strictly identical to those from before the third
+    line was added."""
     profile = Profile(layout=LayoutSettings(margin_mm=margin_mm))
     page = compute_page_layout(profile, 12)
     margin_px = mm_to_px(margin_mm)
     assert page.content_bottom_px == page.canvas_h - margin_px
-    # même hauteur utile qu'avant : toute la hauteur moins deux marges et l'en-tête
+    # same usable height as before: the whole height minus two margins and the header
     assert page.content_bottom_px - page.content_top_px == page.canvas_h - 2 * margin_px - HEADER_RESERVED_PX_GRID
