@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Tests de non-régression pour le correctif du débordement vertical des
-planches contact (voir CHANGELOG.md) : ContactSheetGenerator.
-create_contact_sheet() ne retranchait auparavant l'espacement entre
-cellules que de la largeur disponible, jamais de la hauteur, ce qui
-pouvait faire déborder les vignettes de la dernière ligne au bas physique
-de la planche pour certaines combinaisons nombre d'images/format de page.
+Non-regression tests for the fix of the vertical overflow of the contact
+sheets (see CHANGELOG.md): ContactSheetGenerator.create_contact_sheet()
+used to subtract the spacing between cells from the available width
+only, never from the height, which could make the thumbnails of the last
+row overflow the physical bottom of the sheet for some combinations of
+image count/page format.
 """
 import math
 from pathlib import Path
@@ -28,10 +28,10 @@ PAPER_SIZES_MM = {
 
 
 def _grid_fit(num_per_sheet, page_format="A4"):
-    """Reproduit le calcul (version CORRIGÉE) de
-    ContactSheetGenerator.create_contact_sheet(), pour vérifier son
-    invariant sur toute la plage de réglages sans avoir à décoder de
-    vraies images à chaque combinaison."""
+    """Reproduces the (FIXED) calculation of
+    ContactSheetGenerator.create_contact_sheet(), to check its invariant
+    over the whole range of settings without having to decode real images
+    for each combination."""
     DPI = 300
     width_mm, height_mm = PAPER_SIZES_MM.get(page_format, PAPER_SIZES_MM["A4"])
     canvas_w, canvas_h = int(width_mm * DPI / 25.4), int(height_mm * DPI / 25.4)
@@ -63,20 +63,20 @@ def _grid_fit(num_per_sheet, page_format="A4"):
 @pytest.mark.parametrize("page_format", list(PAPER_SIZES_MM.keys()))
 @pytest.mark.parametrize("num_per_sheet", list(range(8, 49, 4)))
 def test_grid_fit_never_overflows_canvas_vertically(num_per_sheet, page_format):
-    """Quelle que soit la combinaison nombre d'images par planche / format
-    de page réellement proposée par l'interface graphique (curseur 8 à 48
-    par pas de 4), la dernière ligne de vignettes ne doit plus déborder du
-    bas physique de la planche."""
+    """Whatever combination of images per sheet / page format is actually
+    offered by the graphical interface (slider from 8 to 48 in steps of 4),
+    the last row of thumbnails must no longer overflow the physical bottom
+    of the sheet."""
     canvas_w, canvas_h, margin, spacing, cols, rows, thumb_size = _grid_fit(num_per_sheet, page_format)
-    content_top = margin + 180 + margin  # marge haute + en-tête réservé + espace de contenu
+    content_top = margin + 180 + margin  # top margin + reserved header + content space
     last_row_bottom = content_top + (rows - 1) * (thumb_size + spacing) + thumb_size
     assert last_row_bottom <= canvas_h
 
 
 def test_known_regression_case_24_per_sheet_a4():
-    """Cas précis ayant révélé le bug (24 images/planche, A4) : avant le
-    correctif, thumb_size=505 et la dernière ligne débordait d'environ
-    139 px du bas de la planche."""
+    """The exact case that revealed the bug (24 images/sheet, A4): before
+    the fix, thumb_size=505 and the last row overflowed the bottom of the
+    sheet by about 139 px."""
     canvas_w, canvas_h, margin, spacing, cols, rows, thumb_size = _grid_fit(24, "A4")
     assert thumb_size < 505
     content_top = margin + 180 + margin
@@ -85,10 +85,9 @@ def test_known_regression_case_24_per_sheet_a4():
 
 
 def test_real_generation_end_to_end(tmp_path):
-    """Vérification de bout en bout avec de vraies images (pas seulement
-    l'arithmétique isolée) : la génération doit réussir et produire une
-    planche de la bonne taille de canevas, sans erreur, sur le cas ayant
-    révélé le bug."""
+    """End-to-end check with real images (not only the isolated
+    arithmetic): generation must succeed and produce a sheet of the right
+    canvas size, without error, on the case that revealed the bug."""
     img_dir = tmp_path / "photos"
     img_dir.mkdir()
     for i in range(24):
@@ -106,12 +105,12 @@ def test_real_generation_end_to_end(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Câblage du moteur de mise en page/légendes/thème partagé
-# (portfolio/presentation/) dans ContactSheetGenerator - cahier des charges
-# §1/§2/§4/§5. La non-régression du comportement PAR DÉFAUT (aucun Profil
-# personnalisé) est déjà exhaustivement couverte ailleurs (ce fichier,
-# tests/test_layout_engine.py) ; les tests ci-dessous couvrent les NOUVELLES
-# capacités (thème, légendes, modèles alternatifs) elles-mêmes.
+# Wiring of the shared layout engine/captions/theme
+# (portfolio/presentation/) into ContactSheetGenerator - specification
+# §1/§2/§4/§5. The non-regression of the DEFAULT behaviour (no custom
+# Profile) is already exhaustively covered elsewhere (this file,
+# tests/test_layout_engine.py); the tests below cover the NEW
+# capabilities (theme, captions, alternative templates) themselves.
 # ---------------------------------------------------------------------------
 
 def _make_images(tmp_path, n, color=(90, 140, 200), size=(800, 600)):
@@ -133,8 +132,8 @@ def test_dark_theme_changes_the_background_color(tmp_path):
 
     sheet = cs_gen.create_contact_sheet(images, 1, 1)
     corner = sheet.getpixel((2, 2))
-    # Thème "dark" (voir portfolio/presentation/themes.py) : fond proche de
-    # "#1b1b1b", très loin du blanc par défaut.
+    # "dark" theme (see portfolio/presentation/themes.py): background close to
+    # "#1b1b1b", very far from the default white.
     assert corner[0] < 60 and corner[1] < 60 and corner[2] < 60
 
 
@@ -148,16 +147,15 @@ def test_default_profile_keeps_white_background(tmp_path):
 
 
 def test_exif_metadata_is_never_read_when_no_caption_field_is_configured(tmp_path, monkeypatch):
-    """Garantie de performance (cahier des charges) : le comportement par
-    défaut (aucune légende) ne doit pas payer le coût d'une extraction
-    EXIF par photo. On fait planter get_exif_metadata() s'il est appelé,
-    pour une génération par défaut."""
+    """Performance guarantee (specification): the default behaviour (no
+    caption) must not pay the cost of an EXIF extraction per photo. We make
+    get_exif_metadata() crash if it is called, for a default generation."""
     images = _make_images(tmp_path, 4)
     config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=4)
     cs_gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
 
     def _boom(path):
-        raise AssertionError("get_exif_metadata() ne doit pas être appelé sans légende configurée")
+        raise AssertionError("get_exif_metadata() must not be called without a configured caption")
 
     monkeypatch.setattr("portfolio.contactsheet.get_exif_metadata", _boom)
     sheet = cs_gen.create_contact_sheet(images, 1, 1)
@@ -165,9 +163,9 @@ def test_exif_metadata_is_never_read_when_no_caption_field_is_configured(tmp_pat
 
 
 def test_captions_are_actually_drawn_when_configured(tmp_path):
-    """Les légendes doivent produire une différence de pixels observable
-    par rapport à une génération identique sans légende - preuve qu'elles
-    sont réellement dessinées, pas seulement acceptées sans effet."""
+    """Captions must produce an observable pixel difference compared with
+    an identical generation without captions - proof that they are really
+    drawn, not merely accepted with no effect."""
     images = _make_images(tmp_path, 4)
 
     profile_no_caption = Profile(layout=LayoutSettings(per_page=4, caption_position="none"))
@@ -189,14 +187,14 @@ def test_captions_are_actually_drawn_when_configured(tmp_path):
 
 @pytest.mark.parametrize("caption_position", ["below", "above", "right"])
 def test_caption_reserved_area_never_overlaps_the_next_photo(tmp_path, caption_position):
-    """RÉGRESSION : une première version de ce câblage recalculait l'écart
-    entre cellules à la main dans create_contact_sheet() sans retrancher
-    l'espace de légende, si bien qu'une légende "below"/"above" empiétait
-    sur la ligne de vignettes suivante - découvert par inspection visuelle
-    du rendu, pas par ce test (qui vient le verrouiller). On repère les
-    vraies limites verticales des vignettes (couleur unique et saturée)
-    sur la colonne centrale de la première colonne de la grille, et on
-    vérifie l'écart réel entre deux lignes consécutives."""
+    """REGRESSION: a first version of this wiring recomputed the gap
+    between cells by hand in create_contact_sheet() without subtracting the
+    caption space, so that a "below"/"above" caption encroached on the next
+    row of thumbnails - discovered by visual inspection of the rendering,
+    not by this test (which now locks it in). We locate the real vertical
+    bounds of the thumbnails (single saturated colour) on the central column
+    of the grid's first column, and check the real gap between two
+    consecutive rows."""
     photo_color = (10, 200, 10)
     images = _make_images(tmp_path, 6, color=photo_color)
 
@@ -209,7 +207,7 @@ def test_caption_reserved_area_never_overlaps_the_next_photo(tmp_path, caption_p
     sheet = cs_gen.create_contact_sheet(images, 1, 1)
 
     page = compute_page_layout(config.profile, photo_count=6)
-    assert page.cols >= 1 and page.rows >= 2, "Ce test suppose au moins 2 lignes de vignettes"
+    assert page.cols >= 1 and page.rows >= 2, "This test assumes at least 2 rows of thumbnails"
     x_center = page.cells[0].photo_x + page.cells[0].photo_w // 2
 
     arr = np.array(sheet)
@@ -228,28 +226,27 @@ def test_caption_reserved_area_never_overlaps_the_next_photo(tmp_path, caption_p
     if in_segment:
         segments.append((start, len(is_photo) - 1))
 
-    assert len(segments) >= 2, f"Au moins deux segments de vignette attendus sur cette colonne ({caption_position})"
+    assert len(segments) >= 2, f"At least two thumbnail segments expected on this column ({caption_position})"
     gap = segments[1][0] - segments[0][1]
 
-    # Avant le correctif, cet écart aurait été d'environ spacing (5 mm)
-    # pour "below"/"above" (l'espace de légende n'étant pas retranché de
-    # l'écart entre lignes) ; il doit désormais être d'au moins la hauteur
-    # de légende réservée (12 mm), avec une marge de tolérance pour
-    # l'anticrénelage du texte sur les bords du segment détecté.
+    # Before the fix, this gap would have been about spacing (5 mm)
+    # for "below"/"above" (the caption space not being subtracted from the
+    # gap between rows); it must now be at least the reserved caption
+    # height (12 mm), with a tolerance margin for the anti-aliasing of the
+    # text at the edges of the detected segment.
     if caption_position in ("below", "above"):
         assert gap >= mm_to_px(12) * 0.9, (caption_position, gap)
-    else:  # "right" ne réserve pas de hauteur supplémentaire entre les lignes
+    else:  # "right" does not reserve any extra height between rows
         assert gap >= mm_to_px(5) * 0.9, (caption_position, gap)
 
 
 def test_large_thumbs_never_draws_more_cells_than_its_effective_per_page(tmp_path):
-    """"large_thumbs" peut réduire lui-même son effectif par page (voir
-    layout_engine.compute_effective_per_page) ; tant que la pagination
-    amont (portfolio.py) n'en tient pas encore compte (étape ultérieure),
-    create_contact_sheet() ne doit JAMAIS dessiner plus de cellules que ce
-    que sa géométrie prévoit réellement - les photos excédentaires sont
-    simplement absentes de CETTE planche plutôt que de déborder de la
-    grille calculée."""
+    """"large_thumbs" can itself reduce its per-page count (see
+    layout_engine.compute_effective_per_page); as long as the upstream
+    pagination (portfolio.py) does not yet take this into account (later
+    step), create_contact_sheet() must NEVER draw more cells than its
+    geometry actually provides for - the surplus photos are simply absent
+    from THIS sheet rather than overflowing the computed grid."""
     from portfolio.presentation.layout_engine import LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE
 
     n_images = LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE + 10
@@ -259,18 +256,17 @@ def test_large_thumbs_never_draws_more_cells_than_its_effective_per_page(tmp_pat
     cs_gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
 
     sheet = cs_gen.create_contact_sheet(images, 1, 1)
-    assert sheet is not None  # ne doit pas lever d'exception (dépassement d'index, etc.)
+    assert sheet is not None  # must not raise an exception (index overflow, etc.)
 
 
 def test_fit_text_to_width_truncates_with_ellipsis_when_too_wide():
-    """Filet de sécurité (signalé par l'utilisateur : "les légendes se
-    chevauchent et sont illisibles") : une ligne dont le texte rendu dépasse
-    la largeur disponible doit être tronquée avec une ellipsis ("…"),
-    jamais dessinée telle quelle - sans quoi elle déborde dans la cellule
-    voisine. Depuis le retour à la ligne des légendes
-    (presentation.captions.layout_caption_lines()), ce filet ne s'applique
-    plus qu'à un MOT isolé plus large que la cellule, jamais à une légende
-    ordinaire de plusieurs champs (voir les tests suivants)."""
+    """Safety net (reported by the user: "the captions overlap and are
+    unreadable"): a line whose rendered text exceeds the available width
+    must be truncated with an ellipsis ("…"), never drawn as is - otherwise
+    it overflows into the neighbouring cell. Since the captions' line
+    wrapping (presentation.captions.layout_caption_lines()), this net only
+    applies to a single WORD wider than the cell, never to an ordinary
+    multi-field caption (see the following tests)."""
     from PIL import ImageDraw
     from portfolio.contactsheet import _fit_text_to_width
     from portfolio.utils import get_font
@@ -286,26 +282,25 @@ def test_fit_text_to_width_truncates_with_ellipsis_when_too_wide():
     assert fitted != long_text
     assert fitted.endswith("…")
 
-    # Un texte qui tient déjà dans max_width n'est jamais modifié.
+    # A text that already fits within max_width is never modified.
     short_text = "img_00.jpg"
     assert _fit_text_to_width(draw, short_text, font, max_width=300) == short_text
 
 
 def test_long_caption_with_several_fields_does_not_bleed_into_the_next_column(tmp_path, monkeypatch):
-    """RÉGRESSION rapportée par l'utilisateur : avec plusieurs champs de
-    légende sélectionnés et le réglage par défaut (lines=1), les champs
-    sont joints sur une seule ligne (voir
-    presentation.captions.resolve_caption_lines()) qui pouvait être bien
-    plus large qu'une vignette, débordant alors massivement dans la
-    colonne voisine ("les légendes se chevauchent et sont illisibles").
+    """REGRESSION reported by the user: with several caption fields
+    selected and the default setting (lines=1), the fields are joined on a
+    single line (see presentation.captions.resolve_caption_lines()) which
+    could be much wider than a thumbnail, then massively overflowing into the
+    neighbouring column ("the captions overlap and are unreadable").
 
-    La zone de légende réelle sur l'image rendue est décalée verticalement
-    (`y_shift`, voir create_contact_sheet()) par rapport aux coordonnées
-    brutes de compute_page_layout() - ce test repère donc le bandeau
-    réel par la même technique que
-    test_caption_reserved_area_never_overlaps_the_next_photo ci-dessus
-    (détection des segments de vignette par couleur), plutôt que de
-    recalculer ce décalage à la main."""
+    The actual caption area on the rendered image is shifted vertically
+    (`y_shift`, see create_contact_sheet()) relative to the raw coordinates
+    of compute_page_layout() - this test therefore locates the actual band
+    with the same technique as
+    test_caption_reserved_area_never_overlaps_the_next_photo above
+    (detection of the thumbnail segments by colour), rather than
+    recomputing that shift by hand."""
     photo_color = (10, 200, 10)
     images = _make_images(tmp_path, 6, color=photo_color)
 
@@ -328,7 +323,7 @@ def test_long_caption_with_several_fields_does_not_bleed_into_the_next_column(tm
     sheet = cs_gen.create_contact_sheet(images, 1, 1)
 
     page = compute_page_layout(config.profile, photo_count=6)
-    assert page.cols >= 2 and page.rows >= 2, "ce test suppose au moins 2 colonnes et 2 lignes"
+    assert page.cols >= 2 and page.rows >= 2, "this test assumes at least 2 columns and 2 rows"
     cell0, cell1 = page.cells[0], page.cells[1]
     x_center = cell0.photo_x + cell0.photo_w // 2
 
@@ -346,25 +341,25 @@ def test_long_caption_with_several_fields_does_not_bleed_into_the_next_column(tm
     if in_segment:
         segments.append((start, len(is_photo) - 1))
 
-    assert len(segments) >= 2, "au moins deux segments de vignette attendus sur cette colonne"
+    assert len(segments) >= 2, "at least two thumbnail segments expected on this column"
     caption_band_top, caption_band_bottom = segments[0][1] + 1, segments[1][0]
 
     band = arr[caption_band_top:caption_band_bottom, :, :].astype(int)
-    is_text = np.any(band < 128, axis=2)  # pixel sombre (texte) sur fond blanc par défaut
+    is_text = np.any(band < 128, axis=2)  # dark pixel (text) on a white background by default
 
-    # La gouttière entre les deux colonnes (cell1 a sa PROPRE légende, donc
-    # on ne peut pas vérifier au-delà de cell1.photo_x - ce serait alors sa
-    # légende à elle, pas un débordement de cell0) : aucun pixel de texte
-    # ne doit y apparaître. Avant le correctif, le texte de cell0 non
-    # tronqué traversait largement cette gouttière (et bien au-delà).
+    # The gutter between the two columns (cell1 has its OWN caption, so we
+    # cannot check beyond cell1.photo_x - that would be its own caption, not
+    # an overflow of cell0): no text pixel must appear there. Before the
+    # fix, the untruncated text of cell0 crossed this gutter widely (and
+    # well beyond).
     gutter = is_text[:, cell0.photo_x + cell0.photo_w:cell1.photo_x]
     assert not gutter.any(), (
-        "la légende déborde dans la gouttière vers la colonne suivante - "
-        "texte non tronqué à la largeur de la cellule"
+        "the caption overflows into the gutter towards the next column - "
+        "text not truncated to the cell width"
     )
-    # Et la légende doit bien avoir produit du texte visible DANS sa
-    # propre cellule (preuve que le test exerce réellement le dessin,
-    # pas un cas où rien n'aurait été dessiné du tout).
+    # And the caption must indeed have produced visible text WITHIN its
+    # own cell (proof that the test really exercises the drawing, not a
+    # case where nothing would have been drawn at all).
     assert is_text[:, cell0.photo_x:cell0.photo_x + cell0.photo_w].any()
 
 
@@ -397,13 +392,12 @@ def _caption_generator(tmp_path, monkeypatch, n_photos=6, color=(90, 140, 200), 
 
 
 def test_plan_page_wraps_captions_so_that_no_information_is_truncated(tmp_path, monkeypatch):
-    """RÉGRESSION rapportée par l'utilisateur : "les informations sont
-    tronquées sous les photos (elles se terminent par « ... »)". Avec
-    plusieurs champs et lines=1, la légende tenait sur une seule ligne,
-    tronquée par une ellipsis pour ne pas déborder. Elle doit maintenant
-    passer à la ligne : TOUS les champs visibles, aucune ligne plus large
-    que la vignette, et une hauteur réservée suffisante pour toutes les
-    lignes (sinon la dernière déborderait dans la rangée suivante)."""
+    """REGRESSION reported by the user: "the information is truncated under
+    the photos (it ends with "...")". With several fields and lines=1, the
+    caption fitted on a single line, truncated by an ellipsis so as not to
+    overflow. It must now wrap: ALL fields visible, no line wider than the
+    thumbnail, and a reserved height sufficient for all the lines
+    (otherwise the last one would overflow into the next row)."""
     from PIL import ImageDraw
     from portfolio.presentation import pt_to_px, CAPTION_LINE_SPACING_PX
     from portfolio.utils import get_font
@@ -417,8 +411,8 @@ def test_plan_page_wraps_captions_so_that_no_information_is_truncated(tmp_path, 
     font = get_font(font_px)
     draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     for idx, lines in texts.items():
-        assert len(lines) > 1, "la légende doit passer à la ligne, pas rester sur une seule ligne"
-        assert not any("…" in line for line in lines), "aucune information ne doit être tronquée"
+        assert len(lines) > 1, "the caption must wrap, not stay on a single line"
+        assert not any("…" in line for line in lines), "no information must be truncated"
         joined = " ".join(lines)
         for expected in (f"img_{idx:02d}", "Canon EOS R5", "RF 24-70mm F2.8 L IS USM", "f/2.8", "ISO 400", "6000 × 4000"):
             assert expected in joined, (idx, expected)
@@ -431,11 +425,10 @@ def test_plan_page_wraps_captions_so_that_no_information_is_truncated(tmp_path, 
 
 
 def test_wrapped_captions_leave_no_text_in_the_gutter_between_columns(tmp_path, monkeypatch):
-    """Rendu réel de bout en bout (create_contact_sheet) avec légendes
-    passées à la ligne : aucun pixel de texte dans la gouttière entre deux
-    colonnes, et du texte bien présent sous chaque vignette de la première
-    rangée - sur toute la hauteur de la zone réservée, pas seulement la
-    première ligne."""
+    """Real end-to-end rendering (create_contact_sheet) with wrapped
+    captions: no text pixel in the gutter between two columns, and text
+    really present under each thumbnail of the first row - over the whole
+    height of the reserved area, not only the first line."""
     photo_color = (10, 200, 10)
     images, config, cs_gen = _caption_generator(tmp_path, monkeypatch, color=photo_color)
 
@@ -459,9 +452,9 @@ def test_wrapped_captions_leave_no_text_in_the_gutter_between_columns(tmp_path, 
     is_text = np.any(band < 128, axis=2)
 
     assert not is_text[:, cell0.photo_x + cell0.photo_w:cell1.photo_x].any()
-    # Le texte occupe plusieurs lignes : l'étendue verticale des pixels
-    # sombres sous la première vignette prouve que TOUTES les lignes sont
-    # bien dessinées (et donc visibles), pas seulement la première.
+    # The text spans several lines: the vertical extent of the dark pixels
+    # under the first thumbnail proves that ALL the lines are really drawn
+    # (hence visible), not only the first one.
     from portfolio.presentation import pt_to_px, CAPTION_LINE_SPACING_PX
     line_height = max(6, pt_to_px(9)) + CAPTION_LINE_SPACING_PX
     n_lines = len(texts[0])
@@ -473,19 +466,19 @@ def test_wrapped_captions_leave_no_text_in_the_gutter_between_columns(tmp_path, 
 
 
 def test_plan_page_does_not_read_exif_without_a_caption(tmp_path, monkeypatch):
-    """Aucun coût par défaut : sans légende positionnée sous/sur/à côté de
-    la photo (comportement par défaut), la planification ne doit lire AUCUNE
-    métadonnée EXIF (un ou plusieurs accès fichier par photo)."""
+    """No cost by default: without a caption positioned below/above/beside
+    the photo (default behaviour), the planning must read NO EXIF metadata
+    (one or more file accesses per photo)."""
     def boom(path):
-        raise AssertionError("get_exif_metadata ne doit pas être appelée sans légende")
+        raise AssertionError("get_exif_metadata must not be called without a caption")
 
     monkeypatch.setattr("portfolio.contactsheet.get_exif_metadata", boom)
     images = _make_images(tmp_path, 4)
 
     for profile in (
-        Profile(),  # défaut : ni position ni champs
-        Profile(captions=CaptionSettings(fields=["filename"])),  # champs mais position "none"
-        Profile(layout=LayoutSettings(caption_position="below")),  # position mais aucun champ
+        Profile(),  # default: neither position nor fields
+        Profile(captions=CaptionSettings(fields=["filename"])),  # fields but position "none"
+        Profile(layout=LayoutSettings(caption_position="below")),  # position but no field
     ):
         config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=4, profile=profile)
         cs_gen = ContactSheetGenerator(config, ThumbnailGenerator(config))
@@ -495,10 +488,10 @@ def test_plan_page_does_not_read_exif_without_a_caption(tmp_path, monkeypatch):
 
 
 def test_draw_caption_never_draws_more_lines_than_the_reserved_height(tmp_path):
-    """Filet de sécurité de _draw_caption() : plus de lignes que la hauteur
-    réservée n'en contient (légende "à droite" sur une petite vignette, ou
-    plafond MAX_AUTO_CAPTION_LINES atteint) -> les lignes en trop sont
-    supprimées, jamais dessinées dans l'espace de la photo suivante."""
+    """Safety net of _draw_caption(): more lines than the reserved height
+    can hold ("right" caption on a small thumbnail, or MAX_AUTO_CAPTION_LINES
+    ceiling reached) -> the surplus lines are dropped, never drawn in the
+    space of the next photo."""
     from PIL import ImageDraw
     from portfolio.presentation import pt_to_px, CAPTION_LINE_SPACING_PX, resolve_theme
 
@@ -517,41 +510,41 @@ def test_draw_caption_never_draws_more_lines_than_the_reserved_height(tmp_path):
 
     arr = np.array(canvas).astype(int)
     dark_rows = np.where(np.any(arr < 128, axis=(1, 2)))[0]
-    assert dark_rows.size > 0, "le texte doit bien être dessiné"
-    # Tolérance de quelques pixels pour le jambage (descendante) de la
-    # dernière ligne autorisée, mais certainement pas 4 lignes de plus.
+    assert dark_rows.size > 0, "the text must really be drawn"
+    # Tolerance of a few pixels for the descender of the last allowed
+    # line, but certainly not 4 more lines.
     assert dark_rows.max() < y0 + 2 * line_height + 8
 
 
 # ---------------------------------------------------------------------------
-# Photo collée à sa légende (au lieu de rester en haut à gauche de la cellule
-# carrée, avec un vide sous les photos en paysage).
+# Photo stuck to its caption (instead of staying at the top left of the
+# square cell, with a gap under landscape photos).
 # ---------------------------------------------------------------------------
 
 def test_thumb_offset_sits_the_photo_against_its_caption():
     from portfolio.contactsheet import _thumb_offset
 
-    landscape, portrait = (400, 300), (300, 400)  # dans une cellule 400 x 400
-    # "below" : photo posée sur sa légende (alignée en bas), centrée par défaut
+    landscape, portrait = (400, 300), (300, 400)  # in a 400 x 400 cell
+    # "below": photo resting on its caption (bottom-aligned), centred by default
     assert _thumb_offset("below", "center", landscape, 400) == (0, 100)
     assert _thumb_offset("below", "center", portrait, 400) == (50, 0)
-    # horizontalement, la photo suit l'alignement du texte
+    # horizontally, the photo follows the text alignment
     assert _thumb_offset("below", "left", portrait, 400) == (0, 0)
     assert _thumb_offset("below", "right", portrait, 400) == (100, 0)
-    # "above" : photo collée sous sa légende (alignée en haut)
+    # "above": photo stuck under its caption (top-aligned)
     assert _thumb_offset("above", "center", landscape, 400) == (0, 0)
-    # "right" : photo collée contre sa légende (alignée à droite)
+    # "right": photo stuck against its caption (right-aligned)
     assert _thumb_offset("right", "center", portrait, 400) == (100, 0)
     assert _thumb_offset("right", "center", landscape, 400) == (0, 0)
-    # sans légende : photo CENTRÉE dans sa cellule, dans les deux sens (elle
-    # était auparavant collée en haut à gauche, d'où un ensemble de photos
-    # décalé vers le haut et la gauche de la page)
+    # without a caption: photo CENTRED in its cell, in both directions (it
+    # used to be stuck at the top left, hence a set of photos shifted
+    # towards the top and left of the page)
     assert _thumb_offset("none", "center", landscape, 400) == (0, 50)
     assert _thumb_offset("none", "center", portrait, 400) == (50, 0)
-    assert _thumb_offset("none", "left", portrait, 400) == (50, 0)  # sans légende, l'alignement du texte n'a pas de sens
+    assert _thumb_offset("none", "left", portrait, 400) == (50, 0)  # without a caption, text alignment is meaningless
     assert _thumb_offset("none", "center", (400, 400), 400) == (0, 0)
     assert _thumb_offset("none", "center", (500, 500), 400) == (0, 0)
-    # jamais de décalage négatif si la vignette dépasse la cellule
+    # never a negative offset if the thumbnail exceeds the cell
     assert _thumb_offset("below", "center", (500, 500), 400) == (0, 0)
 
 
@@ -570,11 +563,11 @@ def _photo_segments(column, photo_color):
 
 
 def test_landscape_photo_has_its_caption_right_under_it(tmp_path, monkeypatch):
-    """Demande de l'utilisateur : « resserrer l'espace » entre une photo en
-    paysage et sa légende. La vignette 4:3 n'occupait que 3/4 de sa cellule
-    carrée, collée en haut, et la légende démarrait sous la CELLULE : un
-    vide d'un quart de vignette les séparait. Désormais la photo est posée
-    sur sa légende : seul l'écart voulu (CAPTION_PHOTO_GAP_PX) subsiste."""
+    """User request: "tighten the space" between a landscape photo and its
+    caption. The 4:3 thumbnail occupied only 3/4 of its square cell, stuck
+    at the top, and the caption started under the CELL: a gap of a quarter
+    of a thumbnail separated them. The photo now rests on its caption: only
+    the intended gap (CAPTION_PHOTO_GAP_PX) remains."""
     from portfolio.presentation import pt_to_px, CAPTION_PHOTO_GAP_PX
 
     photo_color = (10, 200, 10)
@@ -591,19 +584,19 @@ def test_landscape_photo_has_its_caption_right_under_it(tmp_path, monkeypatch):
     band = arr[photo_bottom + 1:next_photo_top, cell0.photo_x:cell0.photo_x + cell0.photo_w, :]
     text_rows = np.where(np.any(band < 128, axis=(1, 2)))[0]
     assert text_rows.size > 0
-    gap_to_text = int(text_rows.min())  # lignes vides entre le bas de la photo et le 1er pixel de texte
+    gap_to_text = int(text_rows.min())  # empty rows between the bottom of the photo and the 1st text pixel
 
     font_px = max(6, pt_to_px(9))
     assert CAPTION_PHOTO_GAP_PX <= gap_to_text < CAPTION_PHOTO_GAP_PX + font_px, (
-        f"écart photo/légende de {gap_to_text}px : attendu l'écart voulu "
-        f"({CAPTION_PHOTO_GAP_PX}px) plus l'approche de la lettre, pas le vide d'une cellule carrée"
+        f"photo/caption gap of {gap_to_text}px: expected the intended gap "
+        f"({CAPTION_PHOTO_GAP_PX}px) plus the letter's approach, not the empty space of a square cell"
     )
 
 
 def test_portrait_photo_is_centered_above_its_centered_caption(tmp_path, monkeypatch):
-    """Une photo en portrait (plus étroite que sa cellule carrée) était
-    collée à GAUCHE de la cellule alors que sa légende était centrée : elle
-    suit désormais l'alignement de la légende."""
+    """A portrait photo (narrower than its square cell) used to be stuck
+    to the LEFT of the cell while its caption was centred: it now follows
+    the caption's alignment."""
     photo_color = (10, 200, 10)
     monkeypatch.setattr("portfolio.contactsheet.get_exif_metadata", _fake_rich_metadata)
     images = _make_images(tmp_path, 6, color=photo_color, size=(600, 800))
@@ -621,27 +614,27 @@ def test_portrait_photo_is_centered_above_its_centered_caption(tmp_path, monkeyp
     arr = np.array(sheet).astype(int)
     center_x = cell0.photo_x + cell0.photo_w // 2
     segments = _photo_segments(arr[:, center_x, :], photo_color)
-    assert segments, "la colonne centrale de la cellule doit traverser la photo"
+    assert segments, "the central column of the cell must cross the photo"
     row = arr[(segments[0][0] + segments[0][1]) // 2, :, :]
     cols = np.where(np.all(np.abs(row - np.array(photo_color)) < 12, axis=1))[0]
     cols = cols[(cols >= cell0.photo_x) & (cols < cell0.photo_x + cell0.photo_w)]
 
     left_margin = int(cols.min() - cell0.photo_x)
     right_margin = int(cell0.photo_x + cell0.photo_w - 1 - cols.max())
-    assert left_margin > 0, "une photo en portrait doit être plus étroite que sa cellule"
+    assert left_margin > 0, "a portrait photo must be narrower than its cell"
     assert abs(left_margin - right_margin) <= 1, (left_margin, right_margin)
 
 
 # ---------------------------------------------------------------------------
-# Mode d'ajustement "Remplir" (fit_mode="cover") : la photo est recadrée en
-# carré pour remplir toute sa cellule. Ce réglage était exposé mais jamais
-# lu par le rendu.
+# "Fill" fit mode (fit_mode="cover"): the photo is cropped to a square
+# to fill its whole cell. This setting was exposed but never read by the
+# rendering.
 # ---------------------------------------------------------------------------
 
 def _render_with_fit_mode(tmp_path, fit_mode, photo_color, **layout_kwargs):
-    # 2000 x 1500 (paysage 4:3), plus grand que la cellule : une vignette
-    # n'est jamais AGRANDIE (ni en "contain" ni en "cover"), donc des photos
-    # plus petites que la cellule ne la rempliraient pas, par construction.
+    # 2000 x 1500 (4:3 landscape), larger than the cell: a thumbnail is
+    # never ENLARGED (neither in "contain" nor in "cover"), so photos
+    # smaller than the cell would not fill it, by construction.
     images = _make_images(tmp_path, 6, color=photo_color, size=(2000, 1500))
     profile = Profile(layout=LayoutSettings(template="grid", per_page=6, fit_mode=fit_mode, **layout_kwargs))
     config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=6,
@@ -652,8 +645,8 @@ def _render_with_fit_mode(tmp_path, fit_mode, photo_color, **layout_kwargs):
 
 
 def _photo_extent(arr, page, photo_color):
-    """(hauteur, largeur) en pixels de la photo de la 1re cellule, mesurées
-    sur une ligne et une colonne qui la traversent en son centre."""
+    """(height, width) in pixels of the 1st cell's photo, measured on a
+    row and a column that cross it through its centre."""
     cell = page.cells[0]
     x_center = cell.photo_x + cell.photo_w // 2
     segments = _photo_segments(arr[:, x_center, :], photo_color)
@@ -669,23 +662,23 @@ def test_cover_fit_mode_fills_the_whole_square_cell_while_contain_keeps_the_prop
     contain_sheet, page = _render_with_fit_mode(tmp_path, "contain", photo_color)
     cover_sheet, cover_page = _render_with_fit_mode(tmp_path, "cover", photo_color)
 
-    # Le mode d'ajustement ne change PAS la géométrie de la grille.
+    # The fit mode does NOT change the grid geometry.
     assert cover_page.thumb_size == page.thumb_size
 
     contain_h, contain_w = _photo_extent(contain_sheet, page, photo_color)
     cover_h, cover_w = _photo_extent(cover_sheet, cover_page, photo_color)
 
-    # "contain" : photo 4:3 entière, donc plus large que haute.
+    # "contain": entire 4:3 photo, hence wider than tall.
     assert abs(contain_w - page.thumb_size) <= 1
     assert abs(contain_h - round(page.thumb_size * 0.75)) <= 2
-    # "cover" : toute la cellule carrée est remplie.
+    # "cover": the whole square cell is filled.
     assert abs(cover_w - page.thumb_size) <= 1
     assert abs(cover_h - page.thumb_size) <= 1
 
 
 def test_cover_fit_mode_leaves_no_gap_between_photo_and_caption_beyond_the_wanted_one(tmp_path, monkeypatch):
-    """Avec une légende, une photo recadrée remplit sa cellule : seul
-    l'écart voulu (CAPTION_PHOTO_GAP_PX) la sépare de son texte."""
+    """With a caption, a cropped photo fills its cell: only the intended
+    gap (CAPTION_PHOTO_GAP_PX) separates it from its text."""
     from portfolio.presentation import pt_to_px, CAPTION_PHOTO_GAP_PX
 
     photo_color = (10, 200, 10)
@@ -713,10 +706,10 @@ def test_cover_fit_mode_leaves_no_gap_between_photo_and_caption_beyond_the_wante
 
 
 # ---------------------------------------------------------------------------
-# Position du titre / de l'auteur et numérotation des planches
-# (LayoutSettings.title_position, author_position, page_numbering) : ces
-# trois réglages étaient exposés par l'interface et le profil JSON, mais
-# jamais lus par le rendu.
+# Position of the title / author and page numbering
+# (LayoutSettings.title_position, author_position, page_numbering): these
+# three settings were exposed by the interface and the JSON profile, but
+# never read by the rendering.
 # ---------------------------------------------------------------------------
 
 from types import SimpleNamespace
@@ -734,16 +727,16 @@ def _header_generator(tmp_path, *, title=None, author=None, watermark=None, **la
 
 
 def _draw_header_only(gen, canvas_w=2480, canvas_h=800, margin=142):
-    """Dessine UNIQUEMENT l'en-tête sur un canevas blanc, renvoie
-    (tableau des niveaux de gris, ordonnée du bas de l'en-tête)."""
+    """Draws ONLY the header on a white canvas, returns
+    (grayscale array, y of the bottom of the header)."""
     canvas = Image.new("RGB", (canvas_w, canvas_h), "white")
     bottom = gen._draw_header(ImageDraw.Draw(canvas), canvas_w, margin, _HEADER_PALETTE)
     return np.array(canvas.convert("L")).astype(int), bottom
 
 
 def _ink_columns(gray, y0=0, y1=None):
-    """(première, dernière) colonne contenant de l'encre entre y0 et y1,
-    ou None si la zone est vide."""
+    """(first, last) column containing ink between y0 and y1,
+    or None if the area is empty."""
     cols = np.where((gray[y0:y1, :] < 128).any(axis=0))[0]
     return (int(cols.min()), int(cols.max())) if len(cols) else None
 
@@ -768,9 +761,9 @@ def test_header_text_is_aligned_on_the_page_margins(tmp_path, which):
 
 
 def test_default_header_is_strictly_the_historical_centered_rendering(tmp_path):
-    """Positions par défaut (centrées) : mêmes pixels qu'avec une position
-    "top_center" explicite, et titre/auteur toujours centrés l'un sous
-    l'autre, bas d'en-tête inchangé (170 px)."""
+    """Default (centred) positions: same pixels as with an explicit
+    "top_center" position, and title/author still centred one under the
+    other, header bottom unchanged (170 px)."""
     default_gen = _header_generator(tmp_path, title="Voyage", author="Jeanne")
     explicit_gen = _header_generator(tmp_path, title="Voyage", author="Jeanne",
                                      title_position="top_center", author_position="top_center")
@@ -785,7 +778,7 @@ def test_header_bottom_keeps_its_historical_values(tmp_path):
     assert _draw_header_only(_header_generator(tmp_path, title="Voyage"))[1] == 128
     assert _draw_header_only(_header_generator(tmp_path, author="Jeanne"))[1] == 112
     assert _draw_header_only(_header_generator(tmp_path, title="Voyage", author="Jeanne"))[1] == 170
-    # Rien à écrire (filigrane seul) : l'en-tête ne réserve que sa marge haute.
+    # Nothing to write (watermark only): the header reserves only its top margin.
     assert _draw_header_only(_header_generator(tmp_path, watermark="© moi"))[1] == 70
 
 
@@ -801,8 +794,8 @@ def test_title_and_author_can_sit_on_opposite_sides_while_stacked(tmp_path):
     right_ink = _ink_columns(gray[:, half:])
     assert abs(left_ink[0] - margin) <= GLYPH_BEARING_TOLERANCE_PX
     assert abs((half + right_ink[1]) - (canvas_w - margin)) <= GLYPH_BEARING_TOLERANCE_PX
-    # Le titre (à gauche) est au-dessus de l'auteur (à droite) : ils ne
-    # partagent pas les mêmes lignes de pixels, hors débord de jambage.
+    # The title (on the left) is above the author (on the right): they do
+    # not share the same pixel rows, apart from descender overflow.
     title_rows = np.where((gray[:, :half] < 128).any(axis=1))[0]
     author_rows = np.where((gray[:, half:] < 128).any(axis=1))[0]
     assert title_rows.min() < author_rows.min()
@@ -838,7 +831,7 @@ def test_folder_name_fallback_title_is_never_shown_once_the_title_is_hidden(tmp_
 @pytest.mark.parametrize("position", ["top_left", "top_center", "top_right"])
 def test_a_very_long_title_always_stays_inside_the_page_margins(tmp_path, position):
     margin, canvas_w = 142, 2480
-    long_title = "Un titre extraordinairement long pour une seule ligne de planche contact " * 3
+    long_title = "An extraordinarily long title for a single contact sheet line " * 3
     gen = _header_generator(tmp_path, title=long_title, author=long_title, title_position=position,
                             author_position=position)
     gray, _ = _draw_header_only(gen, canvas_w=canvas_w, margin=margin)
@@ -849,8 +842,8 @@ def test_a_very_long_title_always_stays_inside_the_page_margins(tmp_path, positi
 
 
 def test_a_short_title_keeps_its_historical_font_size(tmp_path):
-    """Le garde-fou « tenir dans la page » ne doit pas rétrécir un titre
-    qui tient déjà : même encombrement qu'avec la police 54 px d'origine."""
+    """The "fit within the page" safeguard must not shrink a title that
+    already fits: same footprint as with the original 54 px font."""
     from portfolio.utils import get_font
 
     gen = _header_generator(tmp_path, title="Voyage")
@@ -862,16 +855,17 @@ def test_a_short_title_keeps_its_historical_font_size(tmp_path):
     assert abs((right - left) - (bbox[2] - bbox[0])) <= GLYPH_BEARING_TOLERANCE_PX
 
 
-# Pied de page : trois lignes centrées, de haut en bas - numéro de planche
-# (optionnel), « Planche générée par Planche-Contact », puis « Développé par
-# Gilles MAGNEVILLE, sous licence GNU GPL v3 ». Bandes en pixels depuis le
-# BAS de la planche (valeurs écrites en dur, pas relues dans layout_engine :
-# un décalage involontaire des constantes doit faire échouer ces tests).
+# Footer: three centred lines, from top to bottom - sheet number
+# (optional), "Planche générée par Planche-Contact" (credit), then
+# "Développé par Gilles MAGNEVILLE, sous licence GNU GPL v3" (licence),
+# here in French. Bands in pixels from the BOTTOM of the sheet
+# (hard-coded values, not re-read from layout_engine: an unintended
+# shift of the constants must make these tests fail).
 FOOTER_NUMBER_BAND = (120, 80)
 FOOTER_CREDIT_BAND = (80, 52)
 FOOTER_LICENSE_BAND = (52, 20)
-#: Écart admis entre la largeur d'encre mesurée et celle du texte (police
-#: 20 px : crénage/anti-crénelage, pas davantage).
+#: Allowed gap between the measured ink width and that of the text
+#: (20 px font: kerning/anti-aliasing, no more).
 FOOTER_TEXT_TOLERANCE_PX = 4
 
 
@@ -888,7 +882,7 @@ def _footer_gray(gen, page_numbering_arg, canvas_w=2480, canvas_h=3508):
 
 
 def _footer_ink_lines(gray):
-    """(numéro, crédit, licence) : True si la bande contient de l'encre."""
+    """(number, credit, licence): True if the band contains ink."""
     return tuple(bool((_band(gray, b) < 128).any())
                  for b in (FOOTER_NUMBER_BAND, FOOTER_CREDIT_BAND, FOOTER_LICENSE_BAND))
 
@@ -931,9 +925,9 @@ def restore_language():
 
 @pytest.mark.parametrize("lang", ["fr", "en", "de", "es"])
 def test_license_line_is_centered_and_as_wide_as_its_text(tmp_path, restore_language, lang):
-    """La mention développeur/licence est dessinée entière (largeur = celle
-    du texte traduit mesuré à la police 20 px, aucune troncature) et
-    centrée sur la page, dans chaque langue."""
+    """The developer/licence line is drawn in full (width = that of the
+    translated text measured at the 20 px font, no truncation) and centred
+    on the page, in every language."""
     from portfolio.i18n import _
     from portfolio.utils import AUTHOR_NAME, get_font
 
@@ -955,11 +949,11 @@ def test_license_line_sits_below_the_credit_line_without_touching_it(tmp_path):
     gray = _footer_gray(_header_generator(tmp_path), True)
     rows = np.where((gray < 128).any(axis=1))[0]
     h = gray.shape[0]
-    # trois groupes de lignes de pixels séparés par du blanc : numéro, crédit, licence
+    # three groups of pixel rows separated by white: number, credit, licence
     groups = np.split(rows, np.where(np.diff(rows) > 1)[0] + 1)
     assert len(groups) == 3, f"{len(groups)} lignes de texte au lieu de 3"
-    # l'ordre est numéro, crédit, licence, de haut en bas, et la dernière
-    # ligne reste à distance du bord physique de la planche (~2 mm)
+    # the order is number, credit, licence, from top to bottom, and the last
+    # row stays at a distance from the physical edge of the sheet (~2 mm)
     assert groups[0][-1] < groups[1][0] and groups[1][-1] < groups[2][0]
     assert h - 1 - groups[2][-1] >= 20
 
@@ -977,8 +971,8 @@ def test_license_line_uses_the_secondary_text_color(tmp_path):
 
 @pytest.mark.parametrize("lang", ["fr", "en", "de", "es"])
 def test_sheet_and_gallery_use_the_same_license_wording(restore_language, lang):
-    """Les planches/PDF et le pied de la galerie HTML affichent la même
-    mention, dans chaque langue : un seul texte à tenir à jour."""
+    """The sheets/PDF and the HTML gallery's footer display the same
+    line, in every language: a single text to keep up to date."""
     from portfolio.i18n import _
     from portfolio.utils import AUTHOR_NAME
 
@@ -987,10 +981,10 @@ def test_sheet_and_gallery_use_the_same_license_wording(restore_language, lang):
 
 
 def test_the_rendered_sheet_carries_the_license_line_and_the_pdf_inherits_it(tmp_path):
-    """Bout en bout : la planche JPEG réellement générée porte les deux
-    mentions ; le PDF est construit à partir de ces planches (il ne dessine
-    aucun texte visible lui-même, seulement une couche de texte invisible
-    - voir tests/test_pdf_text.py) et les reprend donc à l'identique."""
+    """End to end: the JPEG sheet actually generated carries both lines;
+    the PDF is built from these sheets (it draws no visible text itself,
+    only an invisible text layer - see tests/test_pdf_text.py) and therefore
+    reproduces them identically."""
     images = _make_images(tmp_path, 6)
     config = Config(input_dir=tmp_path, output_dir=tmp_path / "out", num_per_sheet=6,
                     profile=Profile(layout=LayoutSettings(per_page=6)))
@@ -1018,17 +1012,17 @@ def test_header_position_setting_reaches_the_rendered_sheet(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Centrage de l'ensemble des photos sur la page. Deux causes d'un ensemble
-# décalé vers le haut et la gauche : (1) la grille démarrait à la marge
-# gauche/en haut de la zone utile, tout le vide restant à droite/en bas ;
-# (2) sans légende, chaque photo était collée en haut à gauche de sa
-# cellule carrée.
+# Centring of the whole set of photos on the page. Two causes for a set
+# shifted towards the top and left: (1) the grid started at the left/top
+# margin of the usable area, all the remaining space being on the
+# right/bottom; (2) without a caption, each photo was stuck at the top
+# left of its square cell.
 # ---------------------------------------------------------------------------
 
 def _render_ink(tmp_path, photo_size, *, template="grid", per_page=8, page_format="A4",
                 orientation="portrait", n_photos=None, color=(10, 200, 10), title="Voyage",
                 margin_mm=None):
-    """Planche rendue ; renvoie (tableau RGB, PageLayout, bas de l'en-tête)."""
+    """Rendered sheet; returns (RGB array, PageLayout, bottom of the header)."""
     images = _make_images(tmp_path, n_photos or per_page, color=color, size=photo_size)
     extra = {} if margin_mm is None else {"margin_mm": margin_mm}
     profile = Profile(layout=LayoutSettings(template=template, per_page=per_page,
@@ -1042,8 +1036,8 @@ def _render_ink(tmp_path, photo_size, *, template="grid", per_page=8, page_forma
 
 
 def _ink_bbox(arr, color=(10, 200, 10)):
-    """(gauche, droite, haut, bas) des marges entre les pixels de photo et
-    le bord de la page."""
+    """(left, right, top, bottom) margins between the photo pixels and
+    the edge of the page."""
     mask = np.all(np.abs(arr - np.array(color)) < 40, axis=2)
     ys, xs = np.where(mask)
     return (int(xs.min()), int(arr.shape[1] - 1 - xs.max()),
@@ -1051,8 +1045,8 @@ def _ink_bbox(arr, color=(10, 200, 10)):
 
 
 CENTERING_CONFIGS = [
-    # (format, orientation, modèle, photos par page) : la plupart laissaient
-    # un grand vide d'un seul côté (jusqu'à ~6 cm à droite).
+    # (format, orientation, template, photos per page): most of them left
+    # a large gap on one side only (up to ~6 cm on the right).
     ("A4", "portrait", "grid", 8),
     ("A4", "portrait", "grid", 24),
     ("A4", "landscape", "grid", 12),
@@ -1076,41 +1070,40 @@ def test_the_whole_set_of_photos_is_centered_horizontally_on_the_page(
 @pytest.mark.parametrize("page_format,orientation,template,per_page", CENTERING_CONFIGS)
 def test_the_whole_set_of_photos_is_centered_vertically_below_the_header(
         tmp_path, page_format, orientation, template, per_page, photo_size):
-    """Entre le bas de l'en-tête (titre, ici 128 px) + la marge et la marge
-    basse de la page, le vide est réparti à parts égales au-dessus et
-    au-dessous de l'ensemble des photos."""
+    """Between the bottom of the header (title, here 128 px) + the margin and
+    the page's bottom margin, the empty space is split equally above and
+    below the whole set of photos."""
     arr, page = _render_ink(tmp_path, photo_size, template=template, per_page=per_page,
                             page_format=page_format, orientation=orientation)
     _, _, top, bottom = _ink_bbox(arr)
     free_top = 128 + page.margin_px
     free_bottom = page.margin_px
     above, below = top - free_top, bottom - free_bottom
-    assert above >= 0 and below >= 0, f"photos hors de la zone libre : {above} / {below}"
-    assert abs(above - below) <= 3, f"vide au-dessus {above} px, au-dessous {below} px"
+    assert above >= 0 and below >= 0, f"photos outside the free area: {above} / {below}"
+    assert abs(above - below) <= 3, f"gap above {above} px, below {below} px"
 
 
 @pytest.mark.parametrize("margin_mm", [0, 3, 6, 10, 12, 20])
 @pytest.mark.parametrize("page_format,orientation,template,per_page", CENTERING_CONFIGS)
 def test_the_footer_lines_never_overlap_the_photos_whatever_the_margin(
         tmp_path, page_format, orientation, template, per_page, margin_mm):
-    """Le pied de page compte désormais trois lignes : avec une marge
-    basse plus petite que lui, les dernières photos descendaient jusque
-    sous le texte. La grille s'arrête maintenant au-dessus du pied de
-    page, quelle que soit la marge choisie."""
+    """The footer now has three lines: with a bottom margin smaller than
+    it, the last photos used to go down under the text. The grid now stops
+    above the footer, whatever margin is chosen."""
     arr, _ = _render_ink(tmp_path, (1500, 2000), template=template, per_page=per_page,
                          page_format=page_format, orientation=orientation, margin_mm=margin_mm)
     _, _, _, bottom_gap = _ink_bbox(arr)
     assert bottom_gap >= FOOTER_NUMBER_BAND[0], (
-        f"les photos descendent à {bottom_gap} px du bas de la page, "
-        f"le pied de page commence à {FOOTER_NUMBER_BAND[0]} px"
+        f"the photos go down to {bottom_gap} px from the bottom of the page, "
+        f"the footer starts at {FOOTER_NUMBER_BAND[0]} px"
     )
     footer_zone = arr[arr.shape[0] - FOOTER_NUMBER_BAND[0]:, :, :]
     assert not np.all(np.abs(footer_zone - np.array((10, 200, 10))) < 40, axis=2).any()
 
 
 def test_a_portrait_photo_is_centered_in_its_cell_not_stuck_to_its_left_edge(tmp_path):
-    """Cause (2) : sans légende, une photo portrait (plus étroite que sa
-    cellule carrée) restait collée à gauche de la cellule."""
+    """Cause (2): without a caption, a portrait photo (narrower than its
+    square cell) stayed stuck to the left of the cell."""
     arr, page = _render_ink(tmp_path, (1500, 2000), per_page=8)
     cell = page.cells[0]
     mask = np.all(np.abs(arr - np.array((10, 200, 10))) < 40, axis=2)
@@ -1119,21 +1112,21 @@ def test_a_portrait_photo_is_centered_in_its_cell_not_stuck_to_its_left_edge(tmp
     cols = np.where(row[cell.photo_x:cell.photo_x + cell.photo_w])[0]
     left_gap = int(cols.min())
     right_gap = cell.photo_w - 1 - int(cols.max())
-    assert left_gap > 20, "le test n'a pas de sens : la photo remplit sa cellule"
-    assert abs(left_gap - right_gap) <= 2, f"vide à gauche {left_gap} px, à droite {right_gap} px"
+    assert left_gap > 20, "the test is meaningless: the photo fills its cell"
+    assert abs(left_gap - right_gap) <= 2, f"gap on the left {left_gap} px, on the right {right_gap} px"
 
 
 def test_photos_keep_exactly_the_same_place_on_an_incomplete_last_page(tmp_path):
-    """Le centrage se calcule sur la grille d'une page PLEINE : la dernière
-    page, incomplète, garde ses photos exactement aux mêmes endroits que les
-    autres (aucun saut d'une page à l'autre)."""
+    """The centring is computed on the grid of a FULL page: the last,
+    incomplete page keeps its photos at exactly the same places as the
+    others (no jump from one page to the next)."""
     full_arr, full_page = _render_ink(tmp_path, (2000, 1500), per_page=12, n_photos=12)
     short_arr, short_page = _render_ink(tmp_path, (2000, 1500), per_page=12, n_photos=5)
 
     assert (short_page.grid_w, short_page.grid_h) == (full_page.grid_w, full_page.grid_h)
     for short_cell, full_cell in zip(short_page.cells, full_page.cells):
         assert (short_cell.photo_x, short_cell.photo_y) == (full_cell.photo_x, full_cell.photo_y)
-    # même premier pixel de photo, en x comme en y
+    # same first photo pixel, in x as in y
     mask_full = np.all(np.abs(full_arr - np.array((10, 200, 10))) < 40, axis=2)
     mask_short = np.all(np.abs(short_arr - np.array((10, 200, 10))) < 40, axis=2)
     fy, fx = np.where(mask_full); sy, sx = np.where(mask_short)
@@ -1141,8 +1134,8 @@ def test_photos_keep_exactly_the_same_place_on_an_incomplete_last_page(tmp_path)
 
 
 def test_captioned_sheet_is_centered_horizontally_too(tmp_path, monkeypatch):
-    """Avec légende sous les photos (cellule = photo + zone de texte), la
-    grille reste centrée sur la page."""
+    """With a caption under the photos (cell = photo + text area), the
+    grid stays centred on the page."""
     monkeypatch.setattr("portfolio.contactsheet.get_exif_metadata", _fake_rich_metadata)
     images = _make_images(tmp_path, 12, color=(10, 200, 10), size=(2000, 1500))
     profile = Profile(
