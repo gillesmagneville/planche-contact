@@ -1,27 +1,27 @@
 # -*- coding: utf-8 -*-
 """
-Test de non-régression : la pagination de portfolio.py (main()) doit tenir
-compte de la réduction éventuelle du nombre de photos par page appliquée
-par le modèle "grandes vignettes" ("large_thumbs" - voir
-presentation.layout_engine.compute_effective_per_page()), plutôt que de
-continuer à répartir les photos par lots de `config.num_per_sheet`
-directement.
+Non-regression test: the pagination of portfolio.py (main()) must take
+into account the possible reduction of the number of photos per page
+applied by the "large thumbnails" template ("large_thumbs" - see
+presentation.layout_engine.compute_effective_per_page()), rather than
+continuing to distribute the photos in batches of `config.num_per_sheet`
+directly.
 
-Avant ce correctif, `main()` calculait `total_pages` et la taille de
-chaque lot à partir de `config.num_per_sheet` (le nombre demandé par
-l'utilisateur), sans savoir que ContactSheetGenerator.create_contact_sheet()
-ne dessine en réalité jamais plus de
-`presentation.compute_effective_per_page(profile)` cellules par page pour
-ce modèle (voir contactsheet.py, garde `idx >= effective_per_page`) : les
-photos excédentaires d'une page trop chargée étaient donc silencieusement
-ignorées, pour toujours (jamais reportées sur une page supplémentaire).
+Before this fix, `main()` computed `total_pages` and the size of each
+batch from `config.num_per_sheet` (the number requested by the user),
+without knowing that ContactSheetGenerator.create_contact_sheet() in
+reality never draws more than
+`presentation.compute_effective_per_page(profile)` cells per page for
+this template (see contactsheet.py, `idx >= effective_per_page` guard):
+the excess photos of an overcrowded page were therefore silently ignored,
+for good (never carried over to an additional page).
 
-Le CLI n'a pas encore de drapeau `--profile` (étape ultérieure) pour
-sélectionner "large_thumbs" lui-même : ce test construit donc le Profil
-"à la place" de main(), par substitution de portfolio.portfolio.Config
-(équivalent, une fois ce drapeau câblé, à un `--profile` pointant vers un
-tel Profil) - mais exerce bien la VRAIE boucle de pagination de main(),
-pas une réimplémentation de son calcul.
+The CLI does not yet have a `--profile` flag (a later step) to select
+"large_thumbs" itself: this test therefore builds the Profile "in place
+of" main(), by substituting portfolio.portfolio.Config (equivalent, once
+that flag is wired, to a `--profile` pointing to such a Profile) - but
+does exercise main()'s REAL pagination loop, not a reimplementation of
+its computation.
 """
 import json
 import re
@@ -48,18 +48,18 @@ def test_large_thumbs_repaginates_instead_of_dropping_excess_photos(tmp_path, mo
     out_dir = tmp_path / "out"
     _make_photos(img_dir, photo_count)
 
-    # photo_count (20) > LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE (8) : l'ancien
-    # calcul (base sur config.num_per_sheet, ici egal a photo_count) aurait
-    # produit UNE seule page, qui n'aurait jamais dessine que les 8
-    # premieres photos - les 12 autres auraient ete perdues sans message
-    # d'erreur.
+    # photo_count (20) > LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE (8): the old
+    # computation (based on config.num_per_sheet, here equal to photo_count)
+    # would have produced a SINGLE page, which would only ever have drawn the
+    # first 8 photos - the other 12 would have been lost without an error
+    # message.
     assert photo_count > LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE
 
     def patched_config(*args, **kwargs):
-        # Equivalent, une fois un futur drapeau --profile cable, a
-        # `--profile large_thumbs.json` : seul le gabarit change, le reste
-        # du comportement de Config (dont la synchronisation legacy de
-        # Config.__post_init__) reste reel.
+        # Equivalent, once a future --profile flag is wired, to
+        # `--profile large_thumbs.json`: only the template changes, the rest
+        # of Config's behaviour (including the legacy synchronisation of
+        # Config.__post_init__) remains real.
         cfg = RealConfig(*args, **kwargs)
         cfg.profile = replace(cfg.profile, layout=replace(cfg.profile.layout, template="large_thumbs"))
         return cfg
@@ -73,18 +73,18 @@ def test_large_thumbs_repaginates_instead_of_dropping_excess_photos(tmp_path, mo
     cli_module.main()
 
     planches = sorted((out_dir / "planches").glob("planche_*.jpg"))
-    expected_pages = -(-photo_count // LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE)  # division entiere arrondie au-dessus
+    expected_pages = -(-photo_count // LARGE_THUMBS_MAX_EFFECTIVE_PER_PAGE)  # integer division rounded up
     assert len(planches) == expected_pages, (
-        "la pagination doit suivre le nombre EFFECTIF de photos par page "
-        "(reduit par le modele 'large_thumbs'), pas config.num_per_sheet "
-        "directement - sans quoi des photos seraient perdues sans la "
-        "moindre page supplementaire pour les accueillir"
+        "pagination must follow the EFFECTIVE number of photos per page "
+        "(reduced by the 'large_thumbs' template), not config.num_per_sheet "
+        "directly - otherwise photos would be lost without the slightest "
+        "additional page to hold them"
     )
 
 
 def _capture_config(monkeypatch):
-    """Intercepte le VRAI objet Config construit par main() (pour
-    l'inspecter ensuite), sans en modifier le comportement."""
+    """Intercepts the REAL Config object built by main() (to inspect it
+    afterwards), without changing its behaviour."""
     captured = {}
 
     def wrapper(*args, **kwargs):
@@ -97,9 +97,9 @@ def _capture_config(monkeypatch):
 
 
 def test_profile_flag_is_loaded_and_applied(tmp_path, monkeypatch):
-    """--profile (cahier des charges §2/§4.4) doit charger le fichier JSON
-    et l'appliquer tel quel quand --format/--num restent à leur valeur par
-    défaut (aucun conflit à arbitrer)."""
+    """--profile (specification §2/§4.4) must load the JSON file and apply
+    it as is when --format/--num stay at their default value (no conflict
+    to arbitrate)."""
     img_dir = tmp_path / "photos"
     out_dir = tmp_path / "out"
     _make_photos(img_dir, 3)
@@ -121,8 +121,8 @@ def test_profile_flag_is_loaded_and_applied(tmp_path, monkeypatch):
 
 
 def test_profile_flag_absent_keeps_default_profile(tmp_path, monkeypatch):
-    """Sans --profile, le comportement actuel (profil par défaut) ne doit
-    strictement pas changer."""
+    """Without --profile, the current behaviour (default profile) must not
+    change at all."""
     img_dir = tmp_path / "photos"
     out_dir = tmp_path / "out"
     _make_photos(img_dir, 3)
@@ -138,8 +138,8 @@ def test_profile_flag_absent_keeps_default_profile(tmp_path, monkeypatch):
 
 
 def test_nonexistent_profile_falls_back_silently_to_default(tmp_path, monkeypatch, caplog):
-    """Un chemin de profil invalide ne doit jamais interrompre la
-    génération (voir presentation.load_profile(), jamais d'exception)."""
+    """An invalid profile path must never interrupt the generation (see
+    presentation.load_profile(), never an exception)."""
     img_dir = tmp_path / "photos"
     out_dir = tmp_path / "out"
     _make_photos(img_dir, 3)
@@ -149,22 +149,22 @@ def test_nonexistent_profile_falls_back_silently_to_default(tmp_path, monkeypatc
         sys, "argv",
         ["portfolio.py", "-i", str(img_dir), "-o", str(out_dir), "--profile", str(tmp_path / "absent.json")],
     )
-    cli_module.main()  # ne doit lever aucune exception
+    cli_module.main()  # must not raise any exception
 
     assert captured["config"].profile.layout.template == "grid"
     assert (out_dir / "planches" / "planche_001.jpg").exists()
 
 
 def test_explicit_format_overrides_a_profile_left_at_its_default(tmp_path, monkeypatch):
-    """Précédence documentée dans Config.__post_init__ : --format
-    l'emporte sur le profil SEULEMENT si celui-ci n'a pas déjà personnalisé
-    page_format (ici laissé à "A4", la valeur par défaut)."""
+    """Precedence documented in Config.__post_init__: --format prevails
+    over the profile ONLY if the latter has not already customised
+    page_format (here left at "A4", the default value)."""
     img_dir = tmp_path / "photos"
     out_dir = tmp_path / "out"
     _make_photos(img_dir, 3)
 
     profile_path = tmp_path / "profil_format_defaut.json"
-    save_profile(Profile(layout=LayoutSettings(template="landscape")), profile_path)  # page_format reste "A4"
+    save_profile(Profile(layout=LayoutSettings(template="landscape")), profile_path)  # page_format stays "A4"
 
     captured = _capture_config(monkeypatch)
     monkeypatch.setattr(
@@ -174,15 +174,15 @@ def test_explicit_format_overrides_a_profile_left_at_its_default(tmp_path, monke
     cli_module.main()
 
     profile = captured["config"].profile
-    assert profile.layout.template == "landscape"  # le reste du profil est conserve
-    assert profile.layout.page_format == "A3"  # --format explicite l'emporte
+    assert profile.layout.template == "landscape"  # the rest of the profile is preserved
+    assert profile.layout.page_format == "A3"  # explicit --format prevails
 
 
 def test_profile_already_customized_format_wins_over_explicit_format_flag(tmp_path, monkeypatch):
-    """Précédence inverse, documentée comme limite explicite de
-    l'heuristique (Config.__post_init__) : si le profil a DÉJÀ un
-    page_format différent de la valeur par défaut, --format est purement
-    et simplement ignoré."""
+    """Reverse precedence, documented as an explicit limit of the
+    heuristic (Config.__post_init__): if the profile ALREADY has a
+    page_format different from the default value, --format is simply
+    ignored."""
     img_dir = tmp_path / "photos"
     out_dir = tmp_path / "out"
     _make_photos(img_dir, 3)
@@ -200,13 +200,13 @@ def test_profile_already_customized_format_wins_over_explicit_format_flag(tmp_pa
     assert captured["config"].profile.layout.page_format == "A2"
 
 
-# ====================== MODE PRÉVISUALISATION (--preview-output) ======================
-# Usage interne par l'interface graphique (planche-contact-gtk.py,
-# _on_preview_clicked) - voir le commentaire de l'argument --preview-output
-# et la docstring de portfolio.portfolio._generate_preview_sheet() pour le
-# pourquoi (isolement en sous-processus, pour éviter une concurrence
-# Pillow/Pango sur FreeType constatée empiriquement quand la génération de
-# l'aperçu avait lieu directement dans un thread de l'application GTK).
+# ====================== PREVIEW MODE (--preview-output) ======================
+# Internal use by the graphical interface (planche-contact-gtk.py,
+# _on_preview_clicked) - see the comment of the --preview-output argument
+# and the docstring of portfolio.portfolio._generate_preview_sheet() for
+# the why (subprocess isolation, to avoid a Pillow/Pango concurrency on
+# FreeType observed empirically when the preview generation took place
+# directly in a thread of the GTK application).
 
 def test_preview_output_generates_single_png_without_touching_real_output(tmp_path, monkeypatch):
     img_dir = tmp_path / "photos"
@@ -223,26 +223,26 @@ def test_preview_output_generates_single_png_without_touching_real_output(tmp_pa
     )
     cli_module.main()
 
-    assert preview_png.is_file(), "le PNG d'aperçu doit être créé au chemin demandé"
+    assert preview_png.is_file(), "the preview PNG must be created at the requested path"
     with Image.open(preview_png) as img:
-        # A4 à 300 DPI (voir presentation.layout_engine.canvas_size_px) :
-        # exactement la même géométrie qu'une planche réelle au même format.
+        # A4 at 300 DPI (see presentation.layout_engine.canvas_size_px):
+        # exactly the same geometry as a real sheet in the same format.
         assert img.size == (2480, 3507)
 
-    # Le mode aperçu ne doit jamais créer/toucher le VRAI dossier de sortie
-    # (ni planches/, ni portfolio.pdf, ni rien d'autre) : seul le PNG
-    # autonome demandé doit exister.
+    # Preview mode must never create/touch the REAL output folder
+    # (neither planches/, nor portfolio.pdf, nor anything else): only the
+    # requested standalone PNG must exist.
     assert not out_dir.exists(), (
-        "une prévisualisation ne doit jamais créer le dossier de sortie réel "
-        "(sans quoi elle se comporterait comme une génération partielle)"
+        "a preview must never create the real output folder "
+        "(otherwise it would behave like a partial generation)"
     )
 
 
 def test_preview_output_never_overwrites_an_existing_generation(tmp_path, monkeypatch):
-    """Garde-fou de non-régression : si --output pointe (comme c'est le cas
-    normal depuis l'interface graphique) vers un dossier qui contient déjà
-    une génération précédente, la prévisualisation ne doit ni la nettoyer
-    ni en écraser le moindre fichier."""
+    """Non-regression safeguard: if --output points (as is normally the
+    case from the graphical interface) to a folder that already contains a
+    previous generation, the preview must neither clean it nor overwrite a
+    single file of it."""
     img_dir = tmp_path / "photos"
     out_dir = tmp_path / "out"
     preview_png = tmp_path / "preview.png"
@@ -251,9 +251,9 @@ def test_preview_output_never_overwrites_an_existing_generation(tmp_path, monkey
     planches_dir = out_dir / "planches"
     planches_dir.mkdir(parents=True)
     sentinel_planche = planches_dir / "planche_001.jpg"
-    sentinel_planche.write_bytes(b"ancienne planche, ne doit pas bouger")
+    sentinel_planche.write_bytes(b"old sheet, must not move")
     sentinel_pdf = out_dir / "portfolio.pdf"
-    sentinel_pdf.write_bytes(b"ancien pdf, ne doit pas bouger")
+    sentinel_pdf.write_bytes(b"old pdf, must not move")
 
     monkeypatch.setattr(
         sys, "argv",
@@ -262,8 +262,8 @@ def test_preview_output_never_overwrites_an_existing_generation(tmp_path, monkey
     cli_module.main()
 
     assert preview_png.is_file()
-    assert sentinel_planche.read_bytes() == b"ancienne planche, ne doit pas bouger"
-    assert sentinel_pdf.read_bytes() == b"ancien pdf, ne doit pas bouger"
+    assert sentinel_planche.read_bytes() == b"old sheet, must not move"
+    assert sentinel_pdf.read_bytes() == b"old pdf, must not move"
 
 
 def test_preview_output_with_no_photos_creates_no_file(tmp_path, monkeypatch, caplog):
@@ -281,10 +281,10 @@ def test_preview_output_with_no_photos_creates_no_file(tmp_path, monkeypatch, ca
 
 
 def test_preview_output_respects_profile_flag(tmp_path, monkeypatch):
-    """La prévisualisation doit utiliser exactement le même Profil (mise en
-    page/légendes/thème) qu'une génération réelle avec le même --profile -
-    ici vérifié via un thème sombre, dont la couleur de fond est facile à
-    distinguer du blanc par défaut sur le PNG produit."""
+    """The preview must use exactly the same Profile (layout/captions/
+    theme) as a real generation with the same --profile - checked here
+    through a dark theme, whose background colour is easy to tell apart from
+    the default white on the produced PNG."""
     img_dir = tmp_path / "photos"
     preview_png = tmp_path / "preview.png"
     _make_photos(img_dir, 3)
@@ -300,20 +300,20 @@ def test_preview_output_respects_profile_flag(tmp_path, monkeypatch):
 
     with Image.open(preview_png) as img:
         corner_pixel = img.convert("RGB").getpixel((5, 5))
-    # Thème sombre : le coin de la planche (hors toute vignette) doit être
-    # sombre, jamais blanc/clair (comportement par défaut).
+    # Dark theme: the sheet's corner (outside any thumbnail) must be dark,
+    # never white/light (default behaviour).
     assert sum(corner_pixel) < 200, (
-        f"le profil --profile (thème sombre) n'a pas été appliqué à l'aperçu : "
-        f"couleur de coin {corner_pixel}"
+        f"the --profile (dark theme) was not applied to the preview: "
+        f"corner colour {corner_pixel}"
     )
 
 
 def test_csv_index_header_follows_language_flag(tmp_path, monkeypatch):
-    """Non-régression : l'en-tête de l'index CSV (portfolio/csvindex.py)
-    était codé en dur en français ("Numéro"/"Fichier"), quelle que soit
-    --language - trouvé lors d'un test de charge complet avec
-    --language en. Doit désormais suivre la langue demandée, comme le
-    reste des sorties générées (CHANGELOG.md, §6 PROJECT_CONTEXT.md)."""
+    """Non-regression: the header of the CSV index (portfolio/csvindex.py)
+    was hard-coded in French ("Numéro"/"Fichier"), whatever --language was -
+    found during a full load test with --language en. It must now follow
+    the requested language, like the rest of the generated outputs
+    (CHANGELOG.md, §6 PROJECT_CONTEXT.md)."""
     img_dir = tmp_path / "photos"
     _make_photos(img_dir, 2)
 
@@ -335,23 +335,22 @@ def test_csv_index_header_follows_language_flag(tmp_path, monkeypatch):
 
 
 def test_html_gallery_file_size_follows_language_in_worker_process(tmp_path, monkeypatch):
-    """Non-régression (bug plus subtil que le précédent) : la galerie HTML
-    régénère les images/vignettes dans des processus worker séparés
-    (ProcessPoolExecutor, mp_context="spawn" - voir htmlgallery.py), qui
-    n'héritent d'AUCUN état du processus principal, y compris la langue
-    active (portfolio.i18n). La taille de fichier affichée dans la
-    visionneuse (utils.format_file_size(), appelée DANS le worker)
-    retombait donc silencieusement sur l'anglais même avec
-    --language fr - trouvé lors du même test de charge que le test
-    ci-dessus. Verrouillé ici en inspectant directement galleryMeta dans
-    le HTML généré, pour les deux langues."""
+    """Non-regression (a subtler bug than the previous one): the HTML
+    gallery regenerates the images/thumbnails in separate worker processes
+    (ProcessPoolExecutor, mp_context="spawn" - see htmlgallery.py), which
+    inherit NO state from the main process, including the active language
+    (portfolio.i18n). The file size displayed in the viewer
+    (utils.format_file_size(), called INSIDE the worker) therefore silently
+    fell back to English even with --language fr - found during the same
+    load test as the test above. Locked down here by directly inspecting
+    galleryMeta in the generated HTML, for both languages."""
     img_dir = tmp_path / "photos"
     _make_photos(img_dir, 2)
 
     def _first_size(out_dir):
         html = (out_dir / "gallery" / "index.html").read_text(encoding="utf-8")
         match = re.search(r"const galleryMeta = (\[.*?\]);", html)
-        assert match, "galleryMeta introuvable dans la galerie générée"
+        assert match, "galleryMeta not found in the generated gallery"
         meta = json.loads(match.group(1))
         return meta[0]["size"]
 
@@ -363,7 +362,7 @@ def test_html_gallery_file_size_follows_language_in_worker_process(tmp_path, mon
     cli_module.main()
     size_fr = _first_size(out_fr)
     assert "Ko" in size_fr and "," in size_fr, (
-        f"taille de fichier non traduite en français (langue du worker non propagée) : {size_fr!r}"
+        f"file size not translated into French (worker language not propagated): {size_fr!r}"
     )
 
     out_en = tmp_path / "out_en"
@@ -377,8 +376,8 @@ def test_html_gallery_file_size_follows_language_in_worker_process(tmp_path, mon
 
 
 def test_html_originals_flag_adds_full_size_originals_to_the_gallery(tmp_path, monkeypatch):
-    """--html-originals joint les originaux à la galerie ; sans lui, aucun
-    dossier originals/ n'est créé (comportement historique)."""
+    """--html-originals attaches the originals to the gallery; without it,
+    no originals/ folder is created (historical behaviour)."""
     img_dir = tmp_path / "photos"
     _make_photos(img_dir, 2)
 
@@ -393,8 +392,8 @@ def test_html_originals_flag_adds_full_size_originals_to_the_gallery(tmp_path, m
     )
     cli_module.main()
     originals_dir = out_orig / "gallery" / "originals"
-    # Chaque original est accompagné de son fichier annexe (téléchargement
-    # en double-clic, voir htmlgallery._write_download_script).
+    # Each original is accompanied by its companion file (double-click
+    # download, see htmlgallery._write_download_script).
     assert sorted(p.name for p in originals_dir.iterdir()) == [
         "img_00.jpg", "img_00.jpg.js", "img_01.jpg", "img_01.jpg.js",
     ]
@@ -406,10 +405,10 @@ def test_html_originals_flag_adds_full_size_originals_to_the_gallery(tmp_path, m
 
 
 def test_html_originals_with_watermark_warns_that_originals_are_not_watermarked(tmp_path, monkeypatch, caplog):
-    """Un filigrane perd son sens si les originaux joints à la galerie
-    n'en portent pas et que l'utilisateur ne le sait pas : avertissement
-    explicite (journal + console, donc journal de l'interface), mais
-    seulement quand les deux options sont actives."""
+    """A watermark loses its meaning if the originals attached to the
+    gallery do not carry it and the user does not know it: explicit warning
+    (log + console, hence the interface's log), but only when both options
+    are active."""
     img_dir = tmp_path / "photos"
     _make_photos(img_dir, 1)
 
@@ -422,6 +421,6 @@ def test_html_originals_with_watermark_warns_that_originals_are_not_watermarked(
         return any("ne portent PAS le filigrane" in r.getMessage() for r in caplog.records)
 
     assert run("a", "--html", "--html-originals", "--watermark", "(c) Moi") is True
-    assert run("b", "--html", "--html-originals") is False, "pas de filigrane : rien à signaler"
-    assert run("c", "--html", "--watermark", "(c) Moi") is False, "pas d'originaux : rien à signaler"
-    assert run("d", "--html-originals", "--watermark", "(c) Moi") is False, "pas de galerie HTML : rien à signaler"
+    assert run("b", "--html", "--html-originals") is False, "no watermark: nothing to report"
+    assert run("c", "--html", "--watermark", "(c) Moi") is False, "no originals: nothing to report"
+    assert run("d", "--html-originals", "--watermark", "(c) Moi") is False, "no HTML gallery: nothing to report"

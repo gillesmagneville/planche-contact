@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-PDF à texte sélectionnable.
+PDF with selectable text.
 
-Le PDF est assemblé à partir des planches JPEG : sans précaution, son texte
-(nom des fichiers sous les photos, titre, pied de page) n'est que des pixels,
-impossible à copier. ContactSheetGenerator note désormais chaque texte qu'il
-dessine (`last_text_runs`) et PDFExporter le repose en INVISIBLE par-dessus
-l'image (portfolio/textlayer.py) : l'aspect de la page ne change pas, mais le
-nom d'un fichier peut être sélectionné, copié, recherché.
+The PDF is assembled from the JPEG sheets: without precautions, its text
+(file names under the photos, title, footer) is only pixels, impossible
+to copy. ContactSheetGenerator now records every text it draws
+(`last_text_runs`) and PDFExporter lays it back as INVISIBLE text over the
+image (portfolio/textlayer.py): the page's look does not change, but a
+file name can be selected, copied, searched.
 
-La lecture du PDF produit passe par `pypdf` (test ignoré s'il n'est pas
-installé : c'est une dépendance de test, pas de l'application).
+Reading the produced PDF goes through `pypdf` (test skipped if it is not
+installed: it is a test dependency, not an application one).
 """
 import sys
 from pathlib import Path
@@ -58,7 +58,7 @@ def _pdf_text(path: Path) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Enregistrement des textes par ContactSheetGenerator
+# Recording of the texts by ContactSheetGenerator
 # ---------------------------------------------------------------------------
 
 def test_sheet_records_every_caption_title_and_footer_text(tmp_path):
@@ -70,9 +70,9 @@ def test_sheet_records_every_caption_title_and_footer_text(tmp_path):
     assert "Voyage" in texts and "Gilles" in texts
     for name in ("été_01.jpg", "b.jpg", "c.jpg"):
         assert name in texts
-    assert any("1/3" in t for t in texts), "le numéro de planche fait partie du pied de page"
+    assert any("1/3" in t for t in texts), "the sheet number is part of the footer"
 
-    # Reading order : en-tête, puis légendes, puis pied de page.
+    # Reading order: header, then captions, then footer.
     assert texts.index("Voyage") < texts.index("été_01.jpg") < texts.index(
         next(t for t in texts if "1/3" in t))
 
@@ -83,8 +83,9 @@ def test_sheet_records_every_caption_title_and_footer_text(tmp_path):
 
 
 def test_recorded_baseline_matches_the_ink_actually_drawn(tmp_path):
-    """La ligne de base notée doit tomber au bas des lettres sans jambage :
-    c'est ce qui aligne le texte invisible sur le texte visible dans le PDF."""
+    """The recorded baseline must fall at the bottom of the letters without
+    descenders: this is what aligns the invisible text with the visible text
+    in the PDF."""
     import numpy as np
 
     images = _images(tmp_path / "photos", ["EEEE.jpg"])
@@ -97,8 +98,8 @@ def test_recorded_baseline_matches_the_ink_actually_drawn(tmp_path):
     band = gray[int(run.baseline) - int(run.size * 1.5): int(run.baseline) + int(run.size), x0:x1]
     ink_rows = np.where((band < 128).any(axis=1))[0]
     assert ink_rows.size
-    # Dernière ligne d'encre des « EEEE » = ligne de base (à un pixel près) ;
-    # le « j » de « .jpg » descend plus bas, d'où la restriction aux 4 « E ».
+    # Last ink line of the "EEEE" = baseline (to within one pixel); the
+    # "j" of ".jpg" descends lower, hence the restriction to the 4 "E"s.
     e_width = max(1, int(run.width * 0.45))
     e_rows = np.where((band[:, :e_width] < 128).any(axis=1))[0]
     bottom = int(run.baseline) - int(run.size * 1.5) + e_rows.max()
@@ -126,8 +127,8 @@ def test_no_caption_means_no_caption_text_but_the_rest_is_still_selectable(tmp_p
 
 
 def test_a_truncated_caption_keeps_its_full_text_for_copy_paste(tmp_path):
-    """Un nom de fichier trop long pour la vignette est tronqué par « … » à
-    l'écran, mais c'est le nom COMPLET qu'on doit pouvoir copier du PDF."""
+    """A file name too long for the thumbnail is truncated with "…" on
+    screen, but it is the FULL name that must be copyable from the PDF."""
     long_name = "IMG_" + "x" * 80 + ".jpg"
     profile = _profile()
     gen = _generator(tmp_path, profile)
@@ -138,7 +139,7 @@ def test_a_truncated_caption_keeps_its_full_text_for_copy_paste(tmp_path):
     assert len(gen.last_text_runs) == 1
     run = gen.last_text_runs[0]
     assert run.text == long_name
-    assert run.width <= 150 + 1, "la largeur retenue est celle du texte VISIBLE"
+    assert run.width <= 150 + 1, "the retained width is that of the VISIBLE text"
 
 
 def test_caption_lines_cut_for_lack_of_height_are_still_copyable(tmp_path):
@@ -191,7 +192,7 @@ def test_pdf_text_layer_is_invisible_and_does_not_change_the_page_geometry(tmp_p
     content = with_text.pages[0].get_contents().get_data()
     assert b"3 Tr" in content, "mode de rendu 3 = texte invisible"
     assert b"3 Tr" not in without.pages[0].get_contents().get_data()
-    # L'image de la planche est toujours là, une seule fois.
+    # The sheet's image is always there, exactly once.
     assert len(list(with_text.pages[0].images)) == 1
 
 
@@ -205,7 +206,7 @@ def test_pdf_is_still_produced_when_the_text_layer_fails(tmp_path, monkeypatch):
     import portfolio.pdfexport as pdfexport
 
     def boom(*args, **kwargs):
-        raise RuntimeError("couche de texte en panne")
+        raise RuntimeError("text layer broken")
 
     monkeypatch.setattr(pdfexport, "draw_text_layer", boom)
     pdf = _make_pdf(tmp_path, ["a.jpg"])
@@ -230,8 +231,8 @@ def test_draw_text_layer_ignores_empty_input(tmp_path):
 
 
 def test_copied_text_spans_the_visible_width_even_when_longer_than_what_is_shown(tmp_path):
-    """Texte complet mais largeur de l'affichage : le texte invisible couvre
-    la zone visible (sélection à la souris au bon endroit)."""
+    """Full text but displayed width: the invisible text covers the
+    visible area (mouse selection at the right place)."""
     pytest.importorskip("pypdf")
     from reportlab.pdfgen import canvas
 
@@ -244,7 +245,7 @@ def test_copied_text_spans_the_visible_width_even_when_longer_than_what_is_shown
 
 
 # ---------------------------------------------------------------------------
-# Bout en bout, par la ligne de commande
+# End to end, through the command line
 # ---------------------------------------------------------------------------
 
 def test_cli_pdf_is_selectable_with_captions_from_a_profile(tmp_path, monkeypatch):
