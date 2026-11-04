@@ -1,22 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-Couche de texte INVISIBLE superposée aux planches dans le PDF.
+INVISIBLE text layer laid over the sheets in the PDF.
 
-Le PDF est construit à partir des planches JPEG (une image par page) : le
-texte qu'elles portent - titre, légendes par photo (nom de fichier, date,
-réglages...), pied de page - n'y est donc que des pixels, qu'on ne peut ni
-sélectionner ni copier. Pour pouvoir, par exemple, copier le nom d'un
-fichier depuis le PDF, ContactSheetGenerator note chaque texte qu'il dessine
-(`TextRun`) et PDFExporter le repose ici par-dessus l'image, en mode de rendu
-« invisible » (le procédé des PDF issus d'une reconnaissance de caractères) :
-l'aspect de la page ne change pas d'un pixel, mais le texte est sélectionnable,
-copiable et trouvable par la recherche du lecteur PDF.
+The PDF is built from the JPEG sheets (one image per page): the text
+they carry - title, per-photo captions (file name, date, settings...),
+footer - is therefore only pixels, which cannot be selected or copied.
+So that one can, for example, copy a file name out of the PDF,
+ContactSheetGenerator records every text it draws (`TextRun`) and
+PDFExporter places it again here on top of the image, in the
+"invisible" rendering mode (the technique used by PDFs produced by
+character recognition): the page does not change by a single pixel, but
+the text can be selected, copied and found by the PDF reader's search.
 
-Les coordonnées sont celles de la planche, en pixels, origine en HAUT à
-gauche ; la conversion vers le repère du PDF (points, origine en BAS à
-gauche) est faite ici. Une planche étant posée dans le PDF à l'échelle 1 pixel
-= 1 point (voir PDFExporter), le texte s'aligne exactement sur celui de
-l'image.
+The coordinates are those of the sheet, in pixels, origin at the TOP
+left; the conversion to the PDF's coordinate system (points, origin at
+the BOTTOM left) is done here. Since a sheet is placed in the PDF at a
+scale of 1 pixel = 1 point (see PDFExporter), the text lines up exactly
+with that of the image.
 """
 import logging
 from dataclasses import dataclass
@@ -27,7 +27,7 @@ from .utils import _BUNDLED_FONTS_DIR
 
 logger = logging.getLogger(__name__)
 
-#: Mode de rendu PDF « texte invisible » (ni tracé ni rempli).
+#: PDF rendering mode "invisible text" (neither stroked nor filled).
 _INVISIBLE = 3
 
 _FONT_NAMES = {False: "PlancheContact-DejaVuSans", True: "PlancheContact-DejaVuSans-Bold"}
@@ -36,18 +36,18 @@ _FONT_FILES = {False: "DejaVuSans.ttf", True: "DejaVuSans-Bold.ttf"}
 
 @dataclass(frozen=True)
 class TextRun:
-    """Un texte dessiné sur une planche, tel que le PDF doit le reproduire.
+    """A text drawn on a sheet, as the PDF must reproduce it.
 
-    - `text` : ce qui sera copié depuis le PDF. Peut être PLUS LONG que ce
-      qui est visible : une ligne tronquée par « … » faute de place sur la
-      planche garde ici son texte complet (un nom de fichier copié depuis le
-      PDF n'est ainsi jamais coupé) ;
-    - `x`, `baseline` : origine du texte sur la planche, en pixels (abscisse
-      du bord gauche, ordonnée de la LIGNE DE BASE), origine en haut à gauche ;
-    - `size` : corps de la police, en pixels ;
-    - `width` : largeur occupée à l'écran, en pixels (sert à caler la largeur
-      du texte invisible sur celle du texte visible) ;
-    - `bold` : police grasse ou non."""
+    - `text`: what will be copied from the PDF. May be LONGER than what is
+      visible: a line truncated with "…" for lack of room on the sheet keeps
+      its full text here (a file name copied from the PDF is thus never
+      cut off);
+    - `x`, `baseline`: origin of the text on the sheet, in pixels (abscissa
+      of the left edge, ordinate of the BASELINE), origin at the top left;
+    - `size`: font size, in pixels;
+    - `width`: width occupied on screen, in pixels (used to match the width
+      of the invisible text to that of the visible text);
+    - `bold`: bold font or not."""
     text: str
     x: float
     baseline: float
@@ -61,11 +61,10 @@ def _font_path(bold: bool) -> Path:
 
 
 def _register_fonts() -> Optional[dict]:
-    """Enregistre (une seule fois) les polices DejaVu fournies avec
-    l'application, les mêmes que celles qui dessinent les planches, et
-    renvoie `{gras: nom}` - ou None si elles sont introuvables ou
-    inutilisables (le PDF est alors produit sans couche de texte plutôt que
-    de ne pas être produit)."""
+    """Registers (once) the DejaVu fonts shipped with the application, the
+    same ones that draw the sheets, and returns `{bold: name}` - or None if
+    they cannot be found or used (the PDF is then produced without a text
+    layer rather than not being produced at all)."""
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
 
@@ -81,7 +80,7 @@ def _register_fonts() -> Optional[dict]:
                 return None
             try:
                 pdfmetrics.registerFont(TTFont(name, str(path)))
-            except Exception as exc:  # police illisible : on renonce à la couche de texte
+            except Exception as exc:  # unreadable font: give up the text layer
                 logger.warning("Police %s inutilisable (%s) : PDF sans texte sélectionnable.", path, exc)
                 return None
         names[bold] = name
@@ -90,11 +89,11 @@ def _register_fonts() -> Optional[dict]:
 
 def draw_text_layer(pdf_canvas, runs: Iterable[TextRun], sheet_height_px: float,
                     margin_pt: float = 0.0) -> int:
-    """Pose `runs` en texte invisible sur la page courante de `pdf_canvas`
-    (reportlab). La planche occupe le rectangle dont le coin bas-gauche est
-    à (margin_pt, margin_pt) et la hauteur `sheet_height_px`, à l'échelle 1
-    pixel = 1 point. Renvoie le nombre de textes posés (0 si rien à poser
-    ou si les polices manquent)."""
+    """Places `runs` as invisible text on the current page of `pdf_canvas`
+    (reportlab). The sheet occupies the rectangle whose bottom-left corner
+    is at (margin_pt, margin_pt) and whose height is `sheet_height_px`, at a
+    scale of 1 pixel = 1 point. Returns the number of texts placed (0 if
+    there is nothing to place or if the fonts are missing)."""
     runs = [run for run in runs if run.text and run.size > 0]
     if not runs:
         return 0
@@ -113,9 +112,9 @@ def draw_text_layer(pdf_canvas, runs: Iterable[TextRun], sheet_height_px: float,
             natural = stringWidth(run.text, font_name, run.size)
         except Exception:
             continue
-        # Étirement horizontal pour que le texte invisible couvre
-        # exactement la largeur du texte visible (même police : ~100 %, mais
-        # un texte tronqué à l'écran garde son texte complet ici).
+        # Horizontal stretch so that the invisible text covers exactly the
+        # width of the visible text (same font: ~100%, but a text truncated
+        # on screen keeps its full text here).
         scale = 100.0 * run.width / natural if natural > 0 and run.width > 0 else 100.0
         text.setFont(font_name, run.size)
         text.setHorizScale(scale)

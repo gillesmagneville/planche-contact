@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
-"""Internationalisation de l'interface (planche-contact-gtk.py).
+"""Internationalisation of the interface (planche-contact-gtk.py).
 
-Volontairement un simple dictionnaire Python par langue (portfolio/locales/)
-plutôt que gettext/.po/.mo : pas d'étape de compilation, pas de dépendance
-supplémentaire à empaqueter dans le .deb ou l'installeur Windows - un choix
-cohérent avec le reste du projet (voir PROJECT_CONTEXT.md, §5).
+Deliberately a simple Python dictionary per language (portfolio/locales/)
+rather than gettext/.po/.mo: no compilation step, no extra dependency to
+package in the .deb or the Windows installer - a choice consistent with
+the rest of the project (see PROJECT_CONTEXT.md, §5).
 
-Ce module ne traduit QUE l'interface graphique (planche-contact-gtk.py) et
-la fenêtre de dialogue qu'elle affiche. Le CLI (portfolio/portfolio.py), la
-galerie HTML générée et le manuel restent en français pour l'instant (voir
-CHANGELOG.md - portée volontairement limitée dans un premier temps).
+This module translates ONLY the graphical interface
+(planche-contact-gtk.py) and the dialog window it displays. The CLI
+(portfolio/portfolio.py), the generated HTML gallery and the manual
+remain in French for now (see CHANGELOG.md - scope deliberately limited
+at first).
 """
 import locale
 import logging
@@ -18,11 +19,11 @@ from .locales import en, fr, de, es
 
 logger = logging.getLogger(__name__)
 
-# Ordre d'affichage dans le sélecteur de langue de l'onglet "À propos".
+# Display order in the language selector of the "About" tab.
 AVAILABLE_LANGUAGES = ["system", "en", "fr", "de", "es"]
 
-# "en" DOIT rester complet (mêmes clés que fr.py) : c'est la langue de
-# repli utilisée quand la langue système détectée n'a pas de traduction.
+# "en" MUST remain complete (same keys as fr.py): it is the fallback
+# language used when the detected system language has no translation.
 _ALL_STRINGS = {
     "en": en.STRINGS,
     "fr": fr.STRINGS,
@@ -35,9 +36,9 @@ _current_language = _FALLBACK_LANGUAGE
 
 
 def detect_system_language():
-    """Renvoie le code de langue à deux lettres détecté depuis les
-    paramètres système (ex: "fr", "de", "ja"...), ou None si la détection
-    échoue complètement."""
+    """Returns the two-letter language code detected from the system
+    settings (e.g. "fr", "de", "ja"...), or None if detection fails
+    completely."""
     try:
         system_locale, _encoding = locale.getlocale()
     except Exception:
@@ -57,26 +58,26 @@ def detect_system_language():
 
 
 def resolve_language(preference):
-    """Détermine la langue à réellement utiliser à partir de la préférence
-    enregistrée ("system", "en", "fr", "de" ou "es").
+    """Determines the language to actually use from the saved preference
+    ("system", "en", "fr", "de" or "es").
 
-    Renvoie un tuple (langue_active, code_detecte_non_supporte) :
-    - Si `preference` est une langue supportée explicite (pas "system"),
-      elle est utilisée directement ; second élément toujours None.
-    - Si `preference` vaut "system" et que la langue détectée est
-      supportée, elle est utilisée ; second élément None.
-    - Si `preference` vaut "system" mais que la langue détectée n'est PAS
-      supportée (ou n'a pas pu être détectée), on retombe sur l'anglais ;
-      le second élément contient alors le code détecté (ou "?" si la
-      détection a complètement échoué), à charge de l'appelant d'afficher
-      un avertissement (voir lang.fallback_warning_* dans les fichiers de
-      langue) - l'utilisateur doit savoir que ce n'est pas sa langue.
+    Returns a tuple (active_language, unsupported_detected_code):
+    - If `preference` is an explicit supported language (not "system"), it
+      is used directly; second element always None.
+    - If `preference` is "system" and the detected language is supported,
+      it is used; second element None.
+    - If `preference` is "system" but the detected language is NOT supported
+      (or could not be detected), we fall back to English; the second
+      element then holds the detected code (or "?" if detection failed
+      completely), and it is up to the caller to display a warning (see
+      lang.fallback_warning_* in the language files) - the user must know
+      that this is not their language.
     """
     if preference != "system":
         if preference in _ALL_STRINGS:
             return preference, None
-        # Préférence enregistrée invalide (fichier de config corrompu/
-        # ancienne version) : comportement identique à "system".
+        # Saved preference invalid (corrupted config file/older
+        # version): same behaviour as "system".
         preference = "system"
 
     detected = detect_system_language()
@@ -87,9 +88,9 @@ def resolve_language(preference):
 
 
 def set_language(preference):
-    """Active la langue à utiliser par _() pour le reste du processus.
-    Renvoie le même tuple que resolve_language(), pour que l'appelant
-    (l'application GTK) sache s'il doit afficher l'avertissement de repli."""
+    """Activates the language to be used by _() for the rest of the process.
+    Returns the same tuple as resolve_language(), so that the caller
+    (the GTK application) knows whether it must display the fallback warning."""
     global _current_language
     language, unsupported_detected = resolve_language(preference)
     _current_language = language
@@ -97,17 +98,17 @@ def set_language(preference):
 
 
 def get_language():
-    """Langue actuellement active (jamais "system" - toujours déjà
-    résolue par set_language() vers un code concret)."""
+    """Currently active language (never "system" - always already
+    resolved by set_language() to a concrete code)."""
     return _current_language
 
 
 def _(key, **kwargs):
-    """Traduit `key` dans la langue actuellement active. Repli sur
-    l'anglais si la clé manque dans cette langue (fichier de traduction
-    incomplet), puis sur la clé elle-même en tout dernier recours (pour ne
-    jamais faire planter l'interface sur une traduction manquante - un
-    texte de repli moche reste préférable à un crash)."""
+    """Translates `key` into the currently active language. Falls back to
+    English if the key is missing in that language (incomplete translation
+    file), then to the key itself as a last resort (so the interface never
+    crashes on a missing translation - an ugly fallback text is preferable
+    to a crash)."""
     strings = _ALL_STRINGS.get(_current_language, _ALL_STRINGS[_FALLBACK_LANGUAGE])
     text = strings.get(key)
     if text is None:

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Permet `import portfolio` depuis les tests sans installation du paquet :
-ajoute la racine du dépôt (parent de tests/) au sys.path, comme le fait
-déjà portfolio/portfolio.py pour le CLI."""
+"""Allows `import portfolio` from the tests without installing the package:
+adds the repository root (parent of tests/) to sys.path, as
+portfolio/portfolio.py already does for the CLI."""
 import sys
 from pathlib import Path
 

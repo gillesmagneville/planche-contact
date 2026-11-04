@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-rawloader.load_full_resolution() : l'image « pleine taille » d'un RAW, à
-partir de laquelle la galerie HTML crée le JPEG téléchargeable (option
-« originaux pleine taille »). Un faux module `rawpy` est utilisé : le vrai
-n'est pas toujours installé, et ce qu'on vérifie ici est le CHOIX entre
-l'aperçu JPEG embarqué et le dématriçage complet.
+rawloader.load_full_resolution(): the "full-size" image of a RAW, from
+which the HTML gallery creates the downloadable JPEG (the "full-size
+originals" option). A fake `rawpy` module is used: the real one is not
+always installed, and what is checked here is the CHOICE between the
+embedded JPEG preview and full demosaicing.
 """
 import io
 import types
@@ -29,8 +29,8 @@ def _jpeg_bytes(size):
 
 
 def _fake_rawpy(preview_size, calls, sensor=SENSOR):
-    """Faux `rawpy` : capteur `sensor`, aperçu JPEG embarqué de taille
-    `preview_size` (None : pas d'aperçu). `calls` note ce qui est utilisé."""
+    """Fake `rawpy`: sensor `sensor`, embedded JPEG preview of size
+    `preview_size` (None: no preview). `calls` records what is used."""
     class ThumbFormat:
         JPEG = "jpeg"
         BITMAP = "bitmap"
@@ -73,9 +73,9 @@ def install_fake_rawpy(monkeypatch):
 
 
 def test_a_full_size_embedded_preview_is_used_without_demosaicing(install_fake_rawpy, tmp_path):
-    """Beaucoup d'appareils enregistrent une image pleine taille dans le
-    RAW : c'est le rendu de l'appareil, et l'extraction est quasi instantanée
-    (le dématriçage prend de l'ordre d'une seconde par photo)."""
+    """Many cameras store a full-size image in the RAW: it is the camera's
+    own rendering, and extraction is almost instant (demosaicing takes about
+    a second per photo)."""
     calls = install_fake_rawpy((6000, 4000))
     img = rawloader.load_full_resolution(tmp_path / "A.CR2")
     assert img.size == (6000, 4000)
@@ -85,9 +85,9 @@ def test_a_full_size_embedded_preview_is_used_without_demosaicing(install_fake_r
 @pytest.mark.parametrize("preview_size", [(1620, 1080), (5400, 3600), (5700, 3800), None],
                          ids=["petit", "90pc", "95pc", "absent"])
 def test_a_smaller_preview_is_never_passed_off_as_the_full_size_photo(install_fake_rawpy, tmp_path, preview_size):
-    """Un aperçu nettement plus petit que le capteur - même à 90-95 % de la
-    résolution, seuil toléré pour les vignettes - n'est pas la photo
-    complète : dématriçage complet, résolution du capteur."""
+    """A preview clearly smaller than the sensor - even at 90-95% of the
+    resolution, the threshold tolerated for thumbnails - is not the complete
+    photo: full demosaicing, sensor resolution."""
     calls = install_fake_rawpy(preview_size)
     img = rawloader.load_full_resolution(tmp_path / "A.NEF")
     assert img.size == SENSOR
@@ -95,8 +95,8 @@ def test_a_smaller_preview_is_never_passed_off_as_the_full_size_photo(install_fa
 
 
 def test_a_preview_just_under_the_sensor_size_is_accepted(install_fake_rawpy, tmp_path):
-    """Les aperçus pleine taille sont parfois quelques pixels plus petits
-    que la matrice brute (bords) : toléré à 98 %."""
+    """Full-size previews are sometimes a few pixels smaller than the raw
+    matrix (edges): tolerated at 98%."""
     calls = install_fake_rawpy((5900, 3933))
     img = rawloader.load_full_resolution(tmp_path / "A.ARW")
     assert img.size == (5900, 3933) and "demosaic" not in calls
@@ -122,8 +122,8 @@ def test_a_regular_photo_is_loaded_as_is(tmp_path):
 
 
 def test_thumbnail_loading_keeps_its_ninety_percent_tolerance(install_fake_rawpy, tmp_path):
-    """Non-régression : la tolérance des vignettes (90 %) n'a pas bougé -
-    un aperçu à 95 % reste accepté pour elles."""
+    """Non-regression: the thumbnails' tolerance (90%) has not moved -
+    a preview at 95% is still accepted for them."""
     calls = install_fake_rawpy((5700, 3800))
     img = rawloader.load_image(tmp_path / "A.CR2", use_embedded_thumb=True, target_size=SENSOR)
     assert img.size == (5700, 3800) and "demosaic" not in calls

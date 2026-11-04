@@ -10,8 +10,8 @@ from .rawloader import load_image
 
 
 def _init_worker_logging(log_path):
-    """Reconfigure le logging dans les processus enfants (nécessaire avec 'spawn',
-    qui ne partage pas la configuration du processus parent)."""
+    """Reconfigures logging in child processes (required with 'spawn',
+    which does not share the parent process's configuration)."""
     if log_path:
         logging.basicConfig(
             level=logging.INFO,
@@ -22,32 +22,31 @@ def _init_worker_logging(log_path):
 
 
 def fit_thumbnail_image(img, max_size: int, fit_mode: str = "contain"):
-    """Réduit `img` pour une cellule carrée de `max_size` pixels de côté,
-    selon le mode d'ajustement du Profil (LayoutSettings.fit_mode).
+    """Shrinks `img` for a square cell of `max_size` pixels per side,
+    according to the Profile's fit mode (LayoutSettings.fit_mode).
 
-    - "contain" (défaut, comportement d'origine) : la photo ENTIÈRE, avec
-      ses proportions, inscrite dans la cellule (`Image.thumbnail`) - la
-      vignette n'est donc pas carrée sauf si la photo l'est.
-    - "cover" : la photo est RECADRÉE au centre en carré pour remplir
-      toute la cellule, aucune marge vide.
+    - "contain" (default, original behaviour): the WHOLE photo, with its
+      proportions, fitted inside the cell (`Image.thumbnail`) - so the
+      thumbnail is not square unless the photo is.
+    - "cover": the photo is CROPPED to a centred square to fill the whole
+      cell, with no empty margin.
 
-    Dans les deux modes, une image plus petite que la cellule n'est JAMAIS
-    agrandie (même règle que `Image.thumbnail`) : en "cover", une photo
-    dont le petit côté est inférieur à `max_size` donne un carré plus
-    petit que la cellule, que contactsheet.py place ensuite dans sa
-    cellule (voir _thumb_offset()). Toute valeur de `fit_mode` inconnue se
-    comporte comme "contain" - jamais d'exception pour un profil modifié
-    à la main.
+    In both modes, an image smaller than the cell is NEVER enlarged (same
+    rule as `Image.thumbnail`): in "cover", a photo whose short side is
+    smaller than `max_size` gives a square smaller than the cell, which
+    contactsheet.py then places in its cell (see _thumb_offset()). Any
+    unknown `fit_mode` value behaves like "contain" - never an exception
+    for a hand-edited profile.
 
-    Fonction pure (une image PIL en entrée, une en sortie), partagée par la
-    version unitaire et par la version parallèle (workers `spawn`) de
-    ThumbnailGenerator - une seule règle de recadrage, jamais deux."""
+    Pure function (one PIL image in, one out), shared by the single-image
+    version and the parallel version (`spawn` workers) of
+    ThumbnailGenerator - a single cropping rule, never two."""
     if fit_mode == "cover":
         short_side = min(img.width, img.height)
         if short_side > max_size:
-            # Petit côté ramené à `max_size` ; max() garde l'arrondi de
-            # l'autre côté de passer sous max_size (carré final incomplet).
-            # reducing_gap=2.0 : même accélération que Image.thumbnail().
+            # Short side brought down to `max_size`; max() keeps the rounding of
+            # the other side from dropping below max_size (incomplete final square).
+            # reducing_gap=2.0: same speed-up as Image.thumbnail().
             scale = max_size / short_side
             img = img.resize(
                 (max(max_size, round(img.width * scale)), max(max_size, round(img.height * scale))),
@@ -64,7 +63,7 @@ def fit_thumbnail_image(img, max_size: int, fit_mode: str = "contain"):
 
 
 def _process_single_thumbnail(args):
-    """Fonction worker pour le multiprocessing."""
+    """Worker function for multiprocessing."""
     image_path, max_size, fit_mode = args
     try:
         img = load_image(
@@ -84,7 +83,7 @@ class ThumbnailGenerator:
         self.config = config
 
     def create_thumbnail(self, item, max_size: int, fit_mode: str = "contain"):
-        """Version simple (pour usage unitaire)."""
+        """Single-image version (for one-off use)."""
         image_path = self._get_path(item)
         if not image_path:
             return None
@@ -107,13 +106,13 @@ class ThumbnailGenerator:
 
     def generate_parallel(self, items, max_size: int, fit_mode: str = "contain"):
         """
-        Génère les vignettes en parallèle avec des processus.
-        Beaucoup plus rapide sur les gros dossiers.
+        Generates the thumbnails in parallel with processes.
+        Much faster on large folders.
 
-        `fit_mode` : "contain" (photo entière, défaut) ou "cover" (photo
-        recadrée en carré) - voir fit_thumbnail_image().
+        `fit_mode`: "contain" (whole photo, default) or "cover" (photo
+        cropped to a square) - see fit_thumbnail_image().
         """
-        # Prépare les arguments
+        # Prepare the arguments
         tasks = []
         for item in items:
             path = self._get_path(item)
@@ -125,9 +124,9 @@ class ThumbnailGenerator:
 
         max_workers = min(os.cpu_count() or 4, 64)
 
-        # 'spawn' plutôt que le 'fork' par défaut sous Linux : rawpy utilise
-        # OpenMP en interne, et OpenMP + fork() peut provoquer des deadlocks
-        # (avertissement documenté par rawpy lui-même).
+        # 'spawn' rather than Linux's default 'fork': rawpy uses OpenMP
+        # internally, and OpenMP + fork() can cause deadlocks (a warning
+        # documented by rawpy itself).
         ctx = multiprocessing.get_context("spawn")
         log_path = None
         for handler in logging.getLogger().handlers:
@@ -142,7 +141,7 @@ class ThumbnailGenerator:
             initializer=_init_worker_logging,
             initargs=(log_path,),
         ) as executor:
-            # On mappe la fonction worker sur les tâches
+            # Map the worker function over the tasks
             for result in executor.map(_process_single_thumbnail, tasks):
                 results.append(result)
 

@@ -1,1 +1,1 @@
-"""Portfolio Tool - Outil de planches-contact photographiques."""
+"""Portfolio Tool - Photographic contact sheet tool."""
