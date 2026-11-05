@@ -283,8 +283,9 @@ bel et bien dans `portfolio.py` actuel).
 
 ## 5. Conventions de codage
 
-- **Langue** : identifiants de code (variables, fonctions, classes) en
-  anglais ; commentaires de code en français (les scripts de construction et
+- **Langue** : identifiants de code (variables, fonctions, classes) et
+  commentaires de code (docstrings et commentaires du JavaScript/CSS
+  embarqué dans la galerie HTML compris) en anglais (les scripts de construction et
   de packaging — `build-deb.sh`, `build-appimage.sh`, `build-windows.ps1`,
   `debian/postinst` — sont entièrement en anglais, messages compris, et leurs
   questions de confirmation attendent `y` (`[y/N]`) ; les commentaires de
