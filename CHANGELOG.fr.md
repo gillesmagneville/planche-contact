@@ -12,6 +12,10 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 - **Une politique de sécurité** ([`SECURITY.fr.md`](SECURITY.fr.md), en français et en anglais) : comment signaler une vulnérabilité en privé, quelles versions reçoivent des correctifs et ce qu'on peut en attendre. C'est un fichier du dépôt ; les paquets ne l'embarquent pas.
 
+### Modifié
+
+- **Les commentaires et les docstrings du code source du programme sont maintenant en anglais**, comme la documentation et les fichiers de packaging : tout le paquet `portfolio/`, `planche-contact-gtk.py`, les tests, les commentaires du JavaScript et du CSS embarqués dans la galerie HTML (ils figurent dans le code source des pages générées) et les en-têtes de section des fichiers de langue de `portfolio/locales/`, ainsi que les commentaires de `requirements.txt` et l'exemple de `portfolio/Utilisation`. Rien ne change pour l'utilisateur : le code lui-même est identique (vérifié en comparant son arbre syntaxique avant et après ; seuls quelques messages et valeurs d'exemple des tests ont été traduits), les textes affichés par l'interface, la ligne de commande, la galerie HTML et le manuel sont inchangés, et tous les tests passent comme avant.
+
 ### Corrigé
 
 - **`build-appimage.sh` mélangeait à l'AppImage le programme installé sur la machine de construction.** Quand le paquet `.deb` est installé, `quick-sharun` (l'outil d'assemblage) copiait de lui-même `/usr/share/planche-contact` dans l'AppImage : tout le virtualenv du paquet (des centaines de Mo) s'y ajoutait et, pire, les fichiers de la version installée (`VERSION`, `planche-contact-gtk.py`, `portfolio/`...) écrasaient ceux du projet, ce qui donnait une AppImage de l'ancienne version. Cette copie est maintenant désactivée, et le script vérifie, avant de livrer l'AppImage, que les fichiers de l'application qu'elle contient sont exactement ceux du projet (sinon il supprime l'AppImage et s'arrête). Les AppImage publiées (5.2.0 et 5.2.1) ont été construites sur une machine sans le paquet installé et ne sont pas concernées.

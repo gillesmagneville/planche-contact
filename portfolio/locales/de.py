@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Deutsche Zeichenketten. Gleicher Satz an Schlüsseln wie fr.py/en.py."""
+"""German strings. Same keys as fr.py/en.py."""
 
 STRINGS = {
-    # --- Reiter ---
+    # --- Tabs ---
     "tab.generation": "Erstellung",
     "tab.help": "Hilfe",
     "tab.about": "Über",
 
-    # --- Reiter „Erstellung“: Formular ---
+    # --- Generation tab: form ---
     "gen.project_title": "Projekttitel:",
     "gen.author": "Name des Autors:",
     "gen.input_dir": "Quellordner:",
@@ -59,7 +59,7 @@ STRINGS = {
     "watermark.diagonal_cw": "Diagonal (im Uhrzeigersinn)",
     "watermark.diagonal_ccw": "Diagonal (gegen den Uhrzeigersinn)",
 
-    # --- Ordnervorschau (Leiste + Auswahldialog) ---
+    # --- Folder preview (strip + picker) ---
     "preview.analyzing": "Ordner wird analysiert...",
     "preview.no_photos": "Keine Fotos in diesem Ordner gefunden.",
     "preview.loading": "Fotos {start}-{end} von {total} werden geladen...",
@@ -69,7 +69,7 @@ STRINGS = {
     "preview.next": "Weiter →",
     "preview.hint": "Navigieren Sie, um eine Vorschau der Fotos zu sehen.",
 
-    # --- Eigener Ordnerauswahldialog ---
+    # --- Custom folder picker ---
     "folder_picker.title_input": "Quellordner auswählen",
     "folder_picker.title_output": "Zielordner auswählen",
     "folder_picker.path_placeholder": "Pfad eingeben (z. B. \\\\server\\freigabe) und Enter drücken...",
@@ -79,7 +79,7 @@ STRINGS = {
     "folder_picker.home": "Persönlicher Ordner",
     "folder_picker.this_pc": "Dieser PC",
 
-    # --- Erstellung: Validierung, Status, Protokoll ---
+    # --- Generation: validation, status, log ---
     "gen.select_input_first": "Bitte wählen Sie einen Quellordner aus.",
     "gen.starting": "Erstellung wird gestartet...",
     "gen.running": "Erstellung läuft...",
@@ -90,7 +90,7 @@ STRINGS = {
     "gen.error_log_exception": "❌ Fehler: {error}",
     "gen.error_status_generic": "Fehler",
 
-    # --- Dialoge „Keine Anwendung verfügbar“ ---
+    # --- "No application available" dialogs ---
     "dialog.no_file_manager_title": "Kein Dateimanager verfügbar",
     "dialog.no_file_manager_detail": "Auf diesem System ist keine Standardanwendung zum Öffnen von Ordnern konfiguriert.",
     "dialog.no_pdf_viewer_title": "Kein PDF-Betrachter verfügbar",
@@ -100,12 +100,12 @@ STRINGS = {
     "dialog.no_csv_app_title": "Keine Anwendung für CSV-Dateien verfügbar",
     "dialog.no_csv_app_detail": "Auf diesem System ist keine Standardanwendung zum Öffnen von CSV-Dateien konfiguriert.\n\nInstallieren Sie eine Tabellenkalkulation (z. B. LibreOffice Calc) oder einen Texteditor und versuchen Sie es erneut.",
 
-    # --- Reiter „Hilfe“ ---
+    # --- Help tab ---
     "help.title": "Hilfe - Planche-Contact",
     "help.description": "Klicken Sie auf die Schaltfläche unten, um das vollständige Handbuch in Ihrem Browser zu öffnen.",
     "help.open_manual": "Vollständiges Handbuch im Browser öffnen",
 
-    # --- Reiter „Über“ ---
+    # --- About tab ---
     "about.version_build": "Version {version}  —  Build vom {date}",
     "about.version_only": "Version {version}",
     "about.tagline": "Generator für hochwertige (300 dpi)\nfotografische Kontaktbögen",
@@ -115,26 +115,26 @@ STRINGS = {
     "about.language_label": "Sprache:",
     "about.language_restart_notice": "Starten Sie die Anwendung neu, damit diese Sprachänderung wirksam wird.",
 
-    # --- Sprachen (in ihrer eigenen Sprache angezeigt, übliche Konvention
-    # für Sprachauswahlmenüs) ---
+    # --- Languages (shown in their own language, standard convention for
+    # language pickers) ---
     "lang.system": "Systemsprache",
     "lang.en": "English",
     "lang.fr": "Français",
     "lang.de": "Deutsch",
     "lang.es": "Español",
 
-    # --- Rückfall-Warnung (Systemsprache nicht verfügbar) ---
+    # --- Fallback warning (system language not available) ---
     "lang.fallback_warning_title": "Sprache nicht verfügbar",
     "lang.fallback_warning_detail": "Für Ihre Systemsprache ({detected}) ist keine Übersetzung verfügbar. Es wird stattdessen Englisch verwendet.",
 
-    # --- Generierte HTML-Galerie (portfolio/htmlgallery.py) ---
+    # --- Generated HTML gallery (portfolio/htmlgallery.py) ---
     "gallery.by_author": "Von {author}",
     "gallery.header_count": "{count} Bilder • Seite {current} / {total}",
     "gallery.nav_prev": "← Zurück",
     "gallery.nav_next": "Weiter →",
     "gallery.footer": "Galerie erstellt mit Planche-Contact",
 
-    # --- Erzeugter CSV-Index (portfolio/csvindex.py) ---
+    # --- Generated CSV index (portfolio/csvindex.py) ---
     "csv.header_num": "Nummer",
     "csv.header_filename": "Dateiname",
     "gallery.lightbox_page": "Seite {current} / {total}",
@@ -157,8 +157,8 @@ STRINGS = {
     "gallery.info_date": "Datum:",
     "gallery.unknown": "Unbekannt",
 
-    # --- Dateigrößeneinheiten (utils.format_file_size(), in der
-    # HTML-Galerie-Ansicht angezeigt) ---
+    # --- File size units (utils.format_file_size(), shown in the HTML
+    # gallery viewer) ---
     "unit.bytes": "B",
     "unit.kb": "KB",
     "unit.mb": "MB",
@@ -211,7 +211,7 @@ STRINGS = {
     "cli.progress_html_done": "HTML-Galerie fertig.",
     "cli.progress_success": "Erfolgreich abgeschlossen!",
 
-    # --- Engine-Protokoll (scanner.py, pdfexport.py, rawloader.py) ---
+    # --- Engine log (scanner.py, pdfexport.py, rawloader.py) ---
     "engine.log_scan_folder": "Ordner wird gescannt: {dir} (rekursiv={recursive})",
     "engine.log_images_found_sorted": "{count} Bilder gefunden und sortiert.",
     "engine.log_include_dirs": "Ausgewählte Unterordner: {count}",
@@ -219,7 +219,7 @@ STRINGS = {
     "engine.log_pdf_created": "PDF erfolgreich erstellt: {path}",
     "engine.raw_module_missing": "'{name}' kann nicht gelesen werden: das Modul 'rawpy' ist nicht installiert. Installieren Sie es mit: pip install rawpy",
 
-    # --- Auf dem Kontaktbogen selbst eingeblendeter Text (JPEG/PDF -
+    # --- Text drawn on the contact sheet itself (JPEG/PDF -
     # portfolio/contactsheet.py, _draw_page_number()) ---
     "sheet.page_label": "Kontaktbogen {page}/{total}",
     "sheet.footer": "Kontaktbogen erstellt mit Planche-Contact",

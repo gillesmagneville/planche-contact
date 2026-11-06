@@ -283,8 +283,9 @@ exist in the current `portfolio.py`).
 
 ## 5. Coding conventions
 
-- **Language**: code identifiers (variables, functions, classes) in
-  English; code comments in French (the build and packaging scripts —
+- **Language**: code identifiers (variables, functions, classes) and code
+  comments (including docstrings and the comments of the JavaScript/CSS
+  embedded in the HTML gallery) in English (the build and packaging scripts —
   `build-deb.sh`, `build-appimage.sh`, `build-windows.ps1`, `debian/postinst` —
   are entirely in English, messages included, and their confirmation questions
   are answered by `y` (`[y/N]`); the comments of `windows/installer.nsi` and

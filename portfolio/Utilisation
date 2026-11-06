@@ -1,11 +1,11 @@
-Exemple d'utilisation :
+Usage example:
 
-python3 portfolio.py -i /chemin/vers/dossier/images -o ./sortie --pdf --html --csv -n 12 --thumb 450 --sort date -r
+python3 portfolio.py -i /path/to/images/folder -o ./output --pdf --html --csv -n 12 --thumb 450 --sort date -r
 
-Avec titre, auteur et filigrane :
+With a title, an author and a watermark:
 
-python3 portfolio.py -i /chemin/vers/dossier/images -o ./sortie --pdf --html --csv \
-  --title "Mon Projet" --author "Mon Nom" \
-  --watermark "Mon Nom" --watermark-orientation "Diagonale horaire" --watermark-opacity 40
+python3 portfolio.py -i /path/to/images/folder -o ./output --pdf --html --csv \
+  --title "My Project" --author "My Name" \
+  --watermark "My Name" --watermark-orientation "Diagonale horaire" --watermark-opacity 40
 
-Liste complète des options : python3 portfolio.py --help
+Full list of options: python3 portfolio.py --help

@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Chaînes françaises. Langue source du projet : toutes les clés doivent
-exister ici en premier - les autres fichiers de langue (en.py, de.py,
-es.py) suivent exactement le même jeu de clés."""
+"""French strings. Source language of the project: all keys must exist
+here first - the other language files (en.py, de.py, es.py) follow
+exactly the same set of keys."""
 
 STRINGS = {
-    # --- Onglets ---
+    # --- Tabs ---
     "tab.generation": "Génération",
     "tab.help": "Aide",
     "tab.about": "À propos",
 
-    # --- Onglet Génération : formulaire ---
+    # --- Generation tab: form ---
     "gen.project_title": "Titre du projet :",
     "gen.author": "Nom de l'auteur :",
     "gen.input_dir": "Dossier d'entrée :",
@@ -61,7 +61,7 @@ STRINGS = {
     "watermark.diagonal_cw": "Diagonale horaire",
     "watermark.diagonal_ccw": "Diagonale anti-horaire",
 
-    # --- Aperçu du dossier (bande + sélecteur) ---
+    # --- Folder preview (strip + picker) ---
     "preview.analyzing": "Analyse du dossier...",
     "preview.no_photos": "Aucune photo trouvée dans ce dossier.",
     "preview.loading": "Chargement des photos {start}-{end} sur {total}...",
@@ -71,7 +71,7 @@ STRINGS = {
     "preview.next": "Suivant →",
     "preview.hint": "Naviguez pour voir un aperçu des photos.",
 
-    # --- Sélecteur de dossier personnalisé ---
+    # --- Custom folder picker ---
     "folder_picker.title_input": "Choisir un dossier d'entrée",
     "folder_picker.title_output": "Choisir un dossier de sortie",
     "folder_picker.path_placeholder": "Saisir un chemin (ex: \\\\serveur\\partage) et appuyer sur Entrée...",
@@ -81,7 +81,7 @@ STRINGS = {
     "folder_picker.home": "Dossier personnel",
     "folder_picker.this_pc": "Ce PC",
 
-    # --- Génération : validation, statut, journal ---
+    # --- Generation: validation, status, log ---
     "gen.select_input_first": "Veuillez sélectionner un dossier d'entrée.",
     "gen.starting": "Démarrage de la génération...",
     "gen.running": "Génération en cours...",
@@ -92,7 +92,7 @@ STRINGS = {
     "gen.error_log_exception": "❌ Erreur : {error}",
     "gen.error_status_generic": "Erreur",
 
-    # --- Boîtes de dialogue "aucune application disponible" ---
+    # --- "No application available" dialogs ---
     "dialog.no_file_manager_title": "Aucun gestionnaire de fichiers disponible",
     "dialog.no_file_manager_detail": "Aucune application par défaut n'est configurée pour ouvrir des dossiers sur ce système.",
     "dialog.no_pdf_viewer_title": "Aucun lecteur PDF disponible",
@@ -102,12 +102,12 @@ STRINGS = {
     "dialog.no_csv_app_title": "Aucune application disponible pour les fichiers CSV",
     "dialog.no_csv_app_detail": "Aucune application par défaut n'est configurée pour ouvrir les fichiers CSV sur ce système.\n\nInstallez un tableur (par exemple : LibreOffice Calc) ou un éditeur de texte, puis réessayez.",
 
-    # --- Onglet Aide ---
+    # --- Help tab ---
     "help.title": "Aide - Planche-Contact",
     "help.description": "Clique sur le bouton ci-dessous pour ouvrir le manuel complet dans ton navigateur.",
     "help.open_manual": "Ouvrir le manuel complet dans le navigateur",
 
-    # --- Onglet À propos ---
+    # --- About tab ---
     "about.version_build": "Version {version}  —  Build du {date}",
     "about.version_only": "Version {version}",
     "about.tagline": "Générateur de planches contact photographiques\nhaute qualité (300 dpi)",
@@ -117,26 +117,26 @@ STRINGS = {
     "about.language_label": "Langue :",
     "about.language_restart_notice": "Redémarrez l'application pour appliquer ce changement de langue.",
 
-    # --- Langues (noms affichés dans le sélecteur - toujours dans leur
-    # propre langue, convention habituelle des sélecteurs de langue) ---
+    # --- Languages (shown in their own language, standard convention for
+    # language pickers) ---
     "lang.system": "Langue système",
     "lang.en": "English",
     "lang.fr": "Français",
     "lang.de": "Deutsch",
     "lang.es": "Español",
 
-    # --- Avertissement de repli (langue système non disponible) ---
+    # --- Fallback warning (system language not available) ---
     "lang.fallback_warning_title": "Langue non disponible",
     "lang.fallback_warning_detail": "Aucune traduction n'est disponible pour la langue de votre système ({detected}). L'anglais est utilisé à la place.",
 
-    # --- Galerie HTML générée (portfolio/htmlgallery.py) ---
+    # --- Generated HTML gallery (portfolio/htmlgallery.py) ---
     "gallery.by_author": "Par {author}",
     "gallery.header_count": "{count} images • Page {current} / {total}",
     "gallery.nav_prev": "← Précédent",
     "gallery.nav_next": "Suivant →",
     "gallery.footer": "Galerie générée par Planche-Contact",
 
-    # --- Index CSV généré (portfolio/csvindex.py) ---
+    # --- Generated CSV index (portfolio/csvindex.py) ---
     "csv.header_num": "Numéro",
     "csv.header_filename": "Fichier",
     "gallery.lightbox_page": "Page {current} / {total}",
@@ -159,8 +159,8 @@ STRINGS = {
     "gallery.info_date": "Date :",
     "gallery.unknown": "Inconnue",
 
-    # --- Unités de taille de fichier (utils.format_file_size(),
-    # affichées dans la visionneuse de la galerie HTML) ---
+    # --- File size units (utils.format_file_size(), shown in the HTML
+    # gallery viewer) ---
     "unit.bytes": "o",
     "unit.kb": "Ko",
     "unit.mb": "Mo",
@@ -213,7 +213,7 @@ STRINGS = {
     "cli.progress_html_done": "Galerie HTML terminée.",
     "cli.progress_success": "Terminé avec succès !",
 
-    # --- Journal du moteur (scanner.py, pdfexport.py, rawloader.py) ---
+    # --- Engine log (scanner.py, pdfexport.py, rawloader.py) ---
     "engine.log_scan_folder": "Scan du dossier : {dir} (récursif={recursive})",
     "engine.log_images_found_sorted": "{count} images trouvées et triées.",
     "engine.log_include_dirs": "Sous-dossiers retenus : {count}",
@@ -221,7 +221,7 @@ STRINGS = {
     "engine.log_pdf_created": "PDF créé avec succès : {path}",
     "engine.raw_module_missing": "Impossible de lire '{name}' : le module 'rawpy' n'est pas installé. Installez-le avec : pip install rawpy",
 
-    # --- Texte dessiné sur la planche de contact elle-même (JPEG/PDF -
+    # --- Text drawn on the contact sheet itself (JPEG/PDF -
     # portfolio/contactsheet.py, _draw_page_number()) ---
     "sheet.page_label": "Planche {page}/{total}",
     "sheet.footer": "Planche générée par Planche-Contact",
