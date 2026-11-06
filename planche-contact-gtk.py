@@ -6,43 +6,43 @@ import sys
 import os
 from pathlib import Path
 
-# --- Interception des processus de travail multiprocessing (AVANT tout
-# import GTK) -----------------------------------------------------------
-# Dans un exécutable gelé (PyInstaller), chaque worker de ProcessPoolExecutor
-# (utilisé pour les planches contact et la galerie HTML, jusqu'à 64 workers
-# en parallèle) relance ce même exécutable. Sans cette interception TRÈS TÔT
-# - avant même `import gi` -, chaque worker chargerait inutilement toute la
-# pile GTK4 (DLL, typelibs...) avant d'atteindre multiprocessing.freeze_
-# support() plus bas, alors qu'un worker ne fait que du traitement d'image
-# et n'a jamais besoin de GTK. Un gaspillage de temps non négligeable,
-# multiplié par le nombre de workers. Sans effet en exécution depuis les
-# sources (Linux/macOS, non gelé) : freeze_support() n'y fait rien de toute
-# façon dans ce cas normal (pas un worker), et l'exécution continue
-# normalement plus bas.
+# --- Interception of the multiprocessing worker processes (BEFORE any
+# GTK import) --------------------------------------------------------
+# In a frozen executable (PyInstaller), each ProcessPoolExecutor worker
+# (used for the contact sheets and the HTML gallery, up to 64 workers in
+# parallel) relaunches this same executable. Without this VERY EARLY
+# interception - even before `import gi` -, each worker would needlessly
+# load the whole GTK4 stack (DLLs, typelibs...) before reaching
+# multiprocessing.freeze_support() further down, whereas a worker only
+# does image processing and never needs GTK. A non-negligible waste of
+# time, multiplied by the number of workers. No effect when running from
+# the sources (Linux/macOS, not frozen): freeze_support() does nothing
+# anyway in that normal case (not a worker), and execution carries on
+# normally further down.
 if getattr(sys, "frozen", False):
     import multiprocessing
     multiprocessing.freeze_support()
-    # Si l'exécution arrive jusqu'ici, ce n'est pas un worker multiprocessing
-    # (sinon freeze_support() aurait déjà appelé sys.exit() ci-dessus) : on
-    # continue normalement vers le chargement de l'application GTK.
+    # If execution reaches this point, this is not a multiprocessing worker
+    # (otherwise freeze_support() would already have called sys.exit() above):
+    # we carry on normally towards loading the GTK application.
 
-# --- Bootstrap Windows (paquet gelé PyInstaller) ---------------------------
-# Quand l'application tourne comme exécutable Windows gelé par PyInstaller
-# (voir windows/planche-contact.spec), GTK4 et ses typelibs sont embarqués à
-# côté de l'exécutable plutôt qu'installés dans le système : il faut donc
-# indiquer explicitement à PyGObject où les trouver, avant le tout premier
-# `import gi`. Sans effet sur Linux/macOS, ni en exécution depuis les
-# sources (getattr(sys, "frozen", False) n'est vrai que dans un exécutable
-# gelé par PyInstaller).
+# --- Windows bootstrap (PyInstaller-frozen package) ---------------------------
+# When the application runs as a Windows executable frozen by PyInstaller
+# (see windows/planche-contact.spec), GTK4 and its typelibs are bundled
+# next to the executable rather than installed in the system: PyGObject
+# must therefore be told explicitly where to find them, before the very
+# first `import gi`. No effect on Linux/macOS, nor when running from the
+# sources (getattr(sys, "frozen", False) is only true in an executable
+# frozen by PyInstaller).
 if sys.platform == "win32" and getattr(sys, "frozen", False):
     _app_dir = Path(sys.executable).parent
     _typelib_dir = _app_dir / "gi_typelibs"
     if _typelib_dir.is_dir():
         os.environ["GI_TYPELIB_PATH"] = str(_typelib_dir)
-    # Les DLL de GTK4 (bin/ de gvsbuild) sont embarquées à la racine du
-    # paquet, à côté de l'exécutable : on l'ajoute explicitement au chemin
-    # de recherche des DLL (nécessaire depuis Python 3.8 sous Windows,
-    # modifier PATH seul ne suffit plus).
+    # GTK4's DLLs (gvsbuild's bin/) are bundled at the root of the package,
+    # next to the executable: we add it explicitly to the DLL search path
+    # (required since Python 3.8 on Windows, changing PATH alone is no
+    # longer enough).
     if hasattr(os, "add_dll_directory"):
         try:
             os.add_dll_directory(str(_app_dir))
@@ -77,31 +77,30 @@ from portfolio.presentation import (
 )
 
 
-# Hauteur minimale de la zone de journal de la fenêtre principale.
+# Minimum height of the main window's log area.
 LOG_MIN_HEIGHT_PX = 120
 
-# Hauteur à laisser, dans la fenêtre principale, à tout ce qui n'est PAS le
-# formulaire défilant : barre de titre et onglets (~85 px), boutons d'action,
-# état, progression, journal (LOG_MIN_HEIGHT_PX) et leurs marges, plus de
-# quoi tenir compte de la barre des tâches/du bandeau du bureau. Sert à
-# déduire du plafond de hauteur de l'écran celui du formulaire défilant.
+# Height to leave, in the main window, for everything that is NOT the
+# scrolling form: title bar and tabs (~85 px), action buttons, status,
+# progress, log (LOG_MIN_HEIGHT_PX) and their margins, plus some room to
+# allow for the desktop's taskbar/panel. Used to derive the scrolling
+# form's height ceiling from the screen's height limit.
 MAIN_WINDOW_RESERVED_PX = 330
 
 
 def glib_idle_add(function, *args):
-    """Enveloppe autour de GLib.idle_add(), tolérante à deux conventions
-    d'appel possibles selon la version/le binding de PyGObject :
-    - GLib.idle_add(function, *args)               (forme pythonique
-      habituelle, fournie par le module de surcharge Python de GLib)
-    - GLib.idle_add(priorite, function, *args)      (signature brute de la
-      fonction C sous-jacente, utilisée si ce module de surcharge n'est
-      pas chargé - observé sur un exécutable gelé par PyInstaller avec la
-      pile GTK4 gvsbuild sous Windows : "TypeError: Must be number, not
-      method").
-    Cette fonction essaie d'abord la forme pythonique ; en cas d'échec
-    précisément pour cette raison, elle retente avec la priorité en tête.
-    Aucun effet sur Linux/macOS, où la forme pythonique fonctionne toujours
-    du premier coup."""
+    """Wrapper around GLib.idle_add(), tolerant of two possible calling
+    conventions depending on the PyGObject version/binding:
+    - GLib.idle_add(function, *args)               (usual Pythonic form,
+      provided by GLib's Python override module)
+    - GLib.idle_add(priority, function, *args)      (raw signature of the
+      underlying C function, used if this override module is not loaded -
+      observed on a PyInstaller-frozen executable with the gvsbuild GTK4
+      stack on Windows: "TypeError: Must be number, not method").
+    This function first tries the Pythonic form; if it fails precisely for
+    this reason, it retries with the priority first.
+    No effect on Linux/macOS, where the Pythonic form always works on the
+    first try."""
     try:
         return GLib.idle_add(function, *args)
     except TypeError:
@@ -110,16 +109,16 @@ def glib_idle_add(function, *args):
 
 PREVIEW_PAGE_SIZE = 10
 PREVIEW_THUMB_SIZE = 90
-DIALOG_PREVIEW_PAGE_SIZE = PREVIEW_PAGE_SIZE * 2  # 2 lignes de 10 dans le sélecteur de dossier
+DIALOG_PREVIEW_PAGE_SIZE = PREVIEW_PAGE_SIZE * 2  # 2 rows of 10 in the folder picker
 
-#: Couleur personnalisée attendue au format "#rrggbb" (cahier des charges
-#: §4.3) - voir PlancheContactGTK._hex_or_none().
+#: Custom colour expected in "#rrggbb" format (specification §4.3) -
+#: see PlancheContactGTK._hex_or_none().
 _HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 def _pagination_sequence(current, total, window=2):
-    """Retourne une séquence comme [1, '…', 3, 4, 5, 6, 7, '…', 19] pour
-    current=5, total=19, window=2 (current et total sont 1-indexés)."""
+    """Returns a sequence such as [1, '…', 3, 4, 5, 6, 7, '…', 19] for
+    current=5, total=19, window=2 (current and total are 1-indexed)."""
     if total <= 0:
         return []
     pages = {1, total}
@@ -137,13 +136,12 @@ def _pagination_sequence(current, total, window=2):
 
 
 class FolderPreviewController:
-    """Scanne un dossier et affiche les vignettes des photos qu'il contient,
-    par pages de PREVIEW_PAGE_SIZE, dans un jeu de widgets GTK donné.
+    """Scans a folder and displays the thumbnails of the photos it contains,
+    in pages of PREVIEW_PAGE_SIZE, in a given set of GTK widgets.
 
-    Réutilisé à la fois par la bande d'aperçu de la fenêtre principale et
-    par le sélecteur de dossier personnalisé (celui-ci en a besoin car la
-    boîte de dialogue native de GTK4 ne permet plus d'y intégrer de widget
-    de prévisualisation - voir _choose_folder)."""
+    Used both by the main window's preview strip and by the custom folder
+    picker (the latter needs it because GTK4's native dialog no longer
+    allows embedding a preview widget - see _choose_folder)."""
 
     def __init__(self, status_label, flow_box, prev_btn, next_btn, pages_box, page_size=PREVIEW_PAGE_SIZE):
         self.status_label = status_label
@@ -190,9 +188,9 @@ class FolderPreviewController:
             child = next_child
 
     def _scan_files(self, folder_path, token):
-        """Exécuté en arrière-plan : liste uniquement les fichiers (rapide,
-        pas de décodage d'image ici) pour connaître le nombre total de
-        photos et permettre la pagination."""
+        """Runs in the background: only lists the files (fast, no image
+        decoding here) to know the total number of photos and allow
+        pagination."""
         try:
             folder = Path(folder_path)
             image_files = sorted(
@@ -205,7 +203,7 @@ class FolderPreviewController:
 
     def _apply_file_list(self, token, image_files):
         if token != self._token:
-            return False  # Un scan plus récent a été lancé entre-temps.
+            return False  # A more recent scan was started in the meantime.
 
         self._files = image_files
         self._page = 0
@@ -277,8 +275,8 @@ class FolderPreviewController:
 
         self._update_nav()
 
-        # Page déjà générée précédemment (navigation arrière notamment) :
-        # on l'affiche immédiatement, sans repasser par un thread.
+        # Page already generated earlier (backward navigation notably):
+        # displayed immediately, without going through a thread again.
         if page_index in self._page_cache:
             self._display(self._page_cache[page_index], start, end, total)
             return
@@ -294,7 +292,7 @@ class FolderPreviewController:
         ).start()
 
     def _generate_thumbs(self, files_slice, token, page_index, start, end, total):
-        """Exécuté en arrière-plan : ne touche à aucun widget GTK ici."""
+        """Runs in the background: touches no GTK widget here."""
         thumbs = []
         for path in files_slice:
             try:
@@ -310,9 +308,9 @@ class FolderPreviewController:
 
     def _apply_thumbs(self, token, page_index, thumb_bytes_list, start, end, total):
         if token != self._token:
-            return False  # Le dossier a changé entre-temps.
+            return False  # The folder changed in the meantime.
         if page_index != self._page:
-            return False  # L'utilisateur a déjà changé de page entre-temps.
+            return False  # The user already changed page in the meantime.
 
         self._page_cache[page_index] = thumb_bytes_list
         self._display(thumb_bytes_list, start, end, total)
@@ -352,26 +350,24 @@ class PlancheContactGTK(Gtk.Application):
         self.language_preference = "system"
         self._preview_debounce_id = None
         self._output_debounce_id = None
-        # Sous-dossiers choisis par l'utilisateur (voir « Choisir les
-        # sous-dossiers... ») : None = tous les dossiers ; sinon tuple de
-        # chemins relatifs POSIX au dossier d'entrée ("." = le dossier
-        # lui-même), le nombre total de dossiers proposés servant à
-        # l'affichage « N sur M ».
+        # Subfolders chosen by the user (see "Choose subfolders..."): None = all
+        # folders; otherwise a tuple of POSIX paths relative to the input folder
+        # ("." = the folder itself), the total number of folders offered being
+        # used for the "N of M" display.
         self._subfolder_selection = None
         self._subfolder_total = 0
         self._last_result = None
         self._pending_result = None
-        # Référence conservée tant qu'une boîte de dialogue Gtk.FileChooserNative
-        # (enregistrer/charger un profil) est ouverte, pour éviter qu'elle soit
-        # collectée par Python avant que l'utilisateur n'y réponde.
+        # Reference kept while a Gtk.FileChooserNative dialog (save/load a
+        # profile) is open, to prevent it from being garbage-collected by Python
+        # before the user answers it.
         self._active_file_dialog = None
         self.load_settings()
-        # Résolu AVANT toute construction d'interface : tous les widgets
-        # créés dans do_activate() appellent _() en supposant la langue
-        # déjà active. self._language_fallback_detected reste None sauf si
-        # la langue système demandée n'a aucune traduction disponible -
-        # dans ce cas, un avertissement est affiché une fois la fenêtre
-        # affichée (voir do_activate).
+        # Resolved BEFORE any interface construction: all the widgets created in
+        # do_activate() call _() assuming the language is already active.
+        # self._language_fallback_detected stays None unless the requested system
+        # language has no translation available - in that case, a warning is
+        # displayed once the window is shown (see do_activate).
         self._language, self._language_fallback_detected = set_language(self.language_preference)
 
     def load_settings(self):
@@ -398,17 +394,16 @@ class PlancheContactGTK(Gtk.Application):
     def do_activate(self):
         self.win = Gtk.ApplicationWindow(application=self)
         self.win.set_title("Planche-Contact")
-        # Pas de set_default_size() : la fenêtre s'ouvre à la taille la plus
-        # réduite possible (celle nécessaire pour afficher son contenu sans
-        # rien couper), déterminée automatiquement par GTK à partir des
-        # tailles minimales des widgets. Elle reste normalement
-        # redimensionnable (agrandissable) par l'utilisateur ensuite.
+        # No set_default_size(): the window opens at the smallest possible size
+        # (the one needed to display its content without cutting anything),
+        # determined automatically by GTK from the widgets' minimum sizes. It
+        # normally remains resizable (can be enlarged) by the user afterwards.
         self.win.set_icon_name("image-x-generic")
 
-        # Barre de titre avec un menu (bouton hamburger) donnant accès aux
-        # Préférences - volontairement PAS dans l'onglet À propos, qui
-        # reste purement informatif (version, licence, crédits) : un
-        # réglage comme la langue n'a logiquement rien à y faire.
+        # Title bar with a menu (hamburger button) giving access to the
+        # Preferences - deliberately NOT in the About tab, which stays purely
+        # informative (version, licence, credits): a setting such as the
+        # language logically has no business there.
         headerbar = Gtk.HeaderBar()
         menu_button = Gtk.MenuButton()
         menu_button.set_icon_name("open-menu-symbolic")
@@ -446,21 +441,21 @@ class PlancheContactGTK(Gtk.Application):
 
         self.win.present()
 
-        # Le set_text() initial du champ dossier d'entrée a lieu avant la
-        # connexion du signal "changed" : on déclenche donc l'aperçu ici
-        # explicitement pour un dossier déjà mémorisé au démarrage.
+        # The initial set_text() of the input folder field happens before the
+        # "changed" signal is connected: the preview is therefore triggered
+        # explicitly here for a folder already remembered at startup.
         if self.last_input_dir:
             self.input_preview.refresh(self.last_input_dir)
 
-        # Même chose pour le dossier de sortie : si des résultats existent
-        # déjà (générés lors d'une session précédente), "Afficher les
-        # résultats" doit être opérant sans attendre une nouvelle génération.
+        # Same for the output folder: if results already exist (generated
+        # during a previous session), "View results" must work without waiting
+        # for a new generation.
         if self.last_output_dir:
             self._check_existing_results(self.last_output_dir)
 
-        # Langue système sélectionnée mais sans traduction disponible :
-        # affiché une seule fois au démarrage, après la fenêtre principale
-        # pour ne pas retarder son affichage.
+        # System language selected but with no translation available:
+        # displayed only once at startup, after the main window so as not to
+        # delay its display.
         if self._language_fallback_detected is not None:
             dialog = Gtk.AlertDialog()
             dialog.set_modal(True)
@@ -503,25 +498,25 @@ class PlancheContactGTK(Gtk.Application):
 
         dialog.present()
 
-    # ====================== ONGLET GÉNÉRATION ======================
+    # ====================== GENERATION TAB ======================
 
     def _build_generation_tab(self):
-        # L'onglet est en DEUX parties (voir la fin de cette méthode) :
-        # - le formulaire (`box` jusqu'à la grille des options de la galerie
-        #   HTML), dans une zone défilante : sur un petit écran, il défile
-        #   au lieu de pousser la fenêtre au-delà de la hauteur de l'écran ;
-        # - le bas, TOUJOURS visible : boutons d'action, état, progression et
-        #   journal (c'est là que s'affichent les messages de génération - ils
-        #   sortaient de l'écran quand la fenêtre était trop haute).
-        # Les petites marges (4 px) autour du formulaire évitent que la zone
-        # défilante ne rogne le halo de focus des champs en bordure.
+        # The tab is in TWO parts (see the end of this method):
+        # - the form (`box` up to the HTML gallery options grid), in a scrolling
+        #   area: on a small screen, it scrolls instead of pushing the window
+        #   beyond the screen height;
+        # - the bottom, ALWAYS visible: action buttons, status, progress and
+        #   log (this is where the generation messages are displayed - they used
+        #   to go off-screen when the window was too tall).
+        # The small margins (4 px) around the form prevent the scrolling area
+        # from clipping the focus halo of the fields on the border.
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.set_margin_top(4)
         box.set_margin_bottom(4)
         box.set_margin_start(4)
         box.set_margin_end(4)
 
-        # Titre du projet + Nom de l'auteur (même ligne)
+        # Project title + Author name (same row)
         hbox = Gtk.Box(spacing=10)
         hbox.append(Gtk.Label(label=_("gen.project_title")))
         self.project_title_entry = Gtk.Entry()
@@ -544,7 +539,7 @@ class PlancheContactGTK(Gtk.Application):
         hbox.append(spacer)
         box.append(hbox)
 
-        # Dossier d'entrée
+        # Input folder
         hbox = Gtk.Box(spacing=10)
         hbox.append(Gtk.Label(label=_("gen.input_dir")))
         self.input_entry = Gtk.Entry()
@@ -563,11 +558,10 @@ class PlancheContactGTK(Gtk.Application):
         hbox.append(spacer)
         box.append(hbox)
 
-        # Aperçu des photos du dossier d'entrée (le sélecteur système ne
-        # propose pas de vignettes pour un choix de dossier : on affiche
-        # donc ici un aperçu généré par l'application elle-même, paginé
-        # pour rester fluide même sur un dossier contenant des centaines
-        # de photos).
+        # Preview of the input folder's photos (the system picker offers no
+        # thumbnails for a folder choice: an application-generated preview is
+        # therefore displayed here, paginated to stay smooth even on a folder
+        # containing hundreds of photos).
         self.input_preview_status = Gtk.Label(label="")
         self.input_preview_status.set_xalign(0)
         self.input_preview_status.add_css_class("dim-label")
@@ -579,13 +573,12 @@ class PlancheContactGTK(Gtk.Application):
         preview_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
         preview_scroll.set_min_content_height(PREVIEW_THUMB_SIZE + 10)
         preview_scroll.set_max_content_height(PREVIEW_THUMB_SIZE + 10)
-        # set_size_request en complément : min/max_content_height ne semblent
-        # pas s'appliquer tant que le contenu (les vignettes) n'a pas encore
-        # été chargé (la zone reste alors quasi invisible, ~2px), ce qui fait
-        # grandir la fenêtre après coup une fois l'aperçu chargé - et
-        # perturbe le centrage vertical fait par le gestionnaire de
-        # fenêtres à l'ouverture. set_size_request agit dès le premier
-        # affichage, sans attendre le contenu.
+        # set_size_request in addition: min/max_content_height do not seem to
+        # apply as long as the content (the thumbnails) has not been loaded yet
+        # (the area then stays nearly invisible, ~2px), which makes the window
+        # grow afterwards once the preview is loaded - and disturbs the vertical
+        # centring done by the window manager at opening. set_size_request acts
+        # from the first display, without waiting for the content.
         preview_scroll.set_size_request(-1, PREVIEW_THUMB_SIZE + 10)
         preview_scroll.set_child(self.input_preview_flow)
         box.append(preview_scroll)
@@ -596,11 +589,11 @@ class PlancheContactGTK(Gtk.Application):
         self.preview_prev_btn = Gtk.Button(label=_("preview.prev"))
         self.preview_prev_btn.set_sensitive(False)
         self.preview_pages_box = Gtk.Box(spacing=4)
-        # Hauteur réservée dès le départ (avant même qu'un dossier ne soit
-        # scanné) : sans ça, cette zone est vide au premier affichage puis
-        # se remplit de boutons de pagination une fois le scan terminé, ce
-        # qui agrandit la fenêtre après coup - et perturbe le centrage
-        # vertical fait par le gestionnaire de fenêtres à l'ouverture.
+        # Height reserved from the start (even before a folder is scanned):
+        # without it, this area is empty at first display then fills with
+        # pagination buttons once the scan is finished, which enlarges the
+        # window afterwards - and disturbs the vertical centring done by the
+        # window manager at opening.
         self.preview_pages_box.set_size_request(-1, 34)
         self.preview_next_btn = Gtk.Button(label=_("preview.next"))
         self.preview_next_btn.set_sensitive(False)
@@ -614,7 +607,7 @@ class PlancheContactGTK(Gtk.Application):
             self.preview_prev_btn, self.preview_next_btn, self.preview_pages_box
         )
 
-        # Dossier de sortie
+        # Output folder
         hbox = Gtk.Box(spacing=10)
         hbox.append(Gtk.Label(label=_("gen.output_dir")))
         self.output_entry = Gtk.Entry()
@@ -667,7 +660,7 @@ class PlancheContactGTK(Gtk.Application):
         self.format_combo.set_selected(1)
         grid.attach(self.format_combo, 3, 1, 1, 1)
 
-        # Filigrane : sur la même ligne, pour limiter la hauteur du formulaire
+        # Watermark: on the same row, to limit the form's height
         watermark_label = Gtk.Label(label=_("gen.watermark_text"))
         watermark_label.set_margin_start(20)
         grid.attach(watermark_label, 4, 1, 1, 1)
@@ -680,11 +673,11 @@ class PlancheContactGTK(Gtk.Application):
         orient_label = Gtk.Label(label=_("gen.watermark_orientation"))
         orient_label.set_margin_start(20)
         grid.attach(orient_label, 6, 1, 1, 1)
-        # Les valeurs de ce menu sont transmises telles quelles au CLI
-        # (portfolio.py --watermark-orientation), qui les compare en
-        # français (voir portfolio/config.py) : on affiche la traduction
-        # mais on garde la valeur française en interne pour ne rien casser
-        # côté moteur.
+        # The values of this menu are passed as is to the CLI
+        # (portfolio.py --watermark-orientation), which compares them in
+        # French (see portfolio/config.py): the translation is displayed
+        # but the French value is kept internally so as not to break anything
+        # on the engine side.
         self._orient_values = ["Horizontal", "Diagonale horaire", "Diagonale anti-horaire"]
         orient_model = Gtk.StringList()
         for key in ["watermark.horizontal", "watermark.diagonal_cw", "watermark.diagonal_ccw"]:
@@ -693,8 +686,8 @@ class PlancheContactGTK(Gtk.Application):
         self.watermark_orient_combo.set_selected(0)
         grid.attach(self.watermark_orient_combo, 7, 1, 1, 1)
 
-        # Opacité du filigrane (0-100%), valeur par défaut alignée sur celle
-        # utilisée par le générateur (voir portfolio/config.py).
+        # Watermark opacity (0-100%), default value aligned with the one used
+        # by the generator (see portfolio/config.py).
         opacity_label = Gtk.Label(label=_("gen.watermark_opacity"))
         grid.attach(opacity_label, 0, 2, 1, 1)
         self.watermark_opacity_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
@@ -705,13 +698,13 @@ class PlancheContactGTK(Gtk.Application):
         self.watermark_opacity_scale.set_size_request(220, -1)
         grid.attach(self.watermark_opacity_scale, 1, 2, 3, 1)
 
-        # Thème graphique (Clair/Sombre/Neutre/Système) : un réglage COURANT,
-        # donc visible dans la fenêtre principale plutôt que caché dans la
-        # section avancée repliée (signalé par un utilisateur : "je ne vois
-        # pas de choix de thème"). Seules les couleurs PERSONNALISÉES
-        # restent dans la section avancée. Ce menu est l'unique widget du
-        # mode de thème : _profile_from_widgets()/_apply_profile_to_widgets()
-        # le lisent/l'écrivent comme les autres réglages du Profil.
+        # Graphical theme (Light/Dark/Neutral/System): a COMMON setting,
+        # hence visible in the main window rather than hidden in the collapsed
+        # advanced section (reported by a user: "I can't see any theme
+        # choice"). Only the CUSTOM colours remain in the advanced section.
+        # This menu is the only widget for the theme mode:
+        # _profile_from_widgets()/_apply_profile_to_widgets() read/write it
+        # like the other Profile settings.
         theme_label = Gtk.Label(label=_("gen.theme_label"))
         theme_label.set_margin_start(20)
         grid.attach(theme_label, 4, 2, 1, 1)
@@ -733,9 +726,9 @@ class PlancheContactGTK(Gtk.Application):
         grid.attach(self.html_check, 0, 4, 2, 1)
         grid.attach(self.csv_check, 0, 5, 2, 1)
 
-        # Nombre d'images par page de la galerie HTML : sur la même ligne
-        # que la case à cocher correspondante (voir portfolio/htmlgallery.py,
-        # HTMLGalleryGenerator.images_per_page, défaut 48).
+        # Number of images per page of the HTML gallery: on the same row as
+        # the corresponding checkbox (see portfolio/htmlgallery.py,
+        # HTMLGalleryGenerator.images_per_page, default 48).
         html_per_page_label = Gtk.Label(label=_("gen.images_per_page"))
         html_per_page_label.set_margin_start(20)
         grid.attach(html_per_page_label, 2, 4, 1, 1)
@@ -746,17 +739,17 @@ class PlancheContactGTK(Gtk.Application):
         self.html_per_page_scale.set_value_pos(Gtk.PositionType.RIGHT)
         self.html_per_page_scale.set_hexpand(False)
         self.html_per_page_scale.set_size_request(220, -1)
-        # GtkScale ne cale pas nativement le glissé à la souris sur le pas
-        # fourni à new_with_range (celui-ci ne régit que le clavier/molette) :
-        # on arrondit donc manuellement au multiple de 4 le plus proche.
+        # GtkScale does not natively snap mouse dragging to the step given to
+        # new_with_range (the latter only governs keyboard/wheel): we therefore
+        # round manually to the nearest multiple of 4.
         self.html_per_page_scale.connect("value-changed", self._snap_html_per_page)
         grid.attach(self.html_per_page_scale, 3, 4, 3, 1)
 
-        # Originaux pleine taille joints à la galerie HTML (bouton de
-        # téléchargement de la visionneuse) : sur cette même ligne, à droite
-        # du curseur, pour ne pas ajouter de hauteur au formulaire (voir
-        # PROJECT_CONTEXT.md : rien de variable/volumineux dans la fenêtre
-        # principale). Sans objet quand la galerie HTML est décochée.
+        # Full-size originals attached to the HTML gallery (the viewer's
+        # download button): on this same row, to the right of the slider, so as
+        # not to add height to the form (see PROJECT_CONTEXT.md: nothing
+        # variable/bulky in the main window). Irrelevant when the HTML gallery
+        # is unchecked.
         self.html_originals_check = Gtk.CheckButton(label=_("gen.html_originals"))
         self.html_originals_check.set_margin_start(20)
         self.html_originals_check.set_tooltip_text(_("gen.html_originals_tooltip"))
@@ -770,11 +763,11 @@ class PlancheContactGTK(Gtk.Application):
         form_box = box
         form_scroll = Gtk.ScrolledWindow()
         form_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        # Hauteur/largeur NATURELLES du formulaire propagées à la fenêtre
-        # (sinon la zone défilante s'ouvrirait quasi vide), plafonnées à ce
-        # que l'écran peut contenir (_apply_form_scroll_limits()) : c'est ce
-        # plafond qui fait apparaître l'ascenseur sur un petit écran, et lui
-        # seul - sur un grand écran la fenêtre garde la taille de son contenu.
+        # NATURAL height/width of the form propagated to the window (otherwise
+        # the scrolling area would open nearly empty), capped at what the screen
+        # can hold (_apply_form_scroll_limits()): it is this cap that makes the
+        # scrollbar appear on a small screen, and it alone - on a large screen
+        # the window keeps the size of its content.
         form_scroll.set_propagate_natural_width(True)
         form_scroll.set_propagate_natural_height(True)
         form_scroll.set_child(form_box)
@@ -788,34 +781,33 @@ class PlancheContactGTK(Gtk.Application):
         box.set_margin_end(25)
         box.append(form_scroll)
 
-        # Mise en page/légendes/thème personnalisables (cahier des charges
-        # §1/§2/§4) : dans une fenêtre modale à part, clairement à l'écart
-        # des réglages simples/courants ci-dessus - voir
-        # _build_advanced_section() et _open_advanced_dialog().
+        # Customisable layout/captions/theme (specification §1/§2/§4): in a
+        # separate modal window, clearly set apart from the simple/common
+        # settings above - see _build_advanced_section() and
+        # _open_advanced_dialog().
         #
-        # Auparavant un Gtk.Expander dans cette fenêtre : une fois déplié,
-        # il l'agrandissait d'environ 550 px (jusqu'à ~1600 px de haut), bien
-        # au-delà de la hauteur d'un écran, et repoussait les boutons
-        # « Lancer »/« Quitter » hors de vue. Les widgets sont toujours
-        # construits ICI, une seule fois, et vivent aussi longtemps que
-        # l'application : _profile_from_widgets() lit donc leur état même si
-        # la fenêtre n'a jamais été ouverte (profil par défaut). La fenêtre,
-        # elle, n'est créée qu'à la première ouverture, puis seulement
-        # masquée à sa fermeture (les réglages sont conservés).
+        # This used to be a Gtk.Expander in this window: once expanded, it
+        # enlarged it by about 550 px (up to ~1600 px tall), well beyond a
+        # screen's height, and pushed the "Start generation"/"Quit" buttons out
+        # of view. The widgets are always built HERE, once, and live as long as
+        # the application: _profile_from_widgets() therefore reads their state
+        # even if the window was never opened (default profile). The window
+        # itself is only created on first opening, then merely hidden when
+        # closed (the settings are kept).
         self.adv_content = self._build_advanced_section()
         self._adv_dialog = None
-        # Le bouton qui l'ouvre est sur la ligne des boutons d'action
-        # (juste après « Lancer »), plus bas dans cette méthode.
+        # The button that opens it is on the action buttons row (right after
+        # "Start generation"), further down in this method.
         self.adv_open_btn = Gtk.Button(label=_("adv.open_button"))
         self.adv_open_btn.set_tooltip_text(_("adv.open_button_tooltip"))
         self.adv_open_btn.connect("clicked", self._open_advanced_dialog)
-        # Au démarrage : le nom du fichier sous chaque photo (voir
-        # interface_default_profile()). La ligne de commande, elle, ne met
-        # aucune légende sans --profile ; l'interface transmet son profil
-        # dès qu'il diffère de default_profile() - donc ici toujours.
+        # At startup: the file name under each photo (see
+        # interface_default_profile()). The command line, on the other hand,
+        # sets no caption without --profile; the interface passes its profile
+        # as soon as it differs from default_profile() - hence always here.
         self._apply_profile_to_widgets(interface_default_profile())
 
-        # Boutons
+        # Buttons
         hbox = Gtk.Box(spacing=10)
         self.run_button = Gtk.Button(label=_("gen.run"))
         self.run_button.add_css_class("suggested-action")
@@ -824,12 +816,11 @@ class PlancheContactGTK(Gtk.Application):
         reset_btn = Gtk.Button(label=_("gen.reset"))
         reset_btn.connect("clicked", self._reset_form)
 
-        # Bouton à liste déroulante pour ouvrir les résultats (planches,
-        # PDF, galerie) dans les applications par défaut du système - pas
-        # d'aperçu intégré, donc la fenêtre principale ne grandit pas.
-        # Désactivé tant qu'aucune génération n'a réussi ; chaque option
-        # individuelle n'est activée que si l'élément correspondant a
-        # effectivement été produit lors de la dernière génération.
+        # Dropdown button to open the results (sheets, PDF, gallery) in the
+        # system's default applications - no built-in preview, so the main
+        # window does not grow. Disabled until a generation has succeeded; each
+        # individual option is enabled only if the corresponding item was
+        # actually produced during the last generation.
         self.view_results_btn = Gtk.MenuButton(label=_("gen.view_results"))
         self.view_results_btn.set_sensitive(False)
 
@@ -893,27 +884,27 @@ class PlancheContactGTK(Gtk.Application):
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_child(self.log_view)
         scrolled.set_vexpand(True)
-        # Hauteur minimale modeste : la fenêtre doit tenir sur un écran
-        # (260 px auparavant, soit ~140 px de trop). Le journal reste
-        # extensible : il récupère tout l'espace gagné en agrandissant la
-        # fenêtre (set_vexpand ci-dessus).
+        # Modest minimum height: the window must fit on a screen (260 px
+        # previously, i.e. ~140 px too many). The log stays expandable: it
+        # takes all the space gained by enlarging the window (set_vexpand
+        # above).
         scrolled.set_min_content_height(LOG_MIN_HEIGHT_PX)
         box.append(scrolled)
 
         return box
 
-    # ====================== FENÊTRE DES RÉGLAGES AVANCÉS ======================
+    # ====================== ADVANCED SETTINGS WINDOW ======================
 
     def _build_advanced_dialog(self):
-        """Fenêtre modale contenant self.adv_content (construit une fois pour
-        toutes par _build_advanced_section()). Le contenu défile dans sa
-        propre zone, dont la hauteur maximale suit celle de l'écran
-        (_advanced_dialog_limits()) : la barre du bas - message d'état et
-        bouton « Fermer » - reste toujours visible, même sur un petit écran."""
+        """Modal window containing self.adv_content (built once and for all by
+        _build_advanced_section()). The content scrolls in its own area, whose
+        maximum height follows the screen's (_advanced_dialog_limits()): the
+        bottom bar - status message and "Close" button - always stays visible,
+        even on a small screen."""
         dialog = Gtk.Window(transient_for=self.win, modal=True)
         dialog.set_title(_("adv.dialog_title"))
-        # Fermer la fenêtre (croix, Échap, bouton) la MASQUE seulement : les
-        # widgets qu'elle contient doivent survivre, ils portent les réglages.
+        # Closing the window (cross, Esc, button) only HIDES it: the widgets it
+        # contains must survive, they carry the settings.
         dialog.set_hide_on_close(True)
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -921,8 +912,8 @@ class PlancheContactGTK(Gtk.Application):
 
         self.adv_scroll = Gtk.ScrolledWindow()
         self.adv_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        # Sans cette propagation, la zone défilante s'ouvrirait à sa taille
-        # minimale (quasi nulle) au lieu de celle du contenu.
+        # Without this propagation, the scrolling area would open at its minimum
+        # size (nearly zero) instead of that of the content.
         self.adv_scroll.set_propagate_natural_width(True)
         self.adv_scroll.set_propagate_natural_height(True)
         self.adv_scroll.set_vexpand(True)
@@ -936,9 +927,8 @@ class PlancheContactGTK(Gtk.Application):
         bar.set_margin_start(14)
         bar.set_margin_end(14)
 
-        # Retour d'information VISIBLE ici : la fenêtre principale (et son
-        # journal) est masquée derrière cette fenêtre modale tant qu'elle
-        # est ouverte (voir _adv_notify()).
+        # VISIBLE feedback here: the main window (and its log) is hidden behind
+        # this modal window as long as it is open (see _adv_notify()).
         self.adv_status_label = Gtk.Label(label="")
         self.adv_status_label.set_xalign(0)
         self.adv_status_label.set_hexpand(True)
@@ -965,11 +955,11 @@ class PlancheContactGTK(Gtk.Application):
         return dialog
 
     def _screen_size(self):
-        """(largeur, hauteur) en pixels de l'écran de la fenêtre principale.
-        Avant que celle-ci soit affichée (pas encore de surface - cas de la
-        construction de l'interface), on se rabat sur le premier écran du
-        système, normalement l'écran principal ; valeurs prudentes si rien
-        n'est lisible (aucune exception ne doit empêcher le démarrage)."""
+        """(width, height) in pixels of the main window's screen. Before it is
+        shown (no surface yet - the case during interface construction), we
+        fall back on the system's first monitor, normally the main one;
+        cautious values if nothing is readable (no exception must prevent
+        startup)."""
         try:
             display = Gdk.Display.get_default()
             monitor = None
@@ -989,11 +979,11 @@ class PlancheContactGTK(Gtk.Application):
         return 1400, 800
 
     def _apply_form_scroll_limits(self):
-        """Plafonne la zone défilante du formulaire de la fenêtre principale
-        pour que celle-ci, une fois ajoutés ses autres éléments (voir
-        MAIN_WINDOW_RESERVED_PX), tienne dans 85 % de la hauteur de l'écran
-        et dans 95 % de sa largeur. Sur un écran assez grand, le plafond
-        n'est jamais atteint : la fenêtre garde la taille de son contenu."""
+        """Caps the main window's scrolling form area so that the window, once
+        its other elements are added (see MAIN_WINDOW_RESERVED_PX), fits within
+        85% of the screen height and 95% of its width. On a large enough
+        screen, the cap is never reached: the window keeps the size of its
+        content."""
         width, height = self._screen_size()
         self.form_scroll.set_max_content_width(int(width * 0.95))
         self._configure_scroll_area(
@@ -1002,19 +992,17 @@ class PlancheContactGTK(Gtk.Application):
         )
 
     def _configure_scroll_area(self, scrolled, content, max_height):
-        """Plafonne la hauteur d'une zone défilante et, SEULEMENT si son
-        contenu dépasse ce plafond (donc s'il va réellement défiler), y
-        affiche un ascenseur vertical classique, toujours présent : les
-        ascenseurs « surcouche » de GTK4 n'apparaissent qu'au survol, et
-        l'utilisateur ne devinerait pas que la zone défile.
+        """Caps the height of a scrolling area and, ONLY if its content
+        exceeds this cap (so if it will really scroll), shows a classic
+        vertical scrollbar there, always present: GTK4's "overlay" scrollbars
+        only appear on hover, and the user would not guess the area scrolls.
 
-        « Toujours présent » (et non « automatique ») est ce qui fait
-        réserver à GTK la largeur de l'ascenseur dans la largeur naturelle
-        propagée à la fenêtre. Avec un ascenseur classique apparaissant à la
-        demande, il prend de la largeur à un contenu qui occupait déjà toute
-        la zone, et un ascenseur HORIZONTAL parasite apparaît aussi (constaté
-        sous Xvfb). Contenu qui tient dans le plafond : rien ne change -
-        aucun ascenseur, comportement par défaut."""
+        "Always present" (rather than "automatic") is what makes GTK reserve
+        the scrollbar's width in the natural width propagated to the window.
+        With a classic scrollbar appearing on demand, it takes width from a
+        content that already filled the whole area, and a stray HORIZONTAL
+        scrollbar also appears (observed under Xvfb). Content that fits within
+        the cap: nothing changes - no scrollbar, default behaviour."""
         scrolled.set_max_content_height(max_height)
         needs_scrolling = content.measure(Gtk.Orientation.VERTICAL, -1)[1] > max_height
         scrolled.set_overlay_scrolling(not needs_scrolling)
@@ -1024,10 +1012,10 @@ class PlancheContactGTK(Gtk.Application):
         )
 
     def _advanced_dialog_limits(self):
-        """(largeur, hauteur) maximales de la zone défilante, déduites de
-        l'écran où se trouve la fenêtre principale : la fenêtre des réglages
-        avancés, barre de titre et barre du bas comprises, doit tenir dans
-        l'écran - jamais plus haute que lui (le défaut corrigé ici)."""
+        """Maximum (width, height) of the scrolling area, derived from the
+        screen where the main window is located: the advanced settings window,
+        title bar and bottom bar included, must fit within the screen - never
+        taller than it (the defect fixed here)."""
         width, height = self._screen_size()
         return int(width * 0.92), int(height * 0.72)
 
@@ -1041,45 +1029,43 @@ class PlancheContactGTK(Gtk.Application):
         self._adv_dialog.present()
 
     def _dialog_parent(self):
-        """Fenêtre parente à donner à toute fenêtre/boîte de dialogue ouverte
-        depuis l'interface : celle des réglages avancés tant qu'elle est
-        affichée (étant modale, elle bloque la fenêtre principale - une
-        fenêtre fille de CELLE-CI n'aurait aucun effet), la fenêtre
-        principale sinon."""
+        """Parent window to give to any window/dialog opened from the
+        interface: the advanced settings one while it is shown (being modal, it
+        blocks the main window - a child window of THAT one would have no
+        effect), the main window otherwise."""
         dialog = getattr(self, "_adv_dialog", None)
         if dialog is not None and dialog.get_visible():
             return dialog
         return self.win
 
     def _adv_notify(self, message):
-        """Message issu d'une action de la fenêtre des réglages avancés
-        (aperçu, enregistrer/charger un profil) : consigné dans le journal
-        de la fenêtre principale ET affiché dans la barre d'état de la
-        fenêtre avancée, seule visible pendant qu'elle est ouverte."""
+        """Message coming from an action of the advanced settings window
+        (preview, save/load a profile): logged in the main window's log AND
+        displayed in the advanced window's status bar, the only one visible
+        while it is open."""
         self._log(message)
         label = getattr(self, "adv_status_label", None)
         if label is not None:
             label.set_text(message)
 
-    # ====================== MISE EN PAGE/LÉGENDES/THÈME AVANCÉS ======================
-    # Cahier des charges §1/§2/§4 : ces réglages alimentent un Profil
-    # (portfolio/presentation/profile.py), la même source unique de vérité
-    # que les planches JPEG/PDF (contactsheet.py) et la galerie HTML
-    # (htmlgallery.py) - jamais de règle de mise en page/légende/thème
-    # dupliquée ici. Le nombre de photos par planche et le format de page
-    # restent pilotés par les réglages simples existants (num_combo/
-    # format_combo) : Config.__post_init__() les synchronise déjà
-    # automatiquement dans le Profil, exactement comme pour le CLI sans
-    # --profile (voir tests/test_portfolio_cli.py) - ils ne sont donc PAS
-    # dupliqués ici pour éviter toute ambiguïté entre deux réglages du
-    # même nombre.
+    # ====================== ADVANCED LAYOUT/CAPTIONS/THEME ======================
+    # Specification §1/§2/§4: these settings feed a Profile
+    # (portfolio/presentation/profile.py), the same single source of truth
+    # as the JPEG/PDF sheets (contactsheet.py) and the HTML gallery
+    # (htmlgallery.py) - never any layout/caption/theme rule duplicated
+    # here. The number of photos per sheet and the page format remain driven
+    # by the existing simple settings (num_combo/format_combo):
+    # Config.__post_init__() already synchronises them automatically into
+    # the Profile, exactly as for the CLI without --profile (see
+    # tests/test_portfolio_cli.py) - they are therefore NOT duplicated here,
+    # to avoid any ambiguity between two settings for the same number.
 
     @staticmethod
     def _make_choice_dropdown(values, label_keys, selected_index=0):
-        """Un Gtk.DropDown dont chaque option affiche une traduction
-        (label_keys) tout en gardant la valeur INTERNE (values, ex :
-        LAYOUT_TEMPLATES) récupérable via _dropdown_value() - même principe
-        que self._orient_values pour le filigrane, généralisé."""
+        """A Gtk.DropDown whose every option displays a translation
+        (label_keys) while keeping the INTERNAL value (values, e.g.
+        LAYOUT_TEMPLATES) retrievable via _dropdown_value() - same principle
+        as self._orient_values for the watermark, generalised."""
         model = Gtk.StringList()
         for key in label_keys:
             model.append(_(key))
@@ -1102,18 +1088,17 @@ class PlancheContactGTK(Gtk.Application):
 
     @staticmethod
     def _spin_or_none(spin_button):
-        """0 = automatique (None) - utilisé pour les colonnes/lignes du
-        modèle "Libre" (LayoutSettings.columns/rows)."""
+        """0 = automatic (None) - used for the columns/rows of the "Free"
+        template (LayoutSettings.columns/rows)."""
         value = int(spin_button.get_value())
         return value if value > 0 else None
 
     @staticmethod
     def _hex_or_none(entry):
-        """Couleur personnalisée valide ("#rrggbb") ou None (champ vide ou
-        invalide) - jamais d'exception, la couleur par défaut du thème
-        s'applique alors simplement (voir ThemeCustomColors). Un contenu
-        non vide mais invalide est signalé visuellement (bordure rouge),
-        sans bloquer la génération pour autant."""
+        """Valid custom colour ("#rrggbb") or None (empty or invalid field) -
+        never an exception, the theme's default colour then simply applies
+        (see ThemeCustomColors). A non-empty but invalid content is flagged
+        visually (red border), though without blocking the generation."""
         text = entry.get_text().strip()
         if not text:
             entry.remove_css_class("error")
@@ -1138,7 +1123,7 @@ class PlancheContactGTK(Gtk.Application):
             lbl.set_margin_top(6)
             return lbl
 
-        # --- Mise en page (cahier des charges §2) --------------------------
+        # --- Layout (specification §2) ------------------------------------
         box.append(subtitle("adv.layout_subtitle"))
         grid = Gtk.Grid(column_spacing=10, row_spacing=6)
         box.append(grid)
@@ -1168,13 +1153,13 @@ class PlancheContactGTK(Gtk.Application):
         self.adv_fit_mode_dd.set_tooltip_text(_("adv.fit_mode_tooltip"))
         grid.attach(self.adv_fit_mode_dd, 5, 0, 1, 1)
 
-        # Quatre lignes de TROIS colonnes de réglages au plus, plutôt que
-        # trois lignes dont une de quatre : les libellés « Colonnes/Lignes
-        # (modèle Libre, 0 = auto) » étant les plus longs, les placer à côté
-        # de la marge et de l'espacement portait la fenêtre des réglages
-        # avancés à ~1260 px de large - plus qu'un écran de 1366 px une fois
-        # l'ascenseur compté. Les réglages du modèle (colonnes/lignes, actifs
-        # seulement pour « Libre ») suivent donc directement le modèle.
+        # Four rows of AT MOST THREE columns of settings, rather than three rows
+        # one of which has four: the "Columns/Rows (Free template, 0 = auto)"
+        # labels being the longest, placing them next to the margin and the
+        # spacing brought the advanced settings window to ~1260 px wide - more
+        # than a 1366 px screen once the scrollbar is counted. The template's
+        # settings (columns/rows, active only for "Free") therefore follow the
+        # template directly.
         cols_label = Gtk.Label(label=_("adv.free_columns_label"), xalign=0)
         grid.attach(cols_label, 0, 1, 1, 1)
         self.adv_free_cols_spin = Gtk.SpinButton.new_with_range(0, 12, 1)
@@ -1215,7 +1200,7 @@ class PlancheContactGTK(Gtk.Application):
         self.adv_page_numbering_check.set_tooltip_text(_("adv.page_numbering_tooltip"))
         grid.attach(self.adv_page_numbering_check, 4, 3, 2, 1)
 
-        # --- Légendes par photo (cahier des charges §1) ---------------------
+        # --- Captions per photo (specification §1) ---------------------
         box.append(subtitle("adv.captions_subtitle"))
         grid = Gtk.Grid(column_spacing=10, row_spacing=6)
         box.append(grid)
@@ -1237,9 +1222,9 @@ class PlancheContactGTK(Gtk.Application):
         lines_label.set_margin_start(20)
         grid.attach(lines_label, 4, 0, 1, 1)
         self.adv_caption_lines_spin = Gtk.SpinButton.new_with_range(1, 4, 1)
-        # Le texte passe de toute façon à la ligne s'il est trop large pour
-        # la vignette (voir presentation.captions.layout_caption_lines()) :
-        # ce réglage n'est donc qu'un point de départ, pas une limite.
+        # The text wraps anyway if it is too wide for the thumbnail (see
+        # presentation.captions.layout_caption_lines()): this setting is
+        # therefore only a starting point, not a limit.
         lines_label.set_tooltip_text(_("adv.caption_lines_tooltip"))
         self.adv_caption_lines_spin.set_tooltip_text(_("adv.caption_lines_tooltip"))
         grid.attach(self.adv_caption_lines_spin, 5, 0, 1, 1)
@@ -1263,8 +1248,8 @@ class PlancheContactGTK(Gtk.Application):
         fields_flow = Gtk.FlowBox()
         fields_flow.set_selection_mode(Gtk.SelectionMode.NONE)
         fields_flow.set_min_children_per_line(3)
-        # 4 par ligne au plus (6 auparavant) : à 6, cette grille à colonnes
-        # égales faisait ~1250 px de large (voir la grille de mise en page).
+        # At most 4 per row (6 previously): at 6, this equal-column grid was
+        # ~1250 px wide (see the layout grid).
         fields_flow.set_max_children_per_line(4)
         fields_flow.set_row_spacing(2)
         fields_flow.set_column_spacing(14)
@@ -1279,11 +1264,10 @@ class PlancheContactGTK(Gtk.Application):
             self.adv_caption_field_checks[field_name] = check
             fields_flow.append(check)
 
-        # --- Couleurs personnalisées du thème (cahier des charges §4) -------
-        # Le MODE de thème (Clair/Sombre/Neutre/Système) se choisit dans la
-        # fenêtre principale (self.theme_mode_dd, voir
-        # _build_generation_tab()) : seules les couleurs qui le surchargent
-        # restent ici, section avancée.
+        # --- Custom theme colours (specification §4) -------
+        # The theme MODE (Light/Dark/Neutral/System) is chosen in the main
+        # window (self.theme_mode_dd, see _build_generation_tab()): only the
+        # colours that override it remain here, in the advanced section.
         box.append(subtitle("adv.theme_subtitle"))
 
         colors_label = Gtk.Label(label=_("adv.custom_colors_label"), xalign=0)
@@ -1306,7 +1290,7 @@ class PlancheContactGTK(Gtk.Application):
         self.adv_color_accent_entry = make_color_entry("adv.custom_accent_label")
         self.adv_color_border_entry = make_color_entry("adv.custom_border_label")
 
-        # --- Profils réutilisables (cahier des charges §2/§4.4) + aperçu ----
+        # --- Reusable profiles (specification §2/§4.4) + preview ----
         actions_box = Gtk.Box(spacing=10)
         actions_box.set_margin_top(10)
         self.adv_preview_btn = Gtk.Button(label=_("adv.preview_button"))
@@ -1339,12 +1323,11 @@ class PlancheContactGTK(Gtk.Application):
             check.set_sensitive(has_caption)
 
     def _profile_from_widgets(self) -> Profile:
-        """Construit le Profil correspondant à l'état courant des widgets
-        avancés ET du menu de thème de la fenêtre principale
-        (self.theme_mode_dd) - layout.per_page/page_format restent
-        volontairement à leur valeur par défaut (voir l'en-tête de cette
-        section) :
-        Config.__post_init__() les aligne sur num_combo/format_combo."""
+        """Builds the Profile matching the current state of the advanced
+        widgets AND of the main window's theme menu (self.theme_mode_dd) -
+        layout.per_page/page_format deliberately stay at their default value
+        (see this section's header):
+        Config.__post_init__() aligns them on num_combo/format_combo."""
         layout = LayoutSettings(
             template=self._dropdown_value(self.adv_template_dd),
             columns=self._spin_or_none(self.adv_free_cols_spin),
@@ -1387,9 +1370,9 @@ class PlancheContactGTK(Gtk.Application):
         return Profile(layout=layout, captions=captions, theme=theme)
 
     def _apply_profile_to_widgets(self, profile: Profile):
-        """Réciproque de _profile_from_widgets() : reflète un Profil
-        (chargé depuis un fichier, ou default_profile() pour réinitialiser)
-        dans l'état des widgets avancés."""
+        """Reciprocal of _profile_from_widgets(): reflects a Profile (loaded
+        from a file, or default_profile() to reset) in the state of the
+        advanced widgets."""
         self._set_dropdown_value(self.adv_template_dd, profile.layout.template)
         self._set_dropdown_value(self.adv_orientation_dd, profile.layout.orientation)
         self._set_dropdown_value(self.adv_fit_mode_dd, profile.layout.fit_mode)
@@ -1465,9 +1448,9 @@ class PlancheContactGTK(Gtk.Application):
                 gfile = dlg.get_file()
                 path = gfile.get_path() if gfile else None
                 if path:
-                    # load_profile() ne lève jamais d'exception (voir
-                    # presentation/profile.py) : un fichier invalide
-                    # retombe silencieusement sur les valeurs par défaut.
+                    # load_profile() never raises an exception (see
+                    # presentation/profile.py): an invalid file silently falls back to
+                    # the default values.
                     profile = load_profile(path)
                     self._apply_profile_to_widgets(profile)
                     self._adv_notify(_("adv.profile_loaded", path=path))
@@ -1478,41 +1461,40 @@ class PlancheContactGTK(Gtk.Application):
         dialog.connect("response", on_response)
         dialog.show()
 
-    # ====================== APERÇU DE LA PLANCHE (CAHIER DES CHARGES §3) ======================
-    # Un VRAI aperçu : réutilise le même moteur (ContactSheetGenerator,
-    # portfolio/presentation/) que la génération finale - mais dans un
-    # SOUS-PROCESSUS CLI séparé (portfolio.py --preview-output), exactement
-    # comme la génération réelle (_on_generate ci-dessous), plutôt que dans
-    # un thread d'arrière-plan interne à cette application GTK.
+    # ====================== SHEET PREVIEW (SPECIFICATION §3) ======================
+    # A REAL preview: reuses the same engine (ContactSheetGenerator,
+    # portfolio/presentation/) as the final generation - but in a separate
+    # CLI SUBPROCESS (portfolio.py --preview-output), exactly like the real
+    # generation (_on_generate below), rather than in a background thread
+    # internal to this GTK application.
     #
-    # Ce n'est pas qu'une question de cohérence architecturale : un premier
-    # essai avec ContactSheetGenerator appelé directement depuis un thread
-    # de cette appli a révélé, à l'usage (tests sous GTK4 réel), un bug de
-    # concurrence réel et reproductible. Le rendu du titre/numéro de page
-    # (texte dessiné par Pillow - voir
-    # ContactSheetGenerator._draw_header()/_draw_page_number()) utilise
-    # FreeType, tout comme Pango pour l'affichage des widgets de la boucle
-    # GTK principale restée active pendant ce temps : les deux sollicitant
-    # FreeType en concurrence (threads différents, même processus), son
-    # initialisation interne peut être corrompue et produire un masque de
-    # glyphe de taille aberrante - jusqu'à faire échouer le rendu avec une
-    # PIL.Image.DecompressionBombError (reproduit à plusieurs reprises,
-    # avec des tailles de masque différentes à chaque fois - signature
-    # typique d'une véritable concurrence, pas d'un problème déterministe).
-    # Un sous-processus séparé, sans fenêtre ni boucle GTK, élimine cette
-    # concurrence structurellement plutôt que de tenter de la fiabiliser
-    # (verrou, pré-chauffage de FreeType - essayé, insuffisant : la
-    # corruption peut survenir sur n'importe quel appel, pas seulement le
-    # premier).
+    # This is not merely a matter of architectural consistency: a first
+    # attempt with ContactSheetGenerator called directly from a thread of
+    # this app revealed, in use (tests under real GTK4), a real and
+    # reproducible concurrency bug. The rendering of the title/page number
+    # (text drawn by Pillow - see
+    # ContactSheetGenerator._draw_header()/_draw_page_number()) uses
+    # FreeType, just like Pango for displaying the widgets of the main GTK
+    # loop, which stayed active in the meantime: both calling FreeType
+    # concurrently (different threads, same process), its internal
+    # initialisation can be corrupted and produce a glyph mask of aberrant
+    # size - to the point of making the rendering fail with a
+    # PIL.Image.DecompressionBombError (reproduced several times, with
+    # different mask sizes each time - typical signature of genuine
+    # concurrency, not of a deterministic problem).
+    # A separate subprocess, with no window nor GTK loop, eliminates this
+    # concurrency structurally rather than trying to make it reliable (lock,
+    # FreeType pre-warming - tried, insufficient: the corruption can occur
+    # on any call, not only the first).
     #
-    # Le sous-processus refait son propre scan du dossier d'entrée (comme
-    # _on_generate le fait déjà pour la génération réelle) plutôt que de
-    # réutiliser la liste déjà affichée par l'aperçu du dossier
-    # (self.input_preview) : cohérent avec le reste de l'application, et
-    # sans conséquence pratique (même dossier, quelques instants plus
-    # tard). self.input_preview._files sert uniquement ici à un
-    # retour immédiat si le dossier ne contient visiblement aucune photo,
-    # avant même de lancer un sous-processus pour rien.
+    # The subprocess redoes its own scan of the input folder (as
+    # _on_generate already does for the real generation) rather than
+    # reusing the list already displayed by the folder preview
+    # (self.input_preview): consistent with the rest of the application,
+    # and with no practical consequence (same folder, a few moments later).
+    # self.input_preview._files is used here only for an immediate return
+    # if the folder visibly contains no photo, before even launching a
+    # subprocess for nothing.
 
     def _on_preview_clicked(self, button):
         input_dir = self.input_entry.get_text().strip()
@@ -1522,9 +1504,9 @@ class PlancheContactGTK(Gtk.Application):
 
         recursive = self.recursive_check.get_active()
         include_dirs = self._include_dirs_for_cli()
-        # En recherche récursive les photos peuvent n'être que dans des
-        # sous-dossiers : l'aperçu du dossier d'entrée (non récursif) ne
-        # dit alors rien, c'est le sous-processus qui scanne.
+        # In recursive search the photos may be only in subfolders: the input
+        # folder preview (non-recursive) then says nothing, it is the
+        # subprocess that scans.
         if not recursive and not self.input_preview._files:
             self._show_no_viewer_dialog(_("adv.preview_title"), _("adv.preview_no_photos"))
             return
@@ -1538,11 +1520,10 @@ class PlancheContactGTK(Gtk.Application):
         opacity = int(self.watermark_opacity_scale.get_value())
         advanced_profile = self._profile_from_widgets()
 
-        # Nombre de photos effectivement affichées sur cette planche
-        # (le modèle "large_thumbs" peut le réduire - voir
-        # compute_effective_per_page) : uniquement pour le message affiché
-        # sous l'aperçu, le sous-processus refait ce même calcul de son
-        # côté pour la planche elle-même.
+        # Number of photos actually displayed on this sheet (the "large_thumbs"
+        # template can reduce it - see compute_effective_per_page): only for the
+        # message displayed under the preview, the subprocess redoes this same
+        # calculation on its side for the sheet itself.
         config_for_count = Config(
             input_dir=Path(input_dir), output_dir=Path(input_dir),
             num_per_sheet=num_per_sheet, page_format=page_format,
@@ -1550,7 +1531,7 @@ class PlancheContactGTK(Gtk.Application):
         )
         per_page = compute_effective_per_page(config_for_count.profile)
         if recursive:
-            # Compté en arrière-plan (parcours de l'arborescence) : voir
+            # Counted in the background (walk of the folder tree): see
             # _generate_preview().
             def shown_count():
                 return min(per_page, self._count_photos(input_dir, include_dirs))
@@ -1645,12 +1626,11 @@ class PlancheContactGTK(Gtk.Application):
 
     def _generate_preview(self, cmd, preview_png_path, profile_path, picture, status_label, shown_count,
                           extra_cleanup=()):
-        """Exécuté en arrière-plan : lance et attend le sous-processus CLI
-        (potentiellement coûteux - décodage/filigrane/dessin réels, voir
-        ContactSheetGenerator) - voir le commentaire au-dessus de
-        _on_preview_clicked pour la raison de cet isolement en
-        sous-processus plutôt qu'un appel direct ici. Ne touche à aucun
-        widget GTK directement, uniquement via glib_idle_add."""
+        """Runs in the background: launches and waits for the CLI subprocess
+        (potentially costly - real decoding/watermark/drawing, see
+        ContactSheetGenerator) - see the comment above _on_preview_clicked for
+        the reason for this isolation in a subprocess rather than a direct call
+        here. Touches no GTK widget directly, only via glib_idle_add."""
         try:
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0 or not Path(preview_png_path).is_file():
@@ -1715,17 +1695,16 @@ class PlancheContactGTK(Gtk.Application):
         self.view_results_btn.set_sensitive(False)
 
     def _choose_folder(self, button, entry, folder_type):
-        """Sélecteur de dossier personnalisé, avec aperçu des vignettes.
+        """Custom folder picker, with a thumbnail preview.
 
-        Entièrement construit "maison" : une première version s'appuyait
-        sur Gtk.FileChooserWidget avec un filtre pour masquer les fichiers,
-        mais ce filtre s'est avéré peu fiable selon les systèmes (fichiers
-        toujours visibles chez certains utilisateurs malgré le filtre). On
-        liste donc nous-mêmes le contenu des dossiers via Gio
-        (Gtk.DirectoryList + Gtk.FilterListModel + Gtk.CustomFilter), ce qui
-        garantit un résultat fiable et identique sur toute machine : le
-        filtrage "dossiers uniquement" est fait par notre propre code
-        Python, pas par un mécanisme interne de GTK qu'on ne contrôle pas.
+        Built entirely "in house": a first version relied on
+        Gtk.FileChooserWidget with a filter to hide files, but this filter
+        proved unreliable depending on the system (files still visible for
+        some users despite the filter). We therefore list the folders'
+        content ourselves via Gio (Gtk.DirectoryList + Gtk.FilterListModel +
+        Gtk.CustomFilter), which guarantees a reliable result, identical on
+        every machine: the "folders only" filtering is done by our own Python
+        code, not by an internal GTK mechanism we do not control.
         """
         dialog = Gtk.Window(transient_for=self.win, modal=True)
         dialog.set_title(
@@ -1737,7 +1716,7 @@ class PlancheContactGTK(Gtk.Application):
         root_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         dialog.set_child(root_box)
 
-        # --- Fil d'Ariane (chemin courant, cliquable par segment) ----------
+        # --- Breadcrumb (current path, clickable per segment) ----------
         breadcrumb_box = Gtk.Box(spacing=2)
         breadcrumb_scroll = Gtk.ScrolledWindow()
         breadcrumb_scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
@@ -1748,10 +1727,10 @@ class PlancheContactGTK(Gtk.Application):
         breadcrumb_scroll.set_margin_bottom(4)
         root_box.append(breadcrumb_scroll)
 
-        # --- Saisie directe d'un chemin --------------------------------------
-        # Utile en particulier pour les partages réseau (ex: \\serveur\partage)
-        # qui n'apparaissent pas forcément dans la barre latérale ou dont la
-        # lettre de lecteur n'est pas mappée en permanence.
+        # --- Direct path entry --------------------------------------
+        # Useful in particular for network shares (e.g. \\server\share)
+        # which do not necessarily appear in the sidebar or whose drive
+        # letter is not permanently mapped.
         path_entry_box = Gtk.Box(spacing=6)
         path_entry_box.set_margin_start(10)
         path_entry_box.set_margin_end(10)
@@ -1764,7 +1743,7 @@ class PlancheContactGTK(Gtk.Application):
         path_entry_box.append(path_go_btn)
         root_box.append(path_entry_box)
 
-        # --- Corps principal : barre latérale + liste de dossiers ----------
+        # --- Main body: sidebar + folder list ----------
         body = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         body.set_vexpand(True)
         root_box.append(body)
@@ -1779,9 +1758,9 @@ class PlancheContactGTK(Gtk.Application):
         sidebar_scroll.set_size_request(190, -1)
         body.append(sidebar_scroll)
 
-        # Liste des dossiers du répertoire courant : Gtk.DirectoryList liste
-        # tout le contenu (fichiers compris), Gtk.FilterListModel + notre
-        # propre fonction de filtre ne garde que les sous-dossiers visibles.
+        # List of the current directory's folders: Gtk.DirectoryList lists the
+        # whole content (files included), Gtk.FilterListModel + our own filter
+        # function only keeps the visible subfolders.
         dir_list = Gtk.DirectoryList()
         dir_list.set_attributes("standard::name,standard::type,standard::is-hidden")
 
@@ -1796,12 +1775,11 @@ class PlancheContactGTK(Gtk.Application):
         filtered_model = Gtk.FilterListModel(model=dir_list, filter=dir_filter)
 
         def compare_names(*args):
-            # Sur certaines plateformes/liaisons, le comparateur peut être
-            # invoqué avec des arguments supplémentaires (observé sous
-            # Windows : un argument numérique en plus des deux éléments à
-            # comparer) - on ne garde donc que les arguments qui
-            # ressemblent réellement à des Gio.FileInfo (qui exposent
-            # get_name()), plutôt que de supposer un ordre positionnel fixe.
+            # On some platforms/bindings, the comparator may be called with
+            # additional arguments (observed on Windows: an extra numeric argument
+            # besides the two items to compare) - we therefore keep only the
+            # arguments that really look like Gio.FileInfo (which expose
+            # get_name()), rather than assuming a fixed positional order.
             items = [x for x in args if hasattr(x, "get_name")]
             if len(items) < 2:
                 return 0
@@ -1844,8 +1822,8 @@ class PlancheContactGTK(Gtk.Application):
         list_scroll.set_vexpand(True)
         body.append(list_scroll)
 
-        # --- Panneau d'aperçu (identique à celui de la fenêtre principale,
-        # mais 2 lignes de 10 vignettes au lieu d'une) ----------------------
+        # --- Preview panel (identical to the main window's,
+        # but 2 rows of 10 thumbnails instead of one) ----------------------
         preview_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         preview_box.set_margin_top(8)
         preview_box.set_margin_start(12)
@@ -1889,7 +1867,7 @@ class PlancheContactGTK(Gtk.Application):
             page_size=DIALOG_PREVIEW_PAGE_SIZE
         )
 
-        # --- Boutons d'action ------------------------------------------------
+        # --- Action buttons ------------------------------------------------
         btn_box = Gtk.Box(spacing=10)
         btn_box.set_halign(Gtk.Align.END)
         btn_box.set_margin_top(8)
@@ -1939,7 +1917,7 @@ class PlancheContactGTK(Gtk.Application):
             if typed and Path(typed).is_dir():
                 navigate_to(typed)
             else:
-                # Chemin invalide/inaccessible : retour visuel temporaire.
+                # Invalid/inaccessible path: temporary visual feedback.
                 entry_widget.add_css_class("error")
                 GLib.timeout_add(
                     1500,
@@ -1957,7 +1935,7 @@ class PlancheContactGTK(Gtk.Application):
 
         list_view.connect("activate", on_row_activated)
 
-        # --- Barre latérale : dossier personnel + signets GTK existants ----
+        # --- Sidebar: home folder + existing GTK bookmarks ----
         def add_sidebar_button(label_text, path, icon_name="folder-symbolic"):
             btn = Gtk.Button()
             btn.add_css_class("flat")
@@ -1971,10 +1949,10 @@ class PlancheContactGTK(Gtk.Application):
         home_path = str(Path.home())
         add_sidebar_button(_("folder_picker.home"), home_path, "user-home-symbolic")
 
-        # "Ce PC" : lettres de lecteur disponibles sous Windows (disques
-        # locaux ET lecteurs réseau mappés - os.listdrives() ne fait pas la
-        # différence, il liste tout ce qui a une lettre assignée). Sans
-        # effet sur Linux/macOS, où cette fonction n'existe pas.
+        # "This PC": drive letters available on Windows (local disks AND mapped
+        # network drives - os.listdrives() makes no difference, it lists
+        # everything that has an assigned letter). No effect on Linux/macOS,
+        # where this function does not exist.
         if hasattr(os, "listdrives"):
             try:
                 drives = os.listdrives()
@@ -1990,8 +1968,8 @@ class PlancheContactGTK(Gtk.Application):
                     if Path(drive).is_dir():
                         add_sidebar_button(drive, drive, "drive-harddisk-symbolic")
 
-        # Réutilise les signets GTK existants de l'utilisateur (partagés
-        # avec Nautilus et les autres applis GTK), s'il y en a.
+        # Reuses the user's existing GTK bookmarks (shared with Nautilus and
+        # the other GTK apps), if there are any.
         bookmarks_file = Path.home() / ".config" / "gtk-3.0" / "bookmarks"
         if bookmarks_file.is_file():
             try:
@@ -2004,9 +1982,9 @@ class PlancheContactGTK(Gtk.Application):
                     if bpath and Path(bpath).is_dir():
                         add_sidebar_button(label or Path(bpath).name, bpath)
             except Exception:
-                pass  # Signets illisibles : pas bloquant, on continue sans.
+                pass  # Unreadable bookmarks: not blocking, we carry on without.
 
-        # --- Dossier de départ -------------------------------------------------
+        # --- Starting folder -------------------------------------------------
         start_path = entry.get_text().strip()
         if not (start_path and Path(start_path).is_dir()):
             start_path = home_path
@@ -2030,13 +2008,13 @@ class PlancheContactGTK(Gtk.Application):
 
         dialog.present()
 
-    # ====================== CHOIX DES SOUS-DOSSIERS ======================
-    # Avec la recherche récursive, le dossier principal peut contenir de
-    # nombreux sous-dossiers dont on ne veut qu'une partie. Le bouton
-    # « Choisir les sous-dossiers... » ouvre la liste des dossiers qui
-    # contiennent des photos (scanner.list_image_folders) ; le choix est
-    # transmis au CLI par un fichier temporaire (--include-dirs-file : pas de
-    # limite de longueur de ligne de commande, accents sans souci).
+    # ====================== SUBFOLDER SELECTION ======================
+    # With recursive search, the main folder may contain many subfolders of
+    # which only some are wanted. The "Choose subfolders..." button opens
+    # the list of folders that contain photos (scanner.list_image_folders);
+    # the choice is passed to the CLI through a temporary file
+    # (--include-dirs-file: no command-line length limit, no trouble with
+    # accents).
 
     def _reset_subfolder_selection(self):
         self._subfolder_selection = None
@@ -2050,8 +2028,8 @@ class PlancheContactGTK(Gtk.Application):
         self._update_subfolder_widgets()
 
     def _update_subfolder_widgets(self):
-        """Bouton actif seulement avec la recherche récursive ET un dossier
-        d'entrée valide ; l'étiquette dit ce qui sera traité."""
+        """Button active only with recursive search AND a valid input folder;
+        the label says what will be processed."""
         button = getattr(self, "subfolders_btn", None)
         label = getattr(self, "subfolders_label", None)
         if button is None or label is None:
@@ -2070,15 +2048,15 @@ class PlancheContactGTK(Gtk.Application):
             ))
 
     def _include_dirs_for_cli(self):
-        """Sous-dossiers à transmettre au CLI (tuple), ou None = tout."""
+        """Subfolders to pass to the CLI (tuple), or None = everything."""
         if not self.recursive_check.get_active():
             return None
         return self._subfolder_selection
 
     def _write_include_dirs_file(self, include_dirs):
-        """Écrit la liste dans un fichier temporaire UTF-8 (un dossier par
-        ligne) et renvoie son chemin, ou None s'il n'y a pas de choix. Le
-        fichier est supprimé par l'appelant une fois le CLI terminé."""
+        """Writes the list to a UTF-8 temporary file (one folder per line) and
+        returns its path, or None if there is no choice. The file is deleted by
+        the caller once the CLI has finished."""
         if include_dirs is None:
             return None
         fd, path = tempfile.mkstemp(suffix=".txt", prefix="planche-contact-dirs-")
@@ -2087,10 +2065,10 @@ class PlancheContactGTK(Gtk.Application):
         return path
 
     def _count_photos(self, input_dir, include_dirs):
-        """Nombre de photos retenues (parcours des noms de fichiers
-        uniquement) - pour la note sous l'aperçu en recherche récursive.
-        Même exclusion de planches/ et gallery/ que l'aperçu lui-même
-        (dossier de sortie = dossier d'entrée dans ce mode)."""
+        """Number of photos retained (file-name walk only) - for the note under
+        the preview in recursive search. Same exclusion of planches/ and
+        gallery/ as the preview itself (output folder = input folder in this
+        mode)."""
         folders = list_image_folders(Path(input_dir), Path(input_dir))
         if include_dirs is not None:
             wanted = set(include_dirs)
@@ -2159,7 +2137,7 @@ class PlancheContactGTK(Gtk.Application):
         action_box.append(ok_btn)
         box.append(action_box)
 
-        entries = []          # [(chemin relatif, nombre de photos, case à cocher)]
+        entries = []          # [(relative path, number of photos, checkbox)]
         state = {"closed": False}
 
         def refresh_summary(*_args):
@@ -2199,7 +2177,7 @@ class PlancheContactGTK(Gtk.Application):
 
         def on_ok(_button):
             chosen = tuple(relative for relative, _count, check in entries if check.get_active())
-            # Tout coché = pas de restriction (même résultat qu'avant ce choix).
+            # Everything ticked = no restriction (same result as before this choice).
             self._subfolder_selection = None if len(chosen) == len(entries) else chosen
             self._subfolder_total = len(entries)
             self._update_subfolder_widgets()
@@ -2218,12 +2196,12 @@ class PlancheContactGTK(Gtk.Application):
         dialog.present()
         threading.Thread(target=scan_folders, daemon=True).start()
 
-    # ====================== APERÇU DU DOSSIER D'ENTRÉE ======================
+    # ====================== INPUT FOLDER PREVIEW ======================
 
     def _on_input_entry_changed(self, entry):
-        # Un autre dossier d'entrée : le choix de sous-dossiers ne vaut plus.
+        # Another input folder: the subfolder choice no longer applies.
         self._reset_subfolder_selection()
-        # Anti-rebond : on évite de relancer un scan à chaque frappe.
+        # Debounce: we avoid relaunching a scan on every keystroke.
         if self._preview_debounce_id is not None:
             GLib.source_remove(self._preview_debounce_id)
         self._preview_debounce_id = GLib.timeout_add(
@@ -2236,8 +2214,8 @@ class PlancheContactGTK(Gtk.Application):
         return False
 
     def _on_output_entry_changed(self, entry):
-        # Anti-rebond, même logique que pour le dossier d'entrée : évite de
-        # scanner le disque à chaque frappe.
+        # Debounce, same logic as for the input folder: avoids scanning the
+        # disk on every keystroke.
         if self._output_debounce_id is not None:
             GLib.source_remove(self._output_debounce_id)
         self._output_debounce_id = GLib.timeout_add(
@@ -2250,12 +2228,12 @@ class PlancheContactGTK(Gtk.Application):
         return False
 
     def _check_existing_results(self, output_dir_str):
-        """Active "Afficher les résultats" pour ce qui existe déjà dans le
-        dossier de sortie choisi (planches, PDF, galerie HTML, CSV d'une
-        génération précédente), sans obliger à relancer une génération
-        juste pour rouvrir des résultats déjà là. Appelé au changement du
-        champ dossier de sortie (saisie ou sélecteur), au démarrage si un
-        dossier était mémorisé, et après une génération réussie."""
+        """Enables "View results" for what already exists in the chosen output
+        folder (sheets, PDF, HTML gallery, CSV from a previous generation),
+        without forcing a new generation just to reopen results that are
+        already there. Called when the output folder field changes (typing or
+        picker), at startup if a folder was remembered, and after a successful
+        generation."""
         output_dir = Path(output_dir_str) if output_dir_str else None
         if not output_dir or not output_dir.is_dir():
             self._last_result = None
@@ -2301,25 +2279,25 @@ class PlancheContactGTK(Gtk.Application):
         title = self.project_title_entry.get_text().strip() or None
         author = self.author_entry.get_text().strip() or None
         watermark = self.watermark_entry.get_text().strip() or None
-        # Valeur française interne (voir portfolio/config.py), pas le texte
-        # traduit affiché dans le menu déroulant - self._orient_values est
-        # rempli dans le même ordre que les options du menu.
+        # Internal French value (see portfolio/config.py), not the translated
+        # text displayed in the dropdown - self._orient_values is filled in the
+        # same order as the menu's options.
         orientation = self._orient_values[self.watermark_orient_combo.get_selected()]
         opacity = int(self.watermark_opacity_scale.get_value())
         html_per_page = int(self.html_per_page_scale.get_value())
 
         if getattr(sys, "frozen", False):
-            # Exécutable gelé (PyInstaller, build Windows) : sys.executable
-            # pointe vers l'application elle-même (planche-contact-gtk.exe),
-            # pas vers un interpréteur Python générique capable d'exécuter
-            # un script portfolio.py séparé. On relance donc ce même exe
-            # avec un indicateur spécial (--run-cli), intercepté tout en
-            # bas de ce fichier pour déléguer directement à la logique CLI
-            # de portfolio.py, sans jamais instancier l'application GTK.
+            # Frozen executable (PyInstaller, Windows build): sys.executable
+            # points to the application itself (planche-contact-gtk.exe), not to a
+            # generic Python interpreter able to run a separate portfolio.py
+            # script. We therefore relaunch this same exe with a special flag
+            # (--run-cli), intercepted at the very bottom of this file to delegate
+            # directly to portfolio.py's CLI logic, without ever instantiating the
+            # GTK application.
             cmd = [sys.executable, "--run-cli"]
         else:
-            # Exécution depuis les sources : sys.executable est un vrai
-            # interpréteur Python, auquel on passe le script CLI à exécuter.
+            # Running from the sources: sys.executable is a real Python
+            # interpreter, to which we pass the CLI script to run.
             cli_path = str(Path(__file__).parent / "portfolio" / "portfolio.py")
             cmd = [sys.executable, cli_path]
 
@@ -2329,10 +2307,10 @@ class PlancheContactGTK(Gtk.Application):
             "-n", str(num_per_sheet),
             "--format", page_format,
             "--html-per-page", str(html_per_page),
-            # Langue déjà résolue (voir __init__ : plus jamais "system" à ce
-            # stade) - garantit que la galerie HTML générée correspond
-            # toujours à la langue affichée dans l'interface, plutôt que de
-            # laisser le CLI redétecter indépendamment la langue système.
+            # Language already resolved (see __init__: never "system" at this
+            # stage) - guarantees that the generated HTML gallery always matches
+            # the language displayed in the interface, rather than letting the CLI
+            # independently re-detect the system language.
             "--language", self._language
         ]
 
@@ -2358,11 +2336,10 @@ class PlancheContactGTK(Gtk.Application):
         if self.csv_check.get_active():
             cmd.append("--csv")
 
-        # Mise en page/légendes/thème avancés (cahier des charges §2/§4.4) :
-        # --profile n'est transmis que si l'utilisateur a réellement
-        # personnalisé quelque chose, pour ne jamais changer le
-        # comportement par défaut (voir Config.__post_init__, déjà
-        # strictement rétrocompatible sans profil explicite).
+        # Advanced layout/captions/theme (specification §2/§4.4): --profile is
+        # passed only if the user has really customised something, so as never
+        # to change the default behaviour (see Config.__post_init__, already
+        # strictly backward compatible without an explicit profile).
         advanced_profile = self._profile_from_widgets()
         profile_path = None
         if advanced_profile != default_profile():
@@ -2377,10 +2354,10 @@ class PlancheContactGTK(Gtk.Application):
         self.progress.set_fraction(0.0)
         self.status_label.set_text(_("gen.running"))
 
-        # Mémorise le dossier de sortie de CETTE génération (indépendamment
-        # du champ, qui pourrait être modifié par l'utilisateur avant la
-        # fin du traitement) : sert à vérifier ce qui existe réellement une
-        # fois terminé (voir _on_generation_success/_check_existing_results).
+        # Remembers the output folder of THIS generation (independently of the
+        # field, which the user could modify before processing ends): used to
+        # check what actually exists once finished (see
+        # _on_generation_success/_check_existing_results).
         self._pending_result = {
             "output_dir": Path(output_dir),
         }
@@ -2404,11 +2381,10 @@ class PlancheContactGTK(Gtk.Application):
                     glib_idle_add(self._log, line)
                     glib_idle_add(self.status_label.set_text, line)
 
-                    # Le calcul de progression repose uniquement sur le
-                    # marqueur "PROGRESS:X/100", volontairement jamais
-                    # traduit (voir portfolio/portfolio.py) : ne dépend
-                    # d'aucun texte humain, donc valable dans toutes les
-                    # langues de l'interface.
+                    # The progress calculation relies only on the "PROGRESS:X/100"
+                    # marker, deliberately never translated (see portfolio/portfolio.py):
+                    # it depends on no human text, hence valid in all the interface
+                    # languages.
                     progress_match = re.search(r"PROGRESS:(\d+)/100", line)
                     if progress_match:
                         fraction = int(progress_match.group(1)) / 100.0
@@ -2429,7 +2405,7 @@ class PlancheContactGTK(Gtk.Application):
             glib_idle_add(self._log, _("gen.error_log_exception", error=e))
             glib_idle_add(self.status_label.set_text, _("gen.error_status_generic"))
         finally:
-            # Fichiers temporaires passés au CLI (profil, liste de dossiers).
+            # Temporary files passed to the CLI (profile, folder list).
             for path in cleanup_paths:
                 if path:
                     try:
@@ -2444,18 +2420,18 @@ class PlancheContactGTK(Gtk.Application):
         try:
             self.log_buffer.insert(end_iter, text)
         except TypeError:
-            # Repli sur la signature C brute (buffer, iter, texte, longueur)
-            # si le module de surcharge Python de Gtk n'est pas charge -
-            # voir le commentaire dans windows/planche-contact.spec.
+            # Fallback on the raw C signature (buffer, iter, text, length) if
+            # Gtk's Python override module is not loaded - see the comment in
+            # windows/planche-contact.spec.
             self.log_buffer.insert(end_iter, text, -1)
         mark = self.log_buffer.get_insert()
         self.log_view.scroll_mark_onscreen(mark)
 
-    # ====================== AFFICHAGE DES RÉSULTATS ======================
-    # Ouvre les résultats (planches, PDF, galerie) avec les applications par
-    # défaut du système (visionneuse d'images/gestionnaire de fichiers,
-    # lecteur PDF, navigateur web) plutôt que dans un aperçu intégré : la
-    # fenêtre principale ne s'agrandit donc jamais pour ça.
+    # ====================== DISPLAYING THE RESULTS ======================
+    # Opens the results (sheets, PDF, gallery) with the system's default
+    # applications (image viewer/file manager, PDF reader, web browser)
+    # rather than in a built-in preview: the main window therefore never
+    # grows because of it.
 
     def _on_generation_success(self):
         output_dir = self._pending_result["output_dir"]
@@ -2472,14 +2448,14 @@ class PlancheContactGTK(Gtk.Application):
         dialog.show(self._dialog_parent())
 
     def _open_path_with_default_app(self, path: Path) -> bool:
-        """Ouvre un fichier avec l'application par défaut du système
-        d'exploitation. Sous Windows, os.startfile() est l'API native pour
-        ça (aucune dépendance supplémentaire) ; sous Linux/macOS, on utilise
-        Gio.AppInfo. Retourne True en cas de succès, False sinon (à charge
-        de l'appelant d'afficher un message adapté)."""
+        """Opens a file with the operating system's default application. On
+        Windows, os.startfile() is the native API for this (no extra
+        dependency); on Linux/macOS, Gio.AppInfo is used. Returns True on
+        success, False otherwise (the caller is responsible for displaying a
+        suitable message)."""
         if sys.platform == "win32":
             try:
-                os.startfile(str(path))  # nosec - ouverture normale de fichier
+                os.startfile(str(path))  # nosec - normal file opening
                 return True
             except OSError:
                 return False
@@ -2498,12 +2474,11 @@ class PlancheContactGTK(Gtk.Application):
         if not planches_dir.is_dir():
             return
 
-        # Ouvre le DOSSIER des planches (gestionnaire de fichiers), pas une
-        # planche individuelle : contrairement à une visionneuse d'images
-        # unique, ça fonctionne de façon identique quel que soit le nombre
-        # de planches, et laisse l'utilisateur choisir laquelle regarder -
-        # même mécanisme que pour le PDF/la galerie/le CSV, appliqué ici à
-        # un dossier plutôt qu'à un fichier.
+        # Opens the sheets FOLDER (file manager), not an individual sheet:
+        # unlike a single image viewer, it works identically whatever the number
+        # of sheets, and lets the user choose which one to look at - same
+        # mechanism as for the PDF/gallery/CSV, applied here to a folder rather
+        # than a file.
         if not self._open_path_with_default_app(planches_dir):
             self._show_no_viewer_dialog(
                 _("dialog.no_file_manager_title"),
@@ -2528,11 +2503,10 @@ class PlancheContactGTK(Gtk.Application):
         gallery_index = self._last_result["output_dir"] / "gallery" / "index.html"
         if not gallery_index.is_file():
             return
-        # Gio.AppInfo / os.startfile (comme pour le PDF/CSV) plutôt que le
-        # module webbrowser de Python : ce dernier ne remonte pas fidèlement
-        # un échec (il lance xdg-open en arrière-plan et considère souvent
-        # l'opération réussie même si aucun navigateur n'a en réalité pu
-        # être trouvé).
+        # Gio.AppInfo / os.startfile (as for the PDF/CSV) rather than Python's
+        # webbrowser module: the latter does not faithfully report a failure
+        # (it launches xdg-open in the background and often considers the
+        # operation successful even if no browser could actually be found).
         if not self._open_path_with_default_app(gallery_index):
             self._show_no_viewer_dialog(
                 _("dialog.no_browser_title"),
@@ -2551,16 +2525,16 @@ class PlancheContactGTK(Gtk.Application):
                 _("dialog.no_csv_app_detail")
             )
 
-    # ====================== AIDE ======================
+    # ====================== HELP ======================
 
     def _open_full_manual(self, button):
         docs_dir = Path(__file__).parent / "docs"
-        # Une version distincte par langue (pas de bascule JS interne au
-        # fichier, comme pour la galerie HTML générée) : plus simple à
-        # maintenir pour un document de référence statique. Repli sur le
-        # français si le fichier de la langue active n'existe pas (ne
-        # devrait arriver que pour "system" avec une langue non couverte,
-        # déjà gérée par ailleurs - voir portfolio/i18n.py).
+        # A separate version per language (no JS toggle inside the file, as for
+        # the generated HTML gallery): simpler to maintain for a static
+        # reference document. Falls back to French if the active language's
+        # file does not exist (should only happen for "system" with an
+        # uncovered language, already handled elsewhere - see
+        # portfolio/i18n.py).
         lang = get_language()
         candidate = docs_dir / f"planche-contact-manual.{lang}.html" if lang != "fr" else docs_dir / "planche-contact-manual.html"
         manual_path = candidate if candidate.exists() else docs_dir / "planche-contact-manual.html"
@@ -2600,7 +2574,7 @@ class PlancheContactGTK(Gtk.Application):
 
         return box
 
-    # ====================== À PROPOS ======================
+    # ====================== ABOUT ======================
 
     def _build_about_tab(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -2608,12 +2582,12 @@ class PlancheContactGTK(Gtk.Application):
         box.set_margin_start(30)
         box.set_margin_end(30)
 
-        # Titre
+        # Title
         title = Gtk.Label()
         title.set_markup("<span size='large'><b>Planche-Contact</b></span>")
         box.append(title)
 
-        # Version + date de build
+        # Version + build date
         version_text = self._get_version_info()
         version_label = Gtk.Label()
         version_label.set_markup(f"<span size='medium'>{version_text}</span>")
@@ -2627,13 +2601,13 @@ class PlancheContactGTK(Gtk.Application):
         desc.set_margin_top(20)
         box.append(desc)
 
-        # Auteur
+        # Author
         author = Gtk.Label()
         author.set_markup(f"<span size='small'>{_('about.developed_by', name=AUTHOR_NAME)}</span>")
         author.set_margin_top(25)
         box.append(author)
 
-        # Mention transparente de l'assistance IA à la conception
+        # Transparent mention of the AI assistance in the design
         ai_credit = Gtk.Label()
         ai_credit.set_markup(
             f"<span size='small'>{_('about.ai_credit', link='<a href=\"https://claude.ai\">Claude.ai</a>')}</span>"
@@ -2647,7 +2621,7 @@ class PlancheContactGTK(Gtk.Application):
         license_label.set_margin_top(10)
         box.append(license_label)
 
-        # Dépôt GitHub (lien cliquable, ouvre le navigateur par défaut)
+        # GitHub repository (clickable link, opens the default browser)
         github_label = Gtk.Label()
         github_label.set_markup(
             '<span size="small">'
@@ -2667,16 +2641,15 @@ class PlancheContactGTK(Gtk.Application):
         self.language_preference = new_preference
         self.save_settings()
         self.language_restart_label.set_visible(True)
-        # Les widgets déjà construits ne changent pas de texte sans
-        # redémarrer (voir le message ci-dessus), mais self._language doit
-        # être mis à jour immédiatement : c'est elle qui est transmise au
-        # CLI via --language dans _on_generate(), et une génération lancée
-        # avant un redémarrage doit refléter le choix qui vient d'être
-        # fait, pas la langue active au démarrage de l'application.
+        # The already-built widgets do not change text without a restart (see
+        # the message above), but self._language must be updated immediately:
+        # it is the one passed to the CLI via --language in _on_generate(), and
+        # a generation launched before a restart must reflect the choice that
+        # was just made, not the language active when the application started.
         self._language, _unsupported = set_language(new_preference)
 
     def _get_version_info(self):
-        """Récupère le numéro de version et la date de build"""
+        """Retrieves the version number and the build date"""
         version = "inconnue"
         build_date = ""
 
@@ -2707,19 +2680,18 @@ class PlancheContactGTK(Gtk.Application):
 
 
 if __name__ == "__main__":
-    # multiprocessing.freeze_support() est désormais appelé bien plus tôt,
-    # tout en haut du fichier (avant même `import gi`) - voir le
-    # commentaire à cet endroit. Rien à refaire ici.
+    # multiprocessing.freeze_support() is now called much earlier, at the
+    # very top of the file (even before `import gi`) - see the comment
+    # there. Nothing to redo here.
 
     if len(sys.argv) > 1 and sys.argv[1] == "--run-cli":
-        # Relance de l'exécutable gelé lui-même en mode CLI (voir
-        # _on_generate ci-dessus, nécessaire car sys.executable pointe vers
-        # cette même application dans un exécutable gelé PyInstaller, pas
-        # vers un interpréteur Python générique). On délègue directement au
-        # point d'entrée CLI de portfolio.py, sans jamais instancier
-        # l'application GTK.
+        # Relaunch of the frozen executable itself in CLI mode (see
+        # _on_generate above, needed because sys.executable points to this same
+        # application in a PyInstaller-frozen executable, not to a generic
+        # Python interpreter). We delegate directly to portfolio.py's CLI entry
+        # point, without ever instantiating the GTK application.
         from portfolio.portfolio import main as portfolio_cli_main
-        sys.argv = [sys.argv[0]] + sys.argv[2:]  # retire "--run-cli" avant argparse
+        sys.argv = [sys.argv[0]] + sys.argv[2:]  # removes "--run-cli" before argparse
         portfolio_cli_main()
     else:
         app = PlancheContactGTK()
