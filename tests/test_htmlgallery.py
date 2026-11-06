@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-Tests de non-régression pour le câblage du thème graphique et des légendes
-personnalisables (cahier des charges §1/§4) dans HTMLGalleryGenerator -
-même Profil que ContactSheetGenerator (voir tests/test_contactsheet.py),
-mais rendu CSS/HTML plutôt que PIL : ces tests vérifient le MARQUAGE
-produit (chaînes attendues dans le HTML/CSS généré), la visionneuse
-('lightbox') étant volontairement laissée hors de propos (voir
-portfolio/presentation/themes.py - elle reste intentionnellement sombre,
-indépendante du thème choisi pour la page).
+Non-regression tests for the wiring of the graphical theme and of the
+customisable captions (specification §1/§4) in HTMLGalleryGenerator -
+same Profile as ContactSheetGenerator (see tests/test_contactsheet.py),
+but CSS/HTML rendering rather than PIL: these tests check the MARKUP
+produced (expected strings in the generated HTML/CSS), the viewer
+('lightbox') being deliberately left out of scope (see
+portfolio/presentation/themes.py - it intentionally stays dark,
+independent of the theme chosen for the page).
 
-Une vérification visuelle complémentaire (captures d'écran Playwright,
-thème clair/sombre/système, bascule manuelle, persistance) a par ailleurs
-été effectuée manuellement lors du développement de ce câblage - voir
-CHANGELOG.md.
+A complementary visual check (Playwright screenshots, light/dark/system
+theme, manual toggle, persistence) was also carried out manually while
+developing this wiring - see CHANGELOG.md.
 """
 import base64
 import filecmp
@@ -72,10 +71,9 @@ def _generate(tmp_path, images, profile, *, per_page=12, title=None, author=None
 
 
 def test_default_profile_grid_markup_is_unchanged(tmp_path):
-    """Sans légende configurée (Profil par défaut), la grille doit garder
-    EXACTEMENT son marquage historique (un <a> par photo, sans wrapper
-    supplémentaire) : aucune régression visuelle pour l'utilisateur qui ne
-    touche à rien de nouveau."""
+    """Without any caption configured (default Profile), the grid must keep
+    EXACTLY its historical markup (one <a> per photo, no extra wrapper):
+    no visual regression for the user who changes nothing."""
     _, images = _make_images(tmp_path, 3)
     html = _generate(tmp_path, images, Profile())
 
@@ -85,13 +83,12 @@ def test_default_profile_grid_markup_is_unchanged(tmp_path):
 
 
 def test_exif_metadata_is_never_read_when_no_caption_field_is_configured(tmp_path, monkeypatch):
-    """Même garde que ContactSheetGenerator (voir test_contactsheet.py) :
-    pas de lecture EXIF coûteuse par photo si aucune légende n'est
-    demandée."""
+    """Same guard as ContactSheetGenerator (see test_contactsheet.py): no
+    costly EXIF read per photo if no caption is requested."""
     import portfolio.htmlgallery as htmlgallery_module
 
     def _boom(_path):
-        raise AssertionError("get_exif_metadata() ne doit pas être appelé sans légende configurée")
+        raise AssertionError("get_exif_metadata() must not be called without a configured caption")
 
     monkeypatch.setattr(htmlgallery_module, "get_exif_metadata", _boom)
 
@@ -100,8 +97,8 @@ def test_exif_metadata_is_never_read_when_no_caption_field_is_configured(tmp_pat
 
 
 def test_captions_are_rendered_when_configured(tmp_path):
-    """Légendes EXIF réellement lues sur chaque photo SOURCE (cahier des
-    charges §1) et affichées sous chaque vignette de la grille."""
+    """EXIF captions actually read from each SOURCE photo (specification
+    §1) and displayed under each thumbnail of the grid."""
     _, images = _make_images(tmp_path, 2, with_exif=True)
     profile = Profile(captions=CaptionSettings(fields=["filename", "camera", "aperture", "iso"], lines=2))
     html = _generate(tmp_path, images, profile)
@@ -111,8 +108,8 @@ def test_captions_are_rendered_when_configured(tmp_path):
 
 
 def test_caption_text_is_html_escaped(tmp_path):
-    """Un nom de fichier contenant des caractères spéciaux HTML ne doit
-    jamais casser le marquage ni permettre une injection."""
+    """A file name containing special HTML characters must never break the
+    markup nor allow an injection."""
     img_dir = tmp_path / "photos"
     img_dir.mkdir()
     tricky_name = "a_<b>_&_amp.jpg"
@@ -129,10 +126,10 @@ def test_caption_text_is_html_escaped(tmp_path):
 
 
 def test_light_theme_is_the_default_and_never_emits_a_media_query(tmp_path):
-    """Le thème "light" (défaut du Profil) doit correspondre exactement à
-    la palette partagée (portfolio/presentation/themes.py) - et un mode
-    fixe ne doit jamais dépendre des préférences systèmes du visiteur
-    (voir vérification visuelle : OS en sombre, page restée claire)."""
+    """The "light" theme (Profile default) must match the shared palette
+    exactly (portfolio/presentation/themes.py) - and a fixed mode must never
+    depend on the visitor's system preferences (see visual check: OS in
+    dark mode, page stayed light)."""
     _, images = _make_images(tmp_path, 2)
     html = _generate(tmp_path, images, Profile())
 
@@ -152,16 +149,16 @@ def test_dark_theme_fixed_mode_never_emits_a_media_query(tmp_path):
 
 
 def test_system_mode_emits_prefers_color_scheme_media_query_with_dark_palette(tmp_path):
-    """Seul le mode "system" doit laisser le NAVIGATEUR choisir (cahier
-    des charges §4) - stratégie documentée dans themes.py : combiner les
-    palettes claire et sombre de part et d'autre d'une media query CSS."""
+    """Only the "system" mode must let the BROWSER choose (specification
+    §4) - strategy documented in themes.py: combine the light and dark
+    palettes on either side of a CSS media query."""
     _, images = _make_images(tmp_path, 2)
     profile = Profile(theme=ThemeSettings(mode="system"))
     html = _generate(tmp_path, images, profile)
 
     light = get_palette("light")
     dark = get_palette("dark")
-    assert f":root {{ --bg: {light.background};" in html, "repli clair tant que la media query ne s'applique pas"
+    assert f":root {{ --bg: {light.background};" in html, "light fallback while the media query does not apply"
     media_block = html.split("@media (prefers-color-scheme: dark)")[1].split("}")[0]
     assert dark.background in media_block
     assert dark.text in media_block
@@ -169,10 +166,10 @@ def test_system_mode_emits_prefers_color_scheme_media_query_with_dark_palette(tm
 
 @pytest.mark.parametrize("mode", ["light", "dark", "neutral", "system"])
 def test_theme_toggle_and_all_three_overrides_are_always_present(tmp_path, mode):
-    """Le sélecteur de thème discret (cahier des charges §4) doit toujours
-    permettre au visiteur de basculer manuellement, quel que soit le mode
-    choisi par défaut pour la galerie - vérifié visuellement : bascule au
-    clic, persistance après rechargement (localStorage)."""
+    """The discreet theme selector (specification §4) must always let the
+    visitor switch manually, whatever the default mode chosen for the
+    gallery - checked visually: switch on click, persistence after reload
+    (localStorage)."""
     _, images = _make_images(tmp_path, 2)
     profile = Profile(theme=ThemeSettings(mode=mode))
     html = _generate(tmp_path, images, profile)
@@ -184,19 +181,18 @@ def test_theme_toggle_and_all_three_overrides_are_always_present(tmp_path, mode)
 
 
 def _theme_keys(html):
-    """Toutes les clés localStorage de thème citées dans une page, sans
-    doublon (la clé fixe historique, sans suffixe, comprise)."""
+    """All the theme localStorage keys cited in a page, without duplicates
+    (the historical fixed key, without suffix, included)."""
     return set(re.findall(r"planche-contact-theme[0-9a-f-]*", html))
 
 
 def test_visitor_theme_choice_is_stored_under_a_per_generation_key(tmp_path):
-    """Régression : le choix manuel d'un visiteur (bouton ◐) était mémorisé
-    sous UNE clé fixe, partagée par toutes les galeries ouvertes depuis la
-    même origine (Chrome partage un seul localStorage entre tous les
-    fichiers locaux). Un seul clic suffisait donc à faire ignorer, pour
-    toujours, le thème choisi dans la fenêtre principale - y compris pour
-    une galerie régénérée avec un autre thème. La clé doit maintenant être
-    propre à CHAQUE génération."""
+    """Regression: a visitor's manual choice (◐ button) was stored under ONE
+    fixed key, shared by all the galleries opened from the same origin
+    (Chrome shares a single localStorage between all local files). A single
+    click was therefore enough to make the theme chosen in the main window
+    be ignored for good - including for a gallery regenerated with another
+    theme. The key must now be specific to EACH generation."""
     _, images = _make_images(tmp_path, 2)
     profile = Profile(theme=ThemeSettings(mode="dark"))
     first = _theme_keys(_generate(tmp_path / "a", images, profile))
@@ -205,15 +201,15 @@ def test_visitor_theme_choice_is_stored_under_a_per_generation_key(tmp_path):
     assert len(first) == 1 and len(second) == 1
     (key_a,), (key_b,) = first, second
     assert re.fullmatch(r"planche-contact-theme-[0-9a-f]{12}", key_a)
-    assert key_a != key_b, "deux générations ne doivent jamais partager le choix d'un visiteur"
+    assert key_a != key_b, "two generations must never share a visitor's choice"
     assert "planche-contact-theme'" not in _generate(tmp_path / "c", images, profile), (
-        "l'ancienne clé fixe ne doit plus jamais être lue"
+        "the old fixed key must never be read again"
     )
 
 
 def test_theme_key_is_shared_by_every_page_of_one_generation(tmp_path):
-    """Le choix d'un visiteur doit, lui, suivre d'une page à l'autre de la
-    MÊME galerie : toutes ses pages citent la même clé."""
+    """A visitor's choice must, on the other hand, carry over from one page
+    to the next of the SAME gallery: all its pages cite the same key."""
     _, images = _make_images(tmp_path, 5)
     _generate(tmp_path, images, Profile(), html_per_page=2)
     pages = sorted((tmp_path / "out").glob("*.html"))
@@ -226,9 +222,9 @@ def test_theme_key_is_shared_by_every_page_of_one_generation(tmp_path):
 
 @pytest.mark.parametrize("mode", ["light", "dark", "neutral", "system"])
 def test_theme_toggle_reads_writes_and_clears_the_same_key(tmp_path, mode):
-    """Le script de tête (lecture), le bouton ◐ (écriture) et son retour au
-    thème demandé (suppression) doivent tous viser la MÊME clé : sinon un
-    choix mémorisé resterait appliqué malgré le second clic."""
+    """The head script (read), the ◐ button (write) and its return to the
+    requested theme (removal) must all target the SAME key: otherwise a
+    stored choice would stay applied despite the second click."""
     _, images = _make_images(tmp_path, 2)
     html = _generate(tmp_path, images, Profile(theme=ThemeSettings(mode=mode)))
 
@@ -239,18 +235,18 @@ def test_theme_toggle_reads_writes_and_clears_the_same_key(tmp_path, mode):
 
 
 def test_second_toggle_click_returns_to_the_requested_theme(tmp_path):
-    """Régression : le bouton ne faisait qu'alterner clair/sombre. Depuis
-    une galerie « Neutre », deux clics laissaient la page en « clair » sans
-    aucun moyen de retrouver le thème demandé. Un choix déjà mémorisé doit
-    maintenant être RETIRÉ (attribut data-theme supprimé), ce qui rend la
-    main au thème choisi à la génération."""
+    """Regression: the button merely alternated light/dark. From a "Neutral"
+    gallery, two clicks left the page "light" with no way of getting back
+    the requested theme. An already stored choice must now be REMOVED
+    (data-theme attribute deleted), which hands control back to the theme
+    chosen at generation."""
     _, images = _make_images(tmp_path, 2)
     html = _generate(tmp_path, images, Profile(theme=ThemeSettings(mode="neutral")))
 
     toggle = html.split("function toggleTheme()")[1].split("function openLightbox")[0]
     assert "if (current)" in toggle
     assert "document.documentElement.removeAttribute('data-theme')" in toggle
-    # Le retour au thème demandé a lieu AVANT toute écriture d'un nouveau choix.
+    # The return to the requested theme happens BEFORE any write of a new choice.
     assert toggle.index("removeAttribute('data-theme')") < toggle.index("setAttribute('data-theme', next)")
 
 
@@ -261,13 +257,13 @@ def test_second_toggle_click_returns_to_the_requested_theme(tmp_path):
     ("system", "light dark"),
 ])
 def test_page_declares_its_color_scheme_to_the_browser(tmp_path, mode, declared):
-    """Régression : « thème clair demandé, page sombre affichée ». Sans
-    déclaration `color-scheme`, un navigateur dont le mode sombre
-    automatique est actif (Chrome/Edge « Auto Dark Mode for Web Contents »,
-    Chrome Android, extensions) noircit de force une galerie claire.
-    `only light` est le refus normalisé de ce noircissement (`light` seul
-    ne l'empêche pas - vérifié dans Chromium) ; la page doit le déclarer
-    à la fois en <meta> (avant tout rendu) et en CSS, pour chaque thème."""
+    """Regression: "light theme requested, dark page displayed". Without a
+    `color-scheme` declaration, a browser whose automatic dark mode is
+    active (Chrome/Edge "Auto Dark Mode for Web Contents", Chrome Android,
+    extensions) forcibly darkens a light gallery. `only light` is the
+    standardised refusal of this darkening (`light` alone does not prevent
+    it - verified in Chromium); the page must declare it both in <meta>
+    (before any rendering) and in CSS, for each theme."""
     _, images = _make_images(tmp_path, 2)
     html = _generate(tmp_path, images, Profile(theme=ThemeSettings(mode=mode)))
 
@@ -277,8 +273,8 @@ def test_page_declares_its_color_scheme_to_the_browser(tmp_path, mode, declared)
 
 
 def test_default_clair_gallery_refuses_forced_darkening(tmp_path):
-    """Cas exact signalé : « Clair » choisi dans l'interface (profil par
-    défaut, donc AUCUN --profile transmis au CLI)."""
+    """Exact reported case: "Light" chosen in the interface (default
+    profile, hence NO --profile passed to the CLI)."""
     _, images = _make_images(tmp_path, 2)
     html = _generate(tmp_path, images, Profile())
 
@@ -294,10 +290,9 @@ def test_default_clair_gallery_refuses_forced_darkening(tmp_path):
 ])
 @pytest.mark.parametrize("mode", ["light", "dark", "neutral", "system"])
 def test_visitor_override_updates_the_declared_color_scheme(tmp_path, mode, override, declared):
-    """Quand le visiteur bascule le thème (bouton ◐), la déclaration doit
-    suivre : une page passée en sombre ne doit plus se dire « claire
-    uniquement » (le navigateur la noircirait une seconde fois), et
-    inversement."""
+    """When the visitor toggles the theme (◐ button), the declaration must
+    follow: a page switched to dark must no longer claim to be "light
+    only" (the browser would darken it a second time), and vice versa."""
     _, images = _make_images(tmp_path, 2)
     html = _generate(tmp_path, images, Profile(theme=ThemeSettings(mode=mode)))
 
@@ -306,36 +301,36 @@ def test_visitor_override_updates_the_declared_color_scheme(tmp_path, mode, over
 
 
 def test_custom_accent_color_is_applied_to_every_theme_override(tmp_path):
-    """Une couleur personnalisée (cahier des charges §4.3) s'applique de
-    façon cohérente à TOUTES les variantes claire/sombre/neutre du
-    sélecteur, pas seulement au thème par défaut choisi pour la page."""
+    """A custom colour (specification §4.3) applies consistently to ALL the
+    light/dark/neutral variants of the selector, not only to the default
+    theme chosen for the page."""
     _, images = _make_images(tmp_path, 2)
     custom = ThemeCustomColors(accent="#ff00aa")
     profile = Profile(theme=ThemeSettings(mode="light", custom=custom))
     html = _generate(tmp_path, images, profile)
 
-    assert html.count("--accent: #ff00aa;") == 4  # :root + les 3 overrides data-theme
+    assert html.count("--accent: #ff00aa;") == 4  # :root + the 3 data-theme overrides
 
 
 def test_lightbox_styling_is_independent_of_the_page_theme(tmp_path):
-    """La visionneuse (lightbox) reste volontairement sombre quel que soit
-    le thème choisi pour la page (voir le commentaire de conception dans
-    portfolio/presentation/themes.py) - vérifié aussi visuellement."""
+    """The viewer (lightbox) deliberately stays dark whatever the theme
+    chosen for the page (see the design comment in
+    portfolio/presentation/themes.py) - also checked visually."""
     _, images = _make_images(tmp_path, 2)
     profile = Profile(theme=ThemeSettings(mode="dark"))
     html = _generate(tmp_path, images, profile)
 
-    assert "background: rgba(0,0,0,0.92);" in html  # fond du calque .lightbox, jamais var(--bg)
+    assert "background: rgba(0,0,0,0.92);" in html  # background of the .lightbox layer, never var(--bg)
 
 
 # ---------------------------------------------------------------------------
-# Position du titre et de l'auteur (LayoutSettings.title_position/
-# author_position) : ces réglages étaient exposés mais jamais lus.
+# Position of the title and of the author (LayoutSettings.title_position/
+# author_position): these settings were exposed but never read.
 # ---------------------------------------------------------------------------
 
 def test_default_header_markup_is_unchanged(tmp_path):
-    """Positions par défaut (centrées) : l'en-tête garde EXACTEMENT son
-    balisage historique, sans aucun attribut d'alignement ajouté."""
+    """Default (centred) positions: the header keeps EXACTLY its historical
+    markup, with no alignment attribute added."""
     _, images = _make_images(tmp_path, 3)
     html = _generate(tmp_path, images, Profile(), title="Mon Titre", author="Jeanne")
 
@@ -351,7 +346,7 @@ def test_title_and_author_follow_their_own_position(tmp_path, position, css):
     html = _generate(tmp_path, images, profile, title="Mon Titre", author="Jeanne")
 
     assert f'<h1 style="text-align: {css}">Mon Titre</h1>' in html
-    # L'auteur garde sa propre position (centrée : pas d'attribut).
+    # The author keeps their own position (centred: no attribute).
     assert '<p style=' not in html
     assert "Jeanne" in html
 
@@ -373,7 +368,7 @@ def test_hidden_title_and_author_are_removed_from_the_header(tmp_path):
     body = html.split("<body", 1)[1]
     assert "<h1" not in body
     assert "Jeanne" not in body
-    # Le compteur d'images reste affiché, et le <title> de l'onglet aussi.
+    # The image counter stays displayed, and so does the tab's <title>.
     assert "<title>Mon Titre</title>" in html
     assert 'class="header"' in body
 
@@ -390,21 +385,21 @@ def test_header_positions_apply_to_every_page(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Originaux pleine taille joints à la galerie (Config.html_include_originals) :
-# le bouton de téléchargement de la visionneuse ne donnait que la copie
-# réduite (2000 px) affichée à l'écran.
+# Full-size originals attached to the gallery (Config.html_include_originals):
+# the viewer's download button only gave the reduced copy (2000 px)
+# displayed on screen.
 # ---------------------------------------------------------------------------
 
 def _gallery_meta(html):
     match = re.search(r"const galleryMeta = (\[.*?\]);", html)
-    assert match, "galleryMeta introuvable dans la page"
+    assert match, "galleryMeta not found in the page"
     return json.loads(match.group(1))
 
 
 def _big_images(tmp_path, specs):
-    """specs : liste de (sous-dossier, nom, taille, couleur). Photos plus
-    grandes que GALLERY_FULL_MAX_SIZE (2000 px) pour que la copie affichée
-    soit forcément réduite."""
+    """specs: list of (subfolder, name, size, colour). Photos larger than
+    GALLERY_FULL_MAX_SIZE (2000 px) so that the displayed copy is
+    necessarily reduced."""
     items = []
     for subdir, name, size, color in specs:
         folder = tmp_path / "photos" / subdir if subdir else tmp_path / "photos"
@@ -416,9 +411,9 @@ def _big_images(tmp_path, specs):
 
 
 def test_gallery_has_no_originals_by_default(tmp_path):
-    """Sans l'option, rien ne change : pas de dossier originals/, pas de
-    clé « original » dans les métadonnées - le téléchargement vise la copie
-    affichée, comme avant."""
+    """Without the option, nothing changes: no originals/ folder, no
+    "original" key in the metadata - the download targets the displayed
+    copy, as before."""
     images = _big_images(tmp_path, [("", "a.jpg", (3000, 2000), (10, 20, 30))])
     html = _generate(tmp_path, images, Profile())
 
@@ -427,9 +422,9 @@ def test_gallery_has_no_originals_by_default(tmp_path):
 
 
 def test_originals_are_copied_byte_for_byte_at_full_resolution(tmp_path):
-    """Régression : « le download ne donne pas l'image originale en pleine
-    taille ». Avec l'option, chaque original est copié OCTET POUR OCTET
-    (aucune recompression), la copie affichée restant réduite."""
+    """Regression: "the download does not give the original full-size
+    image". With the option, each original is copied BYTE FOR BYTE (no
+    recompression), the displayed copy staying reduced."""
     images = _big_images(tmp_path, [
         ("", "a.jpg", (3000, 2000), (10, 20, 30)),
         ("", "b.jpg", (2400, 3600), (200, 100, 50)),
@@ -442,16 +437,15 @@ def test_originals_are_copied_byte_for_byte_at_full_resolution(tmp_path):
     assert [e["originalFilename"] for e in meta] == ["a.jpg", "b.jpg"]
     for item in images:
         copy = out / "originals" / item["path"].name
-        assert filecmp.cmp(item["path"], copy, shallow=False), "l'original doit être identique octet pour octet"
+        assert filecmp.cmp(item["path"], copy, shallow=False), "the original must be byte-for-byte identical"
     assert Image.open(out / "originals" / "a.jpg").size == (3000, 2000)
-    assert max(Image.open(out / "images" / "a.jpg").size) == 2000, "la copie affichée reste réduite"
+    assert max(Image.open(out / "images" / "a.jpg").size) == 2000, "the displayed copy stays reduced"
 
 
 def test_originals_with_the_same_name_never_overwrite_each_other(tmp_path):
-    """Deux photos de même nom dans deux sous-dossiers (option -r), y
-    compris à la casse près (Windows/macOS ne les distinguent pas) :
-    perdre un ORIGINAL en silence serait bien plus grave que pour une copie
-    réduite."""
+    """Two photos with the same name in two subfolders (option -r), even
+    differing only by case (Windows/macOS do not distinguish them): silently
+    losing an ORIGINAL would be far worse than for a reduced copy."""
     images = _big_images(tmp_path, [
         ("un", "IMG_1.jpg", (2200, 1500), (255, 0, 0)),
         ("deux", "IMG_1.jpg", (2200, 1500), (0, 255, 0)),
@@ -465,14 +459,14 @@ def test_originals_with_the_same_name_never_overwrite_each_other(tmp_path):
     assert len({n.lower() for n in names}) == 3, f"noms d'originaux non uniques : {names}"
     for item, name in zip(images, names):
         assert filecmp.cmp(item["path"], out / name, shallow=False)
-    # Le téléchargement garde, lui, le nom d'origine de chaque fichier.
+    # The download, for its part, keeps each file's original name.
     assert [e["originalFilename"] for e in meta] == ["IMG_1.jpg", "IMG_1.jpg", "img_1.JPG"]
 
 
 def test_original_url_is_percent_encoded(tmp_path):
-    """Un nom avec espaces, accents, # ou parenthèses doit rester
-    téléchargeable : sans encodage, « # » coupait l'URL (fragment) et le
-    navigateur demandait un fichier inexistant."""
+    """A name with spaces, accents, # or parentheses must remain
+    downloadable: without encoding, "#" cut the URL (fragment) and the
+    browser asked for a non-existent file."""
     images = _big_images(tmp_path, [("", "Été du 12 #3 (copie).jpg", (2200, 1500), (9, 9, 9))])
     html = _generate(tmp_path, images, Profile(), include_originals=True)
 
@@ -483,9 +477,9 @@ def test_original_url_is_percent_encoded(tmp_path):
 
 
 def test_download_button_targets_the_original_when_available(tmp_path):
-    """Le script de la visionneuse doit télécharger l'original (et sous son
-    nom d'origine) quand la page en connaît un, la copie affichée sinon ; le
-    bouton l'annonce par son libellé."""
+    """The viewer script must download the original (under its original
+    name) when the page knows one, the displayed copy otherwise; the button
+    announces it through its label."""
     images = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 2, 3))])
     html = _generate(tmp_path, images, Profile(), include_originals=True)
 
@@ -494,8 +488,8 @@ def test_download_button_targets_the_original_when_available(tmp_path):
     assert "dl.href = meta.original || url;" in html
     assert "dl.download = meta.originalFilename || meta.filename;" in html
     assert f"const downloadOriginalLabel = {json.dumps(_('gallery.download_original'), ensure_ascii=False)};" in html
-    # Un original (peut-être un RAW) n'est pas ce qu'affiche la visionneuse :
-    # le repli « redessiner l'image à l'écran » donnerait la copie réduite.
+    # An original (possibly a RAW) is not what the viewer displays:
+    # the "redraw the on-screen image" fallback would give the reduced copy.
     assert html.index("if (meta.original)") < html.index("canvas.toBlob")
 
 
@@ -521,18 +515,18 @@ def _raw_files_under(folder):
 
 
 def test_worker_converts_a_raw_original_to_a_full_size_jpeg(tmp_path, monkeypatch):
-    """Un RAW n'est JAMAIS copié dans la galerie : l'original téléchargeable
-    est un JPEG à la résolution complète (ici 3000 x 2000, donc plus grand
-    que la copie affichée plafonnée à 2000 px), sous le nom de la photo en
-    `.jpg`. Le worker est appelé directement (dans ce processus) pour
-    pouvoir simuler le décodage RAW, rawpy n'étant pas toujours installé."""
+    """A RAW is NEVER copied into the gallery: the downloadable original is
+    a JPEG at full resolution (here 3000 x 2000, hence larger than the
+    displayed copy capped at 2000 px), under the photo's name in `.jpg`.
+    The worker is called directly (in this process) so that the RAW
+    decoding can be simulated, rawpy not always being installed."""
     from portfolio import htmlgallery
 
     raw = _fake_raw(tmp_path)
     monkeypatch.setattr(htmlgallery, "load_full_resolution",
                         lambda path: Image.new("RGB", (3000, 2000), (5, 60, 200)))
     monkeypatch.setattr(htmlgallery.shutil, "copy2", lambda *a, **k: (_ for _ in ()).throw(
-        AssertionError("un RAW ne doit jamais être copié tel quel")))
+        AssertionError("a RAW must never be copied as is")))
     images_dir, thumbs_dir, originals_dir = _raw_worker_dirs(tmp_path)
 
     ok, meta = htmlgallery._process_full_image_worker((
@@ -544,23 +538,23 @@ def test_worker_converts_a_raw_original_to_a_full_size_jpeg(tmp_path, monkeypatc
     original = originals_dir / "DSC_0001.jpg"
     with Image.open(original) as img:
         assert img.format == "JPEG"
-        assert img.size == (3000, 2000), "l'original garde la résolution complète"
+        assert img.size == (3000, 2000), "the original keeps the full resolution"
         assert all(abs(a - b) <= 6 for a, b in zip(img.getpixel((1500, 1000)), (5, 60, 200)))
-        # Version téléchargeable de la prise de vue, pas une copie d'affichage :
-        # qualité 95 (table de quantification fine) et couleurs en 4:4:4.
+        # Downloadable version of the shot, not a display copy:
+        # quality 95 (fine quantisation table) and 4:4:4 colours.
         assert img.quantization[0][0] <= 3
         assert JpegImagePlugin.get_sampling(img) == 0
     assert original.read_bytes()[:9] != raw.read_bytes()[:9]
     assert meta["original"] == "originals/DSC_0001.jpg"
-    assert meta["original_filename"] == "DSC_0001.jpg", "le téléchargement propose un .jpg, jamais l'extension RAW"
+    assert meta["original_filename"] == "DSC_0001.jpg", "the download offers a .jpg, never the RAW extension"
     assert meta["filename"] == "DSC_0001.jpg"
-    assert max(Image.open(images_dir / "DSC_0001.jpg").size) == 2000, "la copie affichée reste réduite"
+    assert max(Image.open(images_dir / "DSC_0001.jpg").size) == 2000, "the displayed copy stays reduced"
     for folder in (images_dir, thumbs_dir, originals_dir):
         assert _raw_files_under(folder) == []
 
 
 def test_worker_never_writes_a_raw_extension_even_when_given_a_raw_name(tmp_path, monkeypatch):
-    """Garde-fou : quel que soit le nom d'original reçu, un RAW est écrit en
+    """Safeguard: whatever original name is received, a RAW is written as
     `.jpg`."""
     from portfolio import htmlgallery
 
@@ -580,8 +574,8 @@ def test_worker_never_writes_a_raw_extension_even_when_given_a_raw_name(tmp_path
 
 
 def test_raw_original_has_no_watermark_while_the_displayed_copy_has_one(tmp_path, monkeypatch):
-    """Comme pour les autres originaux : le filigrane n'est appliqué qu'aux
-    copies affichées (avertissement déjà prévu côté interface/CLI)."""
+    """As for the other originals: the watermark is applied only to the
+    displayed copies (warning already provided on the interface/CLI side)."""
     from portfolio import htmlgallery
 
     raw = _fake_raw(tmp_path)
@@ -596,16 +590,16 @@ def test_raw_original_has_no_watermark_while_the_displayed_copy_has_one(tmp_path
 
     assert ok
     low, high = Image.open(originals_dir / "DSC_0001.jpg").convert("L").getextrema()
-    assert high - low <= 6, "l'original d'un RAW ne doit porter aucun filigrane"
+    assert high - low <= 6, "a RAW's original must carry no watermark"
     low, high = Image.open(images_dir / "DSC_0001.jpg").convert("L").getextrema()
-    assert high - low > 20, "la copie affichée doit, elle, porter le filigrane"
+    assert high - low > 20, "the displayed copy, on the other hand, must carry the watermark"
 
 
 def test_raw_original_keeps_exif_and_color_profile_and_is_not_rotated_twice(tmp_path, monkeypatch):
-    """L'aperçu embarqué d'un RAW porte l'EXIF (appareil...) et parfois un
-    profil couleur : conservés dans le JPEG téléchargeable. L'orientation
-    est appliquée aux pixels (comme pour la copie affichée) ET retirée de
-    l'EXIF, sinon un visualiseur retournerait l'image une seconde fois."""
+    """A RAW's embedded preview carries the EXIF (camera...) and sometimes a
+    colour profile: kept in the downloadable JPEG. The orientation is
+    applied to the pixels (as for the displayed copy) AND removed from the
+    EXIF, otherwise a viewer would flip the image a second time."""
     from PIL import ImageCms
     from portfolio import htmlgallery
 
@@ -613,8 +607,8 @@ def test_raw_original_keeps_exif_and_color_profile_and_is_not_rotated_twice(tmp_
     icc = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
     preview = Image.new("RGB", (3000, 2000), (200, 30, 30))
     exif = Image.Exif()
-    exif[0x010F] = "AppareilTest"      # Make
-    exif[0x0112] = 6                   # Orientation : 90° - à appliquer
+    exif[0x010F] = "TestCamera"        # Make
+    exif[0x0112] = 6                   # Orientation: 90° - to be applied
     preview_path = tmp_path / "preview.jpg"
     preview.save(preview_path, exif=exif, icc_profile=icc)
     monkeypatch.setattr(htmlgallery, "load_full_resolution", lambda path: Image.open(preview_path))
@@ -627,26 +621,26 @@ def test_raw_original_keeps_exif_and_color_profile_and_is_not_rotated_twice(tmp_
 
     assert ok
     with Image.open(originals_dir / "DSC_0001.jpg") as img:
-        assert img.size == (2000, 3000), "pixels pivotés selon l'orientation EXIF"
+        assert img.size == (2000, 3000), "pixels rotated according to the EXIF orientation"
         saved = img.getexif()
-        assert saved.get(0x010F) == "AppareilTest"
-        assert saved.get(0x0112) in (None, 1), "l'orientation ne doit plus figurer dans l'EXIF"
+        assert saved.get(0x010F) == "TestCamera"
+        assert saved.get(0x0112) in (None, 1), "the orientation must no longer appear in the EXIF"
         assert img.info.get("icc_profile") == icc
 
 
 def test_failed_raw_conversion_never_falls_back_to_copying_the_raw(tmp_path, monkeypatch):
-    """Si l'original JPEG ne peut pas être écrit (disque plein...), la photo
-    reste dans la galerie (téléchargement de la copie affichée) : le RAW,
-    lui, n'est jamais copié à la place."""
+    """If the JPEG original cannot be written (disk full...), the photo
+    stays in the gallery (download of the displayed copy): the RAW is never
+    copied in its place."""
     from portfolio import htmlgallery
 
     raw = _fake_raw(tmp_path)
     monkeypatch.setattr(htmlgallery, "load_full_resolution",
                         lambda path: Image.new("RGB", (2400, 1600), (9, 9, 9)))
     monkeypatch.setattr(htmlgallery.shutil, "copy2", lambda *a, **k: (_ for _ in ()).throw(
-        AssertionError("un RAW ne doit jamais être copié tel quel")))
+        AssertionError("a RAW must never be copied as is")))
     images_dir, thumbs_dir, originals_dir = _raw_worker_dirs(tmp_path)
-    originals_dir.rmdir()  # destination absente : l'écriture de l'original échoue
+    originals_dir.rmdir()  # destination missing: writing the original fails
 
     ok, meta = htmlgallery._process_full_image_worker((
         str(raw), str(images_dir), str(thumbs_dir), "t.jpg", None, 40, "Horizontal",
@@ -659,8 +653,8 @@ def test_failed_raw_conversion_never_falls_back_to_copying_the_raw(tmp_path, mon
 
 
 def test_unreadable_raw_leaves_nothing_in_the_gallery(tmp_path, monkeypatch):
-    """RAW illisible (rawpy absent, fichier corrompu) : la photo est écartée
-    de la galerie, sans RAW copié nulle part."""
+    """Unreadable RAW (rawpy missing, corrupted file): the photo is dropped
+    from the gallery, with no RAW copied anywhere."""
     from portfolio import htmlgallery
 
     raw = _fake_raw(tmp_path)
@@ -682,9 +676,8 @@ def test_unreadable_raw_leaves_nothing_in_the_gallery(tmp_path, monkeypatch):
 
 
 def test_raw_without_originals_option_still_uses_the_fast_decoding_path(tmp_path, monkeypatch):
-    """Sans l'option, rien ne change pour un RAW : décodage « assez grand
-    pour l'affichage » (aperçu embarqué), pas de dématriçage complet pour
-    rien."""
+    """Without the option, nothing changes for a RAW: "large enough for
+    display" decoding (embedded preview), no full demosaicing for nothing."""
     from portfolio import htmlgallery
 
     raw = _fake_raw(tmp_path)
@@ -704,8 +697,8 @@ def test_raw_without_originals_option_still_uses_the_fast_decoding_path(tmp_path
 
 
 def test_raw_original_names_are_jpg_and_stay_unique_next_to_a_jpeg_of_the_same_name(tmp_path):
-    """RAW + JPEG de même nom (paire courante) : deux originaux `.jpg`
-    distincts, aucun écrasé ; l'original du RAW est bien un JPEG."""
+    """RAW + JPEG with the same name (common pair): two distinct `.jpg`
+    originals, none overwritten; the RAW's original is indeed a JPEG."""
     from portfolio.htmlgallery import _unique_file_name
 
     used = set()
@@ -716,18 +709,18 @@ def test_raw_original_names_are_jpg_and_stay_unique_next_to_a_jpeg_of_the_same_n
 
 
 def _file_branch(html):
-    """Corps de la branche `file:` de downloadCurrentImage()."""
+    """Body of the `file:` branch of downloadCurrentImage()."""
     start = html.index("if (window.location.protocol === 'file:')")
-    return html[start:html.index("// L'attribut HTML \"download\" natif", start)]
+    return html[start:html.index("// The native HTML \"download\" attribute", start)]
 
 
 def test_local_file_page_downloads_an_original_through_its_companion_script(tmp_path):
-    """Galerie ouverte en double-clic (file://) : fetch() est bloqué et
-    l'attribut `download` n'est pas honoré partout, mais une balise
-    <script src> voisine se charge toujours. Pour un original, le bouton
-    insère donc `originals/<nom>.js`, qui livre le fichier en base64 : il est
-    ensuite téléchargé sous son vrai nom. Sans fichier annexe exploitable
-    (script absent ou tronqué), retour au lien de téléchargement."""
+    """Gallery opened by double-click (file://): fetch() is blocked and the
+    `download` attribute is not honoured everywhere, but a neighbouring
+    <script src> tag always loads. For an original, the button therefore
+    inserts `originals/<name>.js`, which delivers the file in base64: it is
+    then downloaded under its real name. Without a usable companion file
+    (script missing or truncated), it falls back to the download link."""
     images = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 2, 3))])
     html = _generate(tmp_path, images, Profile(), include_originals=True)
 
@@ -737,32 +730,32 @@ def test_local_file_page_downloads_an_original_through_its_companion_script(tmp_
     assert "script.src = meta.original + '.js';" in html
     assert "script.onerror = failed;" in html and "script.onload = failed;" in html
     assert "triggerBlobDownload(new Blob([bytes], { type: 'image/jpeg' }), pending.filename);" in html
-    # Le nom attendu par le script annexe est celui du fichier (décodé de l'URL).
+    # The name expected by the companion script is that of the file (decoded from the URL).
     assert "decodeURIComponent(meta.original.split('/').pop())" in html
 
 
 def test_download_link_fallback_never_leaves_the_gallery(tmp_path):
-    """Repli (copie affichée sans option « originaux », ou original sans
-    fichier annexe) : lien <a download>, honoré ou non selon le navigateur ;
-    target=_blank pour ne jamais remplacer la page de la galerie, et message
-    explicatif dans tous les cas."""
+    """Fallback (displayed copy without the "originals" option, or original
+    without a companion file): <a download> link, honoured or not depending
+    on the browser; target=_blank so as never to replace the gallery page,
+    and an explanatory message in all cases."""
     images = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 2, 3))])
     html = _generate(tmp_path, images, Profile(), include_originals=False)
 
     start = html.index("function openDownloadLink(url, filename)")
-    body = html[start:html.index("// Téléchargements en cours", start)]
+    body = html[start:html.index("// Downloads in progress", start)]
     for expected in ("link.href = url;", "link.download = filename;", "link.target = '_blank';", "link.click();"):
         assert expected in body, expected
     assert "window.open" not in body
     assert "showToast(" in body
     assert json.dumps(_("gallery.download_toast"), ensure_ascii=False) in html
-    # sans « originaux », seul le lien est utilisé (le script annexe n'existe pas)
+    # without "originals", only the link is used (the companion script does not exist)
     assert _file_branch(html).rstrip().endswith("}")
     assert "openDownloadLink(url, filename);\n            return;" in _file_branch(html)
 
 
 def _script_payload(script_path):
-    """(nom, octets) décodés d'un fichier annexe `pcOriginalLoaded("nom","base64");`."""
+    """(name, bytes) decoded from a companion file `pcOriginalLoaded("name","base64");`."""
     text = script_path.read_text(encoding="ascii")
     match = re.fullmatch(r'window\.pcOriginalLoaded\((".*?"),"([A-Za-z0-9+/=]*)"\);', text, re.S)
     assert match, f"format inattendu : {text[:80]}"
@@ -770,9 +763,9 @@ def _script_payload(script_path):
 
 
 def test_every_original_comes_with_a_companion_script_that_carries_its_exact_bytes(tmp_path):
-    """Fichier annexe de chaque original, à côté de lui : le base64 décodé
-    est identique octet pour octet à l'original, et le nom qu'il annonce est
-    celui du fichier (y compris accents, espaces et # - échappés en ASCII)."""
+    """Companion file of each original, next to it: the decoded base64 is
+    byte-for-byte identical to the original, and the name it announces is
+    that of the file (including accents, spaces and # - escaped in ASCII)."""
     images = _big_images(tmp_path, [
         ("", "Été du 12 #3 (copie).jpg", (2200, 1500), (9, 9, 9)),
         ("un", "IMG_1.jpg", (2200, 1500), (255, 0, 0)),
@@ -814,14 +807,14 @@ def test_companion_script_of_a_converted_raw_carries_the_jpeg_not_the_raw(tmp_pa
     name, payload = _script_payload(originals_dir / "DSC_0001.jpg.js")
     assert name == "DSC_0001.jpg"
     assert payload == (originals_dir / "DSC_0001.jpg").read_bytes()
-    assert payload[:3] == b"\xff\xd8\xff", "le fichier annexe livre le JPEG, jamais le RAW"
+    assert payload[:3] == b"\xff\xd8\xff", "the companion file delivers the JPEG, never the RAW"
     assert raw.read_bytes()[:9] not in payload[:64]
 
 
 def test_a_failed_companion_script_leaves_no_truncated_file_and_keeps_the_original(tmp_path, monkeypatch):
-    """Disque plein pendant l'écriture du fichier annexe : un script tronqué
-    s'exécuterait mal et le clic resterait sans effet - il est donc supprimé
-    (la visionneuse retombe sur le lien) ; l'original, lui, reste valide."""
+    """Disk full while writing the companion file: a truncated script would
+    run badly and the click would have no effect - it is therefore deleted
+    (the viewer falls back to the link); the original itself stays valid."""
     from portfolio import htmlgallery
 
     src = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 1, 1))])[0]["path"]
@@ -840,17 +833,17 @@ def test_a_failed_companion_script_leaves_no_truncated_file_and_keeps_the_origin
     ))
     monkeypatch.setattr(htmlgallery.base64, "b64encode", real_b64)
 
-    assert calls, "le test n'a pas exercé l'écriture du fichier annexe"
+    assert calls, "the test did not exercise the writing of the companion file"
     assert ok and meta["original"] == "originals/a.jpg"
     assert [p.name for p in originals_dir.iterdir()] == ["a.jpg"]
     assert (originals_dir / "a.jpg").read_bytes() == src.read_bytes()
 
 
 def test_companion_script_of_an_original_larger_than_one_block_decodes_exactly(tmp_path):
-    """Avec la taille de bloc réelle : un original un peu plus grand qu'un bloc
-    (deux blocs, le second partiel) doit rester un base64 continu - un bloc
-    qui ne serait pas un multiple de 3 octets insérerait un `=` au milieu et
-    corromprait le fichier téléchargé."""
+    """With the real block size: an original slightly larger than one block
+    (two blocks, the second partial) must stay a continuous base64 - a
+    block that is not a multiple of 3 bytes would insert a `=` in the middle
+    and corrupt the downloaded file."""
     from portfolio import htmlgallery
 
     assert htmlgallery._DOWNLOAD_SCRIPT_CHUNK_BYTES % 3 == 0
@@ -862,9 +855,10 @@ def test_companion_script_of_an_original_larger_than_one_block_decodes_exactly(t
 
 
 def test_companion_script_is_written_in_blocks_and_stays_one_valid_string(tmp_path, monkeypatch):
-    """Un original lu en plusieurs blocs (ici de 3 octets, multiple de 3 pour
-    que le base64 reste continu d'un bloc à l'autre) donne un seul littéral
-    JS, sans retour à la ligne, qui se décode en l'original exact."""
+    """An original read in several blocks (here of 3 bytes, a multiple of 3
+    so that the base64 stays continuous from one block to the next) gives a
+    single JS literal, with no line break, which decodes to the exact
+    original."""
     from portfolio import htmlgallery
 
     monkeypatch.setattr(htmlgallery, "_DOWNLOAD_SCRIPT_CHUNK_BYTES", 3)
@@ -878,9 +872,9 @@ def test_companion_script_is_written_in_blocks_and_stays_one_valid_string(tmp_pa
 
 
 class _InProcessExecutor:
-    """Remplace ProcessPoolExecutor pour que les workers s'exécutent dans CE
-    processus (donc monkeypatchables : un worker `spawn` réimporte le module
-    et ignore tout correctif)."""
+    """Replaces ProcessPoolExecutor so that the workers run in THIS process
+    (hence monkeypatchable: a `spawn` worker re-imports the module and
+    ignores any patch)."""
 
     def __init__(self, *args, **kwargs):
         pass
@@ -896,11 +890,10 @@ class _InProcessExecutor:
 
 
 def test_gallery_with_raw_files_contains_no_raw_and_keeps_raw_jpeg_pairs_apart(tmp_path, monkeypatch):
-    """Galerie complète (nommage, métadonnées, page HTML) avec des RAW
-    simulés : aucun fichier RAW nulle part dans le dossier de la galerie ;
-    une paire RAW + JPEG de même nom donne deux originaux `.jpg` distincts
-    (aucun n'écrase l'autre) ; le téléchargement ne propose jamais
-    d'extension RAW."""
+    """Complete gallery (naming, metadata, HTML page) with simulated RAWs:
+    no RAW file anywhere in the gallery folder; a RAW + JPEG pair with the
+    same name gives two distinct `.jpg` originals (neither overwrites the
+    other); the download never offers a RAW extension."""
     from portfolio import htmlgallery
 
     photos = tmp_path / "photos"
@@ -922,7 +915,7 @@ def test_gallery_with_raw_files_contains_no_raw_and_keeps_raw_jpeg_pairs_apart(t
     files = [unquote(e["original"]).split("/", 1)[1] for e in meta]
     assert files == ["IMG_1.jpg", "IMG_1_2.jpg", "IMG_2.jpg"]
     sizes = [Image.open(out / "originals" / f).size for f in files]
-    assert sizes == [(3200, 2100), (2600, 1700), (3200, 2100)], "le RAW converti n'écrase pas le vrai JPEG"
+    assert sizes == [(3200, 2100), (2600, 1700), (3200, 2100)], "the converted RAW does not overwrite the real JPEG"
     assert Image.open(out / "originals" / "IMG_1_2.jpg").getpixel((1300, 850))[1] > 150
 
 
@@ -930,12 +923,12 @@ REAL_DNG = Path(__file__).parent / "data" / "mini_raw.dng"
 
 
 def test_gallery_with_real_raw_files_contains_no_raw_at_all(tmp_path):
-    """De bout en bout avec un vrai fichier RAW (DNG de 160 x 120 px, rouge à
-    gauche / bleu à droite) décodé par LibRaw, dans de vrais processus
-    worker, en paire avec un JPEG de même nom : aucun fichier RAW nulle part
-    dans le dossier de la galerie, et les originaux sont de vrais JPEG à la
-    résolution du RAW, aux bonnes couleurs. Ignoré si rawpy n'est pas
-    installé (il figure pourtant dans requirements.txt)."""
+    """End to end with a real RAW file (160 x 120 px DNG, red on the left /
+    blue on the right) decoded by LibRaw, in real worker processes, paired
+    with a JPEG of the same name: no RAW file anywhere in the gallery
+    folder, and the originals are real JPEGs at the RAW's resolution, with
+    the right colours. Skipped if rawpy is not installed (it is nevertheless
+    listed in requirements.txt)."""
     pytest.importorskip("rawpy")
     photos = tmp_path / "photos"
     photos.mkdir()
@@ -947,7 +940,7 @@ def test_gallery_with_real_raw_files_contains_no_raw_at_all(tmp_path):
     html = _generate(tmp_path, images, Profile(), include_originals=True)
     out = tmp_path / "out"
 
-    assert _raw_files_under(out) == [], "aucun RAW ne doit subsister dans la galerie"
+    assert _raw_files_under(out) == [], "no RAW must remain in the gallery"
     meta = _gallery_meta(html)
     assert len(meta) == 3
     originals = [out / unquote(e["original"]) for e in meta]
@@ -960,14 +953,14 @@ def test_gallery_with_real_raw_files_contains_no_raw_at_all(tmp_path):
         left, right = img.getpixel((10, 60)), img.getpixel((150, 60))
         assert left[0] > 200 and left[2] < 150, f"gauche attendu rouge : {left}"
         assert right[2] > 200 and right[0] < 120, f"droite attendu bleu : {right}"
-    assert Image.open(originals[1]).convert("RGB").getpixel((80, 60))[1] > 150, "le vrai JPEG reste copié"
+    assert Image.open(originals[1]).convert("RGB").getpixel((80, 60))[1] > 150, "the real JPEG is still copied"
     assert [e["originalFilename"] for e in meta] == ["MINI.jpg", "MINI.jpg", "Autre.jpg"]
 
 
 def test_failed_original_copy_keeps_the_gallery_and_falls_back(tmp_path, monkeypatch):
-    """Disque plein ou fichier verrouillé : l'image reste dans la galerie,
-    sans fichier tronqué dans originals/, et le téléchargement retombe sur
-    la copie affichée (aucune clé « original »)."""
+    """Disk full or locked file: the image stays in the gallery, with no
+    truncated file in originals/, and the download falls back to the
+    displayed copy (no "original" key)."""
     from portfolio import htmlgallery
 
     src = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 1, 1))])[0]["path"]
@@ -987,13 +980,13 @@ def test_failed_original_copy_keeps_the_gallery_and_falls_back(tmp_path, monkeyp
     ))
 
     assert ok and "original" not in meta
-    assert list(originals_dir.iterdir()) == [], "aucun fichier tronqué ne doit rester"
+    assert list(originals_dir.iterdir()) == [], "no truncated file must remain"
     assert (images_dir / "a.jpg").is_file()
 
 
 def test_worker_without_originals_arguments_still_works(tmp_path):
-    """Compatibilité : l'ancien appel à 7 arguments (sans originaux) reste
-    valide."""
+    """Compatibility: the old 7-argument call (without originals) remains
+    valid."""
     from portfolio import htmlgallery
 
     src = _big_images(tmp_path, [("", "a.jpg", (2200, 1500), (1, 1, 1))])[0]["path"]
@@ -1009,14 +1002,14 @@ def test_worker_without_originals_arguments_still_works(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Copies AFFICHÉES (images/) : noms uniques et URL encodées. Défaut constaté en
-# testant les originaux : deux photos de même nom s'écrasaient (la galerie
-# montrait deux fois la même photo) et un « # » dans un nom coupait l'URL.
+# DISPLAYED copies (images/): unique names and encoded URLs. Defect found
+# while testing the originals: two photos with the same name overwrote each
+# other (the gallery showed the same photo twice) and a "#" in a name cut the URL.
 # ---------------------------------------------------------------------------
 
 def _gallery_images(html):
     match = re.search(r"const galleryImages = (\[.*?\]);", html)
-    assert match, "galleryImages introuvable dans la page"
+    assert match, "galleryImages not found in the page"
     return json.loads(match.group(1))
 
 
@@ -1026,11 +1019,10 @@ def _center_color(path):
 
 
 def test_displayed_copies_of_same_named_photos_never_overwrite_each_other(tmp_path):
-    """Deux photos de même nom dans deux sous-dossiers (option -r : plusieurs
-    cartes mémoire dont la numérotation repart de zéro), y compris à la
-    casse près : chacune doit garder SA copie affichée. Avant le
-    correctif, la seconde écrasait la première et la visionneuse montrait
-    deux fois la même photo."""
+    """Two photos with the same name in two subfolders (option -r: several
+    memory cards whose numbering restarts from zero), even differing only
+    by case: each must keep ITS displayed copy. Before the fix, the second
+    overwrote the first and the viewer showed the same photo twice."""
     colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
     images = _big_images(tmp_path, [
         ("carte1", "IMG_1.jpg", (2200, 1500), colors[0]),
@@ -1041,35 +1033,35 @@ def test_displayed_copies_of_same_named_photos_never_overwrite_each_other(tmp_pa
     out = tmp_path / "out"
 
     urls = _gallery_images(html)
-    assert len({u.lower() for u in urls}) == 3, f"copies affichées non uniques : {urls}"
+    assert len({u.lower() for u in urls}) == 3, f"displayed copies not unique: {urls}"
     for url, expected in zip(urls, colors):
         shown = _center_color(out / unquote(url))
         assert all(abs(a - b) <= 12 for a, b in zip(shown, expected)), (
-            f"{url} montre {shown} au lieu de la photo d'origine {expected}"
+            f"{url} shows {shown} instead of the original photo {expected}"
         )
-    # Le nom AFFICHÉ à l'utilisateur reste celui de la photo, pas celui du fichier.
+    # The name DISPLAYED to the user stays that of the photo, not that of the file.
     assert [e["filename"] for e in _gallery_meta(html)] == ["IMG_1.jpg", "IMG_1.jpg", "img_1.JPG"]
 
 
 def test_unique_file_name_handles_raw_jpeg_pairs_and_case():
-    """Une paire RAW + JPEG (très courante) donne DEUX copies affichées
-    nommées pareil : `display_filename()` remplace l'extension RAW par
+    """A RAW + JPEG pair (very common) gives TWO displayed copies named
+    identically: `display_filename()` replaces the RAW extension with
     .jpg."""
     from portfolio.htmlgallery import _unique_file_name
 
     used = set()
     names = [HTMLGalleryGenerator.display_filename(n) for n in ("IMG_1.CR2", "IMG_1.jpg", "IMG_2.NEF")]
-    assert names[0] == names[1] == "IMG_1.jpg", "préalable : la paire RAW+JPEG entre bien en collision"
+    assert names[0] == names[1] == "IMG_1.jpg", "precondition: the RAW+JPEG pair does collide"
     unique = [_unique_file_name(n, used) for n in names]
     assert unique == ["IMG_1.jpg", "IMG_1_2.jpg", "IMG_2.jpg"]
     assert [_unique_file_name(n, used) for n in ("a.jpg", "a.jpg", "A.JPG")] == ["a.jpg", "a_2.jpg", "A_3.JPG"]
 
 
 def test_displayed_image_url_is_percent_encoded(tmp_path):
-    """Un « # », un « % », des espaces, des accents ou des parenthèses dans
-    un nom de photo : la visionneuse et le lien de la vignette doivent
-    viser le bon fichier (sans encodage, « # » coupait l'URL et la
-    visionneuse demandait un fichier inexistant)."""
+    """A "#", a "%", spaces, accents or parentheses in a photo name: the
+    viewer and the thumbnail's link must target the right file (without
+    encoding, "#" cut the URL and the viewer asked for a non-existent
+    file)."""
     name = "100% réussi #2 (final).jpg"
     images = _big_images(tmp_path, [("", name, (2200, 1500), (30, 60, 90))])
     html = _generate(tmp_path, images, Profile())
