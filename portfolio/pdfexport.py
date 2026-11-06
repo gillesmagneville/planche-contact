@@ -19,7 +19,7 @@ class PDFExporter:
         text: the page looks identical, but its text can be selected, copied
         and searched. Without it, the PDF contains only the images."""
         if not planche_files:
-            logging.warning("Aucune planche à exporter en PDF.")
+            logging.warning(_("engine.warn_pdf_no_sheets"))
             return
 
         logger = logging.getLogger(__name__)
@@ -59,11 +59,11 @@ class PDFExporter:
                     except Exception as e:
                         # The selectable text is a bonus: its failure must
                         # never cost the page.
-                        logger.warning(f"Texte sélectionnable ignoré pour {planche.name} : {e}")
+                        logger.warning(_("engine.warn_pdf_text_skipped", name=planche.name, error=e))
                 c.showPage()
 
             except Exception as e:
-                logger.error(f"Erreur lors de l'ajout de {planche.name} au PDF : {e}")
+                logger.error(_("engine.error_pdf_add_sheet", name=planche.name, error=e))
 
         c.save()
         logger.info(_("engine.log_pdf_created", path=output_path))

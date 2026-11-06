@@ -65,10 +65,10 @@
     <li><strong>Kontaktbögen</strong> im JPEG-Format (eine oder mehrere Seiten);</li>
     <li>ein <strong>PDF</strong>, das alle Kontaktbögen zusammenfasst (Bildunterschriften, Titel und Seitenzahlen lassen sich in jedem PDF-Betrachter markieren, kopieren und durchsuchen);</li>
     <li>eine paginierte, eigenständige <strong>HTML-Galerie</strong> mit anklickbaren Miniaturbildern, die jedes Foto in einer Vollbild-Ansicht öffnen: Dateiname und Seitenzahl werden angezeigt, Navigation zwischen den Fotos der Seite (Tastatur oder Pfeile ‹ ›), direkter Sprung zu einer anderen Seite, Zoom von 50 % bis 200 %, Herunterladen des angezeigten Fotos (oder des Originals in voller Größe, mit der Option „Originale in voller Größe in der Galerie“), technische Informationen (Originalauflösung, Größe, Aufnahmedatum) und Vollbild-Umschaltung;</li>
-    <li>ein <strong>CSV-Verzeichnis</strong>, das jedes Foto mit seiner Nummer aufführt.</li>
+    <li>ein <strong>CSV-Index</strong>, der jedes Foto mit seiner Nummer aufführt.</li>
 </ul>
 <div class="note">
-<strong>Unter Windows</strong> zeigt Windows beim ersten Start des Installationsprogramms sehr wahrscheinlich einen blauen Bildschirm „Windows hat Ihren PC geschützt" (SmartScreen) an. Das ist bei kleiner, nicht digital signierter Software normal — kein Hinweis auf Schadsoftware. Klicken Sie auf <strong>Weitere Informationen</strong> und dann auf <strong>Trotzdem ausführen</strong>, um fortzufahren.
+<strong>Unter Windows</strong> erscheint beim ersten Start des Installationsprogramms sehr wahrscheinlich ein blauer Bildschirm „Windows hat Ihren PC geschützt“ (SmartScreen). Das ist bei kleiner, nicht digital signierter Software normal — kein Hinweis auf Schadsoftware. Klicken Sie auf <strong>Weitere Informationen</strong> und dann auf <strong>Trotzdem ausführen</strong>, um fortzufahren.
 </div>
 
 <h2>2. Unterstützte Fotoformate</h2>
@@ -78,7 +78,7 @@
 <tr><td>RAW-Formate</td><td><code>.cr2</code>, <code>.cr3</code> (Canon), <code>.nef</code> (Nikon), <code>.dng</code>, <code>.arw</code> (Sony)</td></tr>
 </table>
 <div class="note">
-Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automatisch im <code>.deb</code>-Paket installiert wird (keine manuelle Installation nötig). Um die Verarbeitung zu beschleunigen, verwendet Planche-Contact bevorzugt die von der Kamera bereits in der RAW-Datei eingebettete JPEG-Vorschau; ein vollständiges (langsameres) Dematrizieren wird nur ausgelöst, wenn diese Vorschau fehlt oder für den gewünschten Zweck (Miniaturbild, Kontaktbogen, „Vollbild"-Galeriebild) zu klein ist.
+Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automatisch im <code>.deb</code>-Paket installiert wird (keine manuelle Installation nötig). Um die Verarbeitung zu beschleunigen, verwendet Planche-Contact bevorzugt die von der Kamera bereits in der RAW-Datei eingebettete JPEG-Vorschau; eine vollständige (langsamere) Demosaikierung der RAW-Daten wird nur ausgelöst, wenn diese Vorschau fehlt oder für den gewünschten Zweck (Miniaturbild, Kontaktbogen, „Vollbild“-Galeriebild) zu klein ist.
 </div>
 <p>Die Ausrichtung der Fotos (Hoch- oder Querformat) wird immer genau so berücksichtigt, wie von der Kamera angegeben, und zwar bei allen drei Ausgaben (Kontaktbögen, PDF, HTML-Galerie) — keine manuelle Anpassung ist nötig, auch nicht bei Fotos, die mit senkrecht gehaltener Kamera aufgenommen wurden.</p>
 
@@ -87,7 +87,7 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
 <h3>3.1 Hauptfenster</h3>
 <p>Das Fenster öffnet sich in der Größe seines Inhalts, bei Bedarf verkleinert, damit es auf den Bildschirm passt (es bleibt normal in der Größe veränderbar). Auf einem kleinen Bildschirm lässt sich das Formular des Reiters Erstellung scrollen (Bildlaufleiste), während der untere Fensterbereich — die Schaltflächen „Erstellung starten“, „Erweiterte Einstellungen…“, „Zurücksetzen“, „Ergebnisse anzeigen“ und „Beenden“, die Fortschrittsanzeige und das Protokoll — immer sichtbar bleibt. Es bietet drei Reiter: <strong>Erstellung</strong>, <strong>Hilfe</strong> und <strong>Über</strong>. Der Reiter Hilfe öffnet dieses Handbuch im Standardbrowser.</p>
 
-<h3>3.2 Reiter „Erstellung"</h3>
+<h3>3.2 Reiter „Erstellung“</h3>
 
 <table>
 <tr><th>Feld / Option</th><th>Beschreibung</th></tr>
@@ -96,10 +96,10 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
 <tr><td><strong>Quellordner</strong></td><td>Ordner mit den zu verarbeitenden Fotografien (erforderlich). Zeigt automatisch eine Vorschau der Fotos im Ordner (siehe §3.5).</td></tr>
 <tr><td><strong>Zielordner</strong></td><td>Ordner, in dem die Ergebnisse erstellt werden. Standard: <code>Portfolio/</code> im Quellordner. Wird automatisch erstellt, falls er noch nicht existiert.</td></tr>
 <tr><td><strong>Rekursive Suche</strong></td><td>Wenn aktiviert, werden auch alle Unterordner durchsucht.</td></tr>
-<tr><td><strong>Unterordner auswählen...</strong></td><td>Verfügbar, sobald „Rekursive Suche“ aktiviert ist: öffnet ein Fenster mit allen Ordnern, die Fotos enthalten („Hauptordner“ zuerst, dann die Unterordner, jeweils mit der Anzahl ihrer Fotos). Aktivieren Sie nur die einzuschließenden Ordner („Alle auswählen“ / „Keine auswählen“): Verarbeitet werden nur die Fotos, die <em>direkt</em> in einem aktivierten Ordner liegen – das Aktivieren von <code>Paris</code> aktiviert also nicht <code>Paris/Louvre</code>. Kontaktbögen, PDF, HTML-Galerie, CSV-Index und Vorschau folgen alle der Auswahl, die neben der Schaltfläche angezeigt wird („3 von 5 Ordner(n)“). Die Auswahl wird zurückgesetzt, wenn sich der Eingabeordner ändert oder „Rekursive Suche“ deaktiviert wird.</td></tr>
+<tr><td><strong>Unterordner auswählen...</strong></td><td>Verfügbar, sobald „Rekursive Suche“ aktiviert ist: öffnet ein Fenster mit allen Ordnern, die Fotos enthalten („Hauptordner“ zuerst, dann die Unterordner, jeweils mit der Anzahl ihrer Fotos). Aktivieren Sie nur die einzuschließenden Ordner („Alle auswählen“ / „Keine auswählen“): Verarbeitet werden nur die Fotos, die <em>direkt</em> in einem aktivierten Ordner liegen – das Aktivieren von <code>Paris</code> aktiviert also nicht <code>Paris/Louvre</code>. Kontaktbögen, PDF, HTML-Galerie, CSV-Index und Vorschau folgen alle der Auswahl, die neben der Schaltfläche angezeigt wird („3 von 5 Ordner(n)“). Die Auswahl wird zurückgesetzt, wenn sich der Quellordner ändert oder „Rekursive Suche“ deaktiviert wird.</td></tr>
 <tr><td><strong>Bilder pro Kontaktbogen</strong></td><td>Anzahl der Miniaturbilder pro Seite (8 bis 48, in Schritten von 4). Auf derselben Zeile wie die nächsten drei Felder.</td></tr>
 <tr><td><strong>Format des Kontaktbogens</strong></td><td>Papierformat: A5, A4, A3, A2 oder Letter.</td></tr>
-<tr><td><strong>Wasserzeichen (Text)</strong></td><td>Text, der als Muster über alle Bilder wiederholt wird (Kontaktbögen, PDF und HTML-Galerie) — ein „©" wird automatisch hinzugefügt, falls nicht vorhanden.</td></tr>
+<tr><td><strong>Wasserzeichen (Text)</strong></td><td>Text, der als Muster über alle Bilder wiederholt wird (Kontaktbögen, PDF und HTML-Galerie) — ein „©“ wird automatisch hinzugefügt, falls nicht vorhanden.</td></tr>
 <tr><td><strong>Ausrichtung des Wasserzeichens</strong></td><td>
     <ul>
         <li><strong>Horizontal</strong>: horizontaler Text</li>
@@ -109,8 +109,8 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
 </td></tr>
 <tr><td><strong>Deckkraft des Wasserzeichens</strong></td><td>Regler von 0 bis 100 % (Standard: 40 %). Gilt identisch für Kontaktbögen, PDF und HTML-Galerie.</td></tr>
 <tr><td><strong>Thema</strong></td><td>Hell (Standard), Dunkel, Neutral oder System: grafisches Thema, das identisch auf Kontaktbögen, PDF und HTML-Galerie angewendet wird (Details und benutzerdefinierte Farben: siehe §3.3).</td></tr>
-<tr><td><strong>Exportoptionen</strong></td><td>Kontrollkästchen: PDF erstellen, HTML-Galerie erstellen, CSV-Verzeichnis erstellen.</td></tr>
-<tr><td><strong>Bilder pro Seite</strong></td><td>Anzahl der Miniaturbilder pro HTML-Galerieseite (12 bis 64, in Schritten von 4, Standard: 48). Auf derselben Zeile wie das Kontrollkästchen „HTML-Galerie erstellen".</td></tr>
+<tr><td><strong>Exportoptionen</strong></td><td>Kontrollkästchen: PDF erstellen, HTML-Galerie erstellen, CSV-Index erstellen.</td></tr>
+<tr><td><strong>Bilder pro Seite</strong></td><td>Anzahl der Miniaturbilder pro HTML-Galerieseite (12 bis 64, in Schritten von 4, Standard: 48). Auf derselben Zeile wie das Kontrollkästchen „HTML-Galerie erstellen“.</td></tr>
 <tr><td><strong>Originale in voller Größe in der Galerie</strong></td><td>Kontrollkästchen, standardmäßig aus, rechts neben dem Schieberegler „Bilder pro Seite“ (ausgegraut, wenn „HTML-Galerie erstellen“ nicht angehakt ist). Fügt der Galerie die Fotos in voller Auflösung hinzu: JPEG-, PNG-, TIFF-Dateien usw. werden verlustfrei kopiert, <strong>RAW-Dateien werden in JPEG voller Größe umgewandelt</strong> (gleiche Auflösung, Qualität 95, EXIF bleibt erhalten, wenn die im RAW eingebettete Vorschau welche enthält) und behalten ihren Namen mit der Endung <code>.jpg</code>: Keine RAW-Datei landet je in der Galerie. Die Download-Schaltfläche ⇩ der Ansicht liefert dann das Foto so, wie es aufgenommen wurde, in voller Auflösung und unter seinem Namen, und nicht die verkleinerte Kopie (2000 px) auf dem Bildschirm. Die Galerie wird deutlich größer (jedes Original erhält zudem eine Begleitdatei von etwa 133 % seiner Größe, die den Download per Doppelklick ermöglicht; auf einem Webserver ist sie überflüssig und kann vor dem Hochladen gelöscht werden). <strong>Die Originale tragen kein Wasserzeichen</strong> (nur die angezeigten Kopien): Wird zusätzlich ein Wasserzeichen verlangt, erscheint eine Warnung im Protokoll.</td></tr>
 </table>
 
@@ -124,60 +124,60 @@ Die RAW-Unterstützung basiert auf der Bibliothek <code>rawpy</code>, die automa
 <tr><th>Einstellung</th><th>Beschreibung</th></tr>
 <tr><td><strong>Vorlage</strong></td><td>Raster (Standardverhalten), Querformat, Hochformat, Große Miniaturbilder (reduziert automatisch die Anzahl der Fotos pro Seite, um große Miniaturbilder zu gewährleisten), Frei (Spalten/Zeilen manuell gewählt).</td></tr>
 <tr><td><strong>Ausrichtung</strong></td><td>Hochformat oder Querformat für die Seite selbst.</td></tr>
-<tr><td><strong>Anpassungsmodus</strong></td><td>Wie sich jedes Foto in seine Zelle einfügt: Einpassen (Standardverhalten, kein Zuschneiden: das ganze Foto mit seinen Proportionen) oder Füllen (das Foto wird mittig quadratisch zugeschnitten, um die gesamte Zelle ohne leeren Rand zu füllen). Gilt für Kontaktbögen und PDF; die HTML-Galerie behält die Proportionen der Fotos bei. Ein Foto, das kleiner als seine Zelle ist, wird nie vergrößert.</td></tr>
+<tr><td><strong>Fotoanpassung</strong></td><td>Wie sich jedes Foto in seine Zelle einfügt: Ganzes Foto (<code>contain</code>; Standardverhalten, kein Zuschneiden: das ganze Foto mit seinen Proportionen) oder Ausfüllen (<code>cover</code>; das Foto wird mittig quadratisch zugeschnitten, um die gesamte Zelle ohne leeren Rand zu füllen). Gilt für Kontaktbögen und PDF; die HTML-Galerie behält die Proportionen der Fotos bei. Ein Foto, das kleiner als seine Zelle ist, wird nie vergrößert.</td></tr>
 <tr><td><strong>Titel / Autor</strong></td><td>Position von Titel und Autor am oberen Rand des Kontaktbogens: Links, Zentriert (Standardverhalten), Rechts oder Ausgeblendet. Jeder hat seine eigene Position, beide bleiben untereinander und richten sich an den Seitenrändern aus; „Ausgeblendet“ entfernt die Zeile, und das Raster rückt entsprechend nach oben. Ein zu langer Text wird verkleinert, damit er in die Seitenbreite passt. Gilt auch für die Kopfzeile der HTML-Galerie.</td></tr>
 <tr><td><strong>Kontaktbögen nummerieren</strong></td><td>Zeigt „Kontaktbogen X/Y“ unten auf jedem Kontaktbogen und im PDF (standardmäßig aktiviert). Ohne Wirkung auf die HTML-Galerie, die ihre eigene Seitennummerierung behält. Die beiden Zeilen darunter bleiben immer sichtbar, auf den Kontaktbögen wie im PDF: „Kontaktbogen erstellt mit Planche-Contact“, dann „Entwickelt von Gilles MAGNEVILLE, unter der Lizenz GNU GPL v3“ (dieselbe wie in der HTML-Galerie). Die Fußzeile braucht etwa 11 mm: Ist der gewählte Rand kleiner, wird der untere Rand auf diesen Wert angehoben, damit das Raster nie darüber läuft.</td></tr>
 <tr><td><strong>Zentrierung</strong></td><td>Das Fotoraster ist auf der Seite immer zentriert, horizontal und vertikal unterhalb der Kopfzeile; ohne Bildunterschriften ist außerdem jedes Foto in seiner Zelle zentriert. Alle Kontaktbögen einer Erstellung — auch der letzte, unvollständige — platzieren ihre Fotos an denselben Stellen.</td></tr>
 <tr><td><strong>Ränder / Abstand</strong></td><td>In Millimetern, um die Seite und zwischen den Miniaturbildern. Der untere Rand fällt nie unter ~11 mm (Platz für die Fußzeile des Kontaktbogens).</td></tr>
-<tr><td><strong>Spalten / Zeilen</strong></td><td>Nur für die Vorlage „Frei" (0 = automatisch).</td></tr>
+<tr><td><strong>Spalten / Zeilen</strong></td><td>Nur für die Vorlage „Frei“ (0 = automatisch).</td></tr>
 </table>
 
 <p><strong>Bildunterschriften pro Foto</strong></p>
 <p>Unter (oder über) jedem Miniaturbild kann eine Bildunterschrift angezeigt werden, die aus den EXIF-Metadaten des Fotos erstellt wird:</p>
 <ul>
-<li>Dateiname, Aufnahmedatum, Kamera (Marke/Modell), Objektiv, Brennweite, KB-äquivalente Brennweite (35&nbsp;mm), Blende, Verschlusszeit, ISO-Empfindlichkeit, Bildabmessungen, GPS-Position.</li>
+<li>Dateiname, Aufnahmedatum, Kamera (Marke/Modell), Objektiv, Brennweite, kleinbildäquivalente Brennweite (35&nbsp;mm), Blende, Verschlusszeit, ISO-Empfindlichkeit, Bildabmessungen, GPS-Koordinaten.</li>
 <li>Position, reservierter Bereich (mm), Zeilenanzahl, Schriftgröße und Ausrichtung sind alle einstellbar.</li>
-<li>Ein für das Vorschaubild zu breiter Text wird automatisch an den Feldgrenzen umbrochen: Es wird keine Information abgeschnitten. Bei Bedarf kommen Zeilen hinzu, und die Vorschaubilder werden etwas kleiner, um ihnen Platz zu machen.</li>
+<li>Ein für das Miniaturbild zu breiter Text wird automatisch an den Feldgrenzen umgebrochen: Es wird keine Information abgeschnitten. Bei Bedarf kommen Zeilen hinzu, und die Miniaturbilder werden etwas kleiner, um ihnen Platz zu machen.</li>
 <li>Ein bei einem bestimmten Foto fehlendes Metadatenfeld (z. B. keine GPS-Daten) wird einfach aus seiner Bildunterschrift weggelassen, ohne jemals einen Fehler zu verursachen.</li>
 </ul>
 <div class="note">
-Die GPS-Position wird, falls aktiviert, im Klartext auf dem erstellten Kontaktbogen angezeigt — nur aktivieren, wenn diese Information tatsächlich weitergegeben werden soll (ein Warnhinweis erscheint beim Überfahren des entsprechenden Kontrollkästchens mit der Maus).
+Die GPS-Koordinaten wird, falls aktiviert, im Klartext auf dem erstellten Kontaktbogen angezeigt — nur aktivieren, wenn diese Information tatsächlich weitergegeben werden soll (ein Warnhinweis erscheint beim Überfahren des entsprechenden Kontrollkästchens mit der Maus).
 </div>
 
 <p><strong>Grafisches Thema</strong></p>
-<p>Vier Modi, die in der Liste „Thema“ des Hauptfensters gewählt werden (siehe §3.2) und identisch auf die JPEG-Kontaktbögen, das PDF und die HTML-Galerie angewendet werden: <strong>Hell</strong> (Standard), <strong>Dunkel</strong>, <strong>Neutral</strong> und <strong>System</strong> (für die HTML-Galerie folgt es dem Browser jedes Besuchers, mit einer kleinen dezenten Schaltfläche, mit der er selbst zwischen Hell und Dunkel wechseln kann; da ein JPEG-Kontaktbogen oder ein PDF ein feststehendes Bild ist, das dem Systemthema nicht folgen kann, bleiben sie in diesem Modus hell). Dieser erweiterte Bereich enthält nur noch die Hintergrund-, Text-, Akzent- und Rahmenfarbe, die einzeln angepasst werden können (Hexadezimalformat <code>#rrggbb</code>), um die Farben des gewählten Themas zu ersetzen. In der HTML-Galerie schaltet die kleine Schaltfläche ◐ (in der Fußzeile) die Seite vom gewählten Thema auf sein helles/dunkles Gegenstück um; ein zweiter Klick führt genau zum gewählten Thema zurück. Die Wahl des Besuchers wird in seinem Browser gespeichert, aber nur für die aktuelle Galerie: Eine neu erstellte Galerie beginnt immer wieder mit dem im Hauptfenster gewählten Thema.</p>
+<p>Vier Modi, die in der Liste „Thema“ des Hauptfensters gewählt werden (siehe §3.2) und identisch auf die JPEG-Kontaktbögen, das PDF und die HTML-Galerie angewendet werden: <strong>Hell</strong> (Standard), <strong>Dunkel</strong>, <strong>Neutral</strong> und <strong>System</strong> (für die HTML-Galerie folgt es dem Browser jedes Besuchers, mit einer kleinen, dezenten Schaltfläche, mit der er selbst zwischen Hell und Dunkel wechseln kann; da ein JPEG-Kontaktbogen oder ein PDF ein feststehendes Bild ist, das dem Systemthema nicht folgen kann, bleiben sie in diesem Modus hell). Dieser erweiterte Bereich enthält nur noch die Hintergrund-, Text-, Akzent- und Rahmenfarbe, die einzeln angepasst werden können (Hexadezimalformat <code>#rrggbb</code>), um die Farben des gewählten Themas zu ersetzen. In der HTML-Galerie schaltet die kleine Schaltfläche ◐ (in der Fußzeile) die Seite vom gewählten Thema auf sein helles/dunkles Gegenstück um; ein zweiter Klick führt genau zum gewählten Thema zurück. Die Wahl des Besuchers wird in seinem Browser gespeichert, aber nur für die aktuelle Galerie: Eine neu erstellte Galerie beginnt immer wieder mit dem im Hauptfenster gewählten Thema.</p>
 
 <p><strong>Profil speichern / laden</strong></p>
-<p>Alle diese Einstellungen (Layout, Bildunterschriften und Thema) können in einer wiederverwendbaren JSON-Datei gespeichert werden (Schaltfläche „Profil speichern…"), und später wieder geladen werden (Schaltfläche „Profil laden…") — praktisch, um dieselben Einstellungen auf mehrere Projekte anzuwenden oder sie weiterzugeben. Dieselbe Datei kann über <code>--profile</code> an die Befehlszeile übergeben werden (siehe §4.1).</p>
+<p>Alle diese Einstellungen (Layout, Bildunterschriften und Thema) können in einer wiederverwendbaren JSON-Datei gespeichert werden (Schaltfläche „Profil speichern…“), und später wieder geladen werden (Schaltfläche „Profil laden…“) — praktisch, um dieselben Einstellungen auf mehrere Projekte anzuwenden oder sie weiterzugeben. Dieselbe Datei kann über <code>--profile</code> an die Befehlszeile übergeben werden (siehe §4.1).</p>
 
 <h3>3.4 Vorschau des Kontaktbogens</h3>
-<p>Die Schaltfläche „Kontaktbogen-Vorschau…" im Fenster der erweiterten Einstellungen zeigt in einem eigenen Fenster den Kontaktbogen genau so an, wie er tatsächlich erstellt wird — einschließlich Layout, Bildunterschriften, Thema und Wasserzeichen —, anhand der ersten Fotos im Quellordner (dieselbe Anzahl, die die tatsächliche Erstellung auf dieser ersten Seite platzieren würde). Praktisch, um die Wirkung einer Einstellung zu überprüfen, bevor eine vollständige Erstellung gestartet wird, insbesondere bei einem Ordner mit vielen Fotos.</p>
+<p>Die Schaltfläche „Vorschau des Kontaktbogens…“ im Fenster der erweiterten Einstellungen zeigt in einem eigenen Fenster den Kontaktbogen genau so an, wie er tatsächlich erstellt wird — einschließlich Layout, Bildunterschriften, Thema und Wasserzeichen —, anhand der ersten Fotos im Quellordner (dieselbe Anzahl, die die tatsächliche Erstellung auf dieser ersten Seite platzieren würde). Praktisch, um die Wirkung einer Einstellung zu überprüfen, bevor eine vollständige Erstellung gestartet wird, insbesondere bei einem Ordner mit vielen Fotos.</p>
 
 <h3>3.5 Vorschau des Quellordners</h3>
 <p>Sobald ein gültiger Quellordner angegeben ist (beim Start, wenn bereits ein Ordner gespeichert war, oder nach Eingabe/Auswahl), zeigt ein Vorschaustreifen automatisch Miniaturbilder der enthaltenen Fotos an, in Seiten zu je 10, mit nummerierter Seitennavigation (<code>← Zurück 1 … 4 5 6 … 19 Weiter →</code>). Das Scannen und Erstellen der Miniaturbilder erfolgt im Hintergrund: Die Benutzeroberfläche friert nicht ein, selbst bei einem Ordner mit Hunderten von Fotos.</p>
 
 <h3>3.6 Eigener Ordnerauswahldialog</h3>
-<p>Die Schaltfläche „Auswählen..." (Quell- oder Zielordner) öffnet einen vollständig von der Anwendung erstellten Ordner-Browser, anstelle des systemeigenen Dialogs:</p>
+<p>Die Schaltfläche „Auswählen...“ (Quell- oder Zielordner) öffnet einen vollständig von der Anwendung erstellten Ordner-Browser, anstelle des systemeigenen Dialogs:</p>
 <ul>
     <li>Es werden <strong>ausschließlich Ordner</strong> angezeigt (keine Dateien), für eine übersichtliche Navigation.</li>
     <li>Ein <strong>Vorschaubereich</strong> unten zeigt bis zu 20 Miniaturbilder (2 Zeilen zu je 10) der Fotos im angezeigten Ordner, mit eigener Seitennavigation.</li>
-    <li>Ein anklickbarer <strong>Pfadnavigationspfad</strong> oben ermöglicht schnelles Aufsteigen in der Ordnerstruktur.</li>
+    <li>Eine anklickbare <strong>Pfadleiste</strong> oben ermöglicht schnelles Aufsteigen in der Ordnerstruktur.</li>
     <li>Eine <strong>Seitenleiste</strong> bietet eine Verknüpfung zum persönlichen Ordner sowie die bereits im System gespeicherten Lesezeichen (dieselben wie im Dateimanager), falls vorhanden.</li>
-    <li>Ein Doppelklick auf einen Ordner öffnet ihn; die Schaltfläche <strong>„Diesen Ordner auswählen"</strong> bestätigt den aktuell angezeigten Ordner.</li>
+    <li>Ein Doppelklick auf einen Ordner öffnet ihn; die Schaltfläche <strong>„Diesen Ordner auswählen“</strong> bestätigt den aktuell angezeigten Ordner.</li>
 </ul>
 
-<h3>3.7 Schaltfläche „Ergebnisse anzeigen"</h3>
+<h3>3.7 Schaltfläche „Ergebnisse anzeigen“</h3>
 <p>Nach einer erfolgreichen Erstellung ermöglicht diese Auswahlschaltfläche, die Ergebnisse direkt mit den Standardanwendungen des Systems zu öffnen, ohne das Hauptfenster zu vergrößern:</p>
 <table>
 <tr><th>Option</th><th>Aktion</th></tr>
 <tr><td><strong>Kontaktbögen</strong></td><td>Öffnet den Ordner <code>planches/</code> im Standard-Dateimanager.</td></tr>
 <tr><td><strong>Portfolio-PDF</strong></td><td>Öffnet das PDF mit dem Standardbetrachter.</td></tr>
 <tr><td><strong>HTML-Galerie</strong></td><td>Öffnet die Galerie im Standardbrowser.</td></tr>
-<tr><td><strong>CSV-Verzeichnis</strong></td><td>Öffnet die CSV-Datei mit der Standardanwendung (meist eine Tabellenkalkulation).</td></tr>
+<tr><td><strong>CSV-Index</strong></td><td>Öffnet die CSV-Datei mit der Standardanwendung (meist eine Tabellenkalkulation).</td></tr>
 </table>
 <p>Jede Option ist nur aktiviert, wenn das entsprechende Element tatsächlich erstellt wurde (je nach bei der Erstellung ausgewählten Kontrollkästchen). Ist auf dem System keine Standardanwendung für einen bestimmten Dateityp konfiguriert, erscheint ein Warnfenster mit einem Vorschlag für eine zu installierende Anwendung.</p>
 
-<h3>3.8 Reiter „Über"</h3>
+<h3>3.8 Reiter „Über“</h3>
 <p>Zeigt die Versionsnummer, das Build-Datum, eine kurze Beschreibung, den Autor, die Lizenz (<strong>GNU GPL v3</strong>) und einen anklickbaren Link zum GitHub-Repository des Projekts an. Enthält außerdem die Sprachauswahl — siehe Hinweis unten.</p>
 <div class="note">
 Eine Sprachänderung wird erst nach einem Neustart der Anwendung wirksam. Die gewählte Sprache wird auch für die Kommandozeile und für jede danach erstellte HTML-Galerie verwendet — siehe §4 und §5.
@@ -200,15 +200,15 @@ Eine Sprachänderung wird erst nach einem Neustart der Anwendung wirksam. Die ge
 <tr><td><code>--watermark-opacity</code></td><td>Deckkraft des Wasserzeichens, von 0 bis 100 (Standard: 40)</td><td><code>--watermark-opacity 60</code></td></tr>
 <tr><td><code>--pdf</code></td><td>PDF erstellen</td><td></td></tr>
 <tr><td><code>--html</code></td><td>HTML-Galerie erstellen</td><td></td></tr>
-<tr><td><code>--csv</code></td><td>CSV-Verzeichnis erstellen</td><td></td></tr>
+<tr><td><code>--csv</code></td><td>CSV-Index erstellen</td><td></td></tr>
 <tr><td><code>-r, --recursive</code></td><td>Rekursive Analyse der Unterordner</td><td></td></tr>
-<tr><td><code>--include-dir</code></td><td>Nur die Fotos verarbeiten, die direkt in diesem Unterordner liegen (Pfad relativ zum Eingabeordner, <code>.</code> für den Eingabeordner selbst). Mehrfach angebbar; impliziert die rekursive Suche. Ohne diese Option werden alle Fotos verarbeitet.</td><td><code>--include-dir Paris --include-dir "Sommer 2026"</code></td></tr>
+<tr><td><code>--include-dir</code></td><td>Nur die Fotos verarbeiten, die direkt in diesem Unterordner liegen (Pfad relativ zum Quellordner, <code>.</code> für den Quellordner selbst). Mehrfach angebbar; impliziert die rekursive Suche. Ohne diese Option werden alle Fotos verarbeitet.</td><td><code>--include-dir Paris --include-dir "Sommer 2026"</code></td></tr>
 <tr><td><code>--include-dirs-file</code></td><td>Textdatei (UTF-8) mit den zu verarbeitenden Unterordnern, einer pro Zeile (wie mehrere <code>--include-dir</code>)</td><td><code>--include-dirs-file ordner.txt</code></td></tr>
 <tr><td><code>--sort</code></td><td>Sortierung der Fotos: <code>date</code> (EXIF) oder <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Anzahl der Bilder pro HTML-Galerieseite (Standard: 48)</td><td><code>--html-per-page 60</code></td></tr>
 <tr><td><code>--html-originals</code></td><td>Die Originale in voller Größe der HTML-Galerie hinzufügen (die Download-Schaltfläche liefert sie; RAW-Dateien werden in JPEG umgewandelt, keine RAW-Datei landet in der Galerie; die Galerie wird deutlich größer, und die Originale tragen kein Wasserzeichen)</td><td><code>--html --html-originals</code></td></tr>
 <tr><td><code>--language</code></td><td>Sprache der Meldungen und der erstellten HTML-Galerie: <code>system</code> (Standard), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language de</code></td></tr>
-<tr><td><code>--profile</code></td><td>JSON-Profildatei (Layout, Bildunterschriften, Thema — siehe §3.3), erstellt über die Schaltfläche „Profil speichern…" der grafischen Oberfläche, oder von Hand geschrieben/bearbeitet. Eine fehlende oder ungültige Datei greift stillschweigend auf die Standardeinstellungen zurück.</td><td><code>--profile mein-profil.json</code></td></tr>
+<tr><td><code>--profile</code></td><td>JSON-Profildatei (Layout, Bildunterschriften, Thema — siehe §3.3), erstellt über die Schaltfläche „Profil speichern…“ der grafischen Oberfläche, oder von Hand geschrieben/bearbeitet. Eine fehlende oder ungültige Datei greift stillschweigend auf die Standardeinstellungen zurück.</td><td><code>--profile mein-profil.json</code></td></tr>
 </table>
 <div class="note">
 Die Werte für <code>--watermark-orientation</code> bleiben intern immer auf Französisch, unabhängig von der gewählten <code>--language</code> (<code>"Horizontal"</code>, <code>"Diagonale horaire"</code>, <code>"Diagonale anti-horaire"</code>) — dies ist die interne Vorgabe des Programmkerns und hat nichts mit der Anzeigesprache zu tun.
@@ -237,14 +237,14 @@ python3 portfolio.py \
 </code></pre>
 
 <h2>5. Wasserzeichen</h2>
-<p>Das Wasserzeichen verwendet eine <strong>einzige, identische Darstellung</strong>, unabhängig vom Ausgabeträger: Kontaktbögen, PDF (das direkt die Kontaktbogenbilder wiederverwendet) und HTML-Galerie (Rastermin­iaturbilder und „Vollbild"-Bilder). Der Text wird als Muster über das ganze Bild wiederholt, mit der gewählten Ausrichtung und Deckkraft — kein Unterschied in der Darstellung zwischen den drei Ausgaben.</p>
+<p>Das Wasserzeichen verwendet eine <strong>einzige, identische Darstellung</strong>, unabhängig vom Ausgabeträger: Kontaktbögen, PDF (das direkt die Kontaktbogenbilder wiederverwendet) und HTML-Galerie (Miniaturbilder im Raster und „Vollbild“-Bilder). Der Text wird als Muster über das ganze Bild wiederholt, mit der gewählten Ausrichtung und Deckkraft — kein Unterschied in der Darstellung zwischen den drei Ausgaben.</p>
 
 <h2>6. Erstellte Dateien</h2>
 <table>
 <tr><th>Ordner / Datei</th><th>Inhalt</th></tr>
 <tr><td><code>planches/</code></td><td>Einzelne Kontaktbögen (JPEG, 300 dpi)</td></tr>
 <tr><td><code>portfolio.pdf</code></td><td>Vollständiges PDF, das alle Kontaktbögen zusammenfasst</td></tr>
-<tr><td><code>gallery/</code></td><td>Paginierte, eigenständige HTML-Galerie (mit eigenen Miniaturbildern und „Vollbild"-Bildern)</td></tr>
+<tr><td><code>gallery/</code></td><td>Paginierte, eigenständige HTML-Galerie (mit eigenen Miniaturbildern und „Vollbild“-Bildern)</td></tr>
 <tr><td><code>gallery/originals/</code></td><td>Fotos in voller Auflösung: Dateien unverändert kopiert, außer RAW-Dateien, die in JPEG umgewandelt werden, jeweils mit ihrer Begleitdatei <code>.js</code> für den Download per Doppelklick (nur mit der Option „Originale in voller Größe in der Galerie“)</td></tr>
 <tr><td><code>index.csv</code></td><td>Liste der Bilder mit ihrer Nummer</td></tr>
 <tr><td><code>generation.log</code></td><td>Detailliertes Protokoll der Erstellung</td></tr>
@@ -260,7 +260,7 @@ python3 portfolio.py \
     <li>Bei umfangreichen Ordnern (mehrere hundert Fotos) nutzt die Verarbeitung automatisch alle verfügbaren Kerne des Rechners: je mehr Kerne, desto schneller die Erstellung.</li>
 </ul>
 <div class="note">
-Wenn die Galerie direkt durch Doppelklick auf <code>index.html</code> geöffnet wird (ohne Webserver), blockieren die Browser aus Sicherheitsgründen das Lesen benachbarter Dateien und damit den üblichen skriptgesteuerten Download. <strong>Mit der Option „Originale in voller Größe in der Galerie“</strong> wird jedem Original eine kleine <code>.js</code>-Datei beigelegt (<code>originals/IMG_1.jpg.js</code>), die die Ansicht bei Bedarf lädt: Die Schaltfläche ⇩ lädt dann das JPEG unter seinem Namen mit dem üblichen Dialog des Browsers herunter, auch per Doppelklick und in jedem Browser. Ohne diese Option (verkleinerte Kopie) oder wenn eine Begleitdatei fehlt, verwendet die Schaltfläche einen einfachen Download-Link: Je nach Browser löst er das Speichern aus oder öffnet das Bild in einem neuen Tab (so verhalten sich Chrome und Chromium-basierte Browser), und in der Ansicht erscheint eine erklärende Meldung. Hat sich das Bild in einem neuen Tab geöffnet: Ein Rechtsklick darauf und <strong>„Bild speichern unter"</strong> funktioniert in diesem Fall weiterhin normal. Um den Download mit einem Klick zurückzubekommen, rufen Sie die Galerie einfach über einen Webserver statt lokal auf — ein einfacher Befehl wie <code>python3 -m http.server</code>, im Galerieordner ausgeführt, reicht aus, ohne dass etwas weiter installiert werden muss.
+Wenn die Galerie direkt durch Doppelklick auf <code>index.html</code> geöffnet wird (ohne Webserver), blockieren die Browser aus Sicherheitsgründen das Lesen benachbarter Dateien und damit den üblichen skriptgesteuerten Download. <strong>Mit der Option „Originale in voller Größe in der Galerie“</strong> wird jedem Original eine kleine <code>.js</code>-Datei beigelegt (<code>originals/IMG_1.jpg.js</code>), die die Ansicht bei Bedarf lädt: Die Schaltfläche ⇩ lädt dann das JPEG unter seinem Namen mit dem üblichen Dialog des Browsers herunter, auch per Doppelklick und in jedem Browser. Ohne diese Option (verkleinerte Kopie) oder wenn eine Begleitdatei fehlt, verwendet die Schaltfläche einen einfachen Download-Link: Je nach Browser löst er das Speichern aus oder öffnet das Bild in einem neuen Tab (so verhalten sich Chrome und Chromium-basierte Browser), und in der Ansicht erscheint eine erklärende Meldung. Hat sich das Bild in einem neuen Tab geöffnet: Ein Rechtsklick darauf und <strong>„Bild speichern unter“</strong> funktioniert in diesem Fall weiterhin normal. Um den Download mit einem Klick zurückzubekommen, rufen Sie die Galerie einfach über einen Webserver statt lokal auf — ein einfacher Befehl wie <code>python3 -m http.server</code>, im Galerieordner ausgeführt, reicht aus, ohne dass etwas weiter installiert werden muss.
 </div>
 
 <h2>8. Über</h2>

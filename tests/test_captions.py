@@ -9,6 +9,8 @@ photos - this module only tests the FORMATTING.
 """
 from datetime import datetime
 
+import pytest
+
 from portfolio.presentation import Profile, CaptionSettings, resolve_caption_lines
 
 
@@ -72,7 +74,7 @@ def test_default_formatting_for_each_field_type():
         "camera": "Canon EOS R5",
         "lens": "RF 24-70mm F2.8",
         "focal_length": "50 mm",
-        "focal_35mm": "50 mm (éq. 24×36)",
+        "focal_35mm": "50 mm (equiv. 24×36)",
         "aperture": "f/2.8",
         "shutter_speed": "1/250s",
         "iso": "ISO 400",
@@ -245,3 +247,17 @@ def test_layout_caption_lines_degenerate_width_falls_back_to_plain_lines():
         layout_caption_lines(profile, _FULL_METADATA, max_width=0, measure=_measure)
         == resolve_caption_lines(profile, _FULL_METADATA)
     )
+
+
+@pytest.mark.parametrize("lang, expected", [
+    ("en", "50 mm (equiv. 24×36)"),
+    ("fr", "50 mm (éq. 24×36)"),
+    ("es", "50 mm (equiv. 24×36)"),
+    ("de", "50 mm (Äquiv. 24×36)"),
+])
+def test_35mm_equivalent_caption_follows_the_active_language(lang, expected):
+    from portfolio.i18n import set_language
+
+    set_language(lang)
+    profile = Profile(captions=CaptionSettings(fields=["focal_35mm"]))
+    assert resolve_caption_lines(profile, {"focal_35mm": 50}) == [expected]

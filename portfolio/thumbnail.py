@@ -6,12 +6,15 @@ import multiprocessing
 import os
 from functools import partial
 
+from .i18n import _, get_language, set_language
 from .rawloader import load_image
 
 
-def _init_worker_logging(log_path):
+def _init_worker_logging(log_path, language=None):
     """Reconfigures logging in child processes (required with 'spawn',
-    which does not share the parent process's configuration)."""
+    which does not share the parent process's configuration), and re-arms
+    the active language there: a worker starts a new interpreter, in
+    which the messages would otherwise come out in English."""
     if log_path:
         logging.basicConfig(
             level=logging.INFO,
@@ -19,6 +22,8 @@ def _init_worker_logging(log_path):
             handlers=[logging.FileHandler(log_path, encoding="utf-8")],
             force=True,
         )
+    if language:
+        set_language(language)
 
 
 def fit_thumbnail_image(img, max_size: int, fit_mode: str = "contain"):
@@ -74,7 +79,7 @@ def _process_single_thumbnail(args):
         img = img.convert("RGB")
         return fit_thumbnail_image(img, max_size, fit_mode)
     except Exception as e:
-        logging.getLogger(__name__).warning(f"Vignette impossible pour {Path(image_path).name}: {e}")
+        logging.getLogger(__name__).warning(_("engine.warn_thumbnail_failed", name=Path(image_path).name, error=e))
         return None
 
 
@@ -96,7 +101,7 @@ class ThumbnailGenerator:
             img = img.convert("RGB")
             return fit_thumbnail_image(img, max_size, fit_mode)
         except Exception as e:
-            logging.getLogger(__name__).warning(f"Vignette impossible pour {Path(image_path).name}: {e}")
+            logging.getLogger(__name__).warning(_("engine.warn_thumbnail_failed", name=Path(image_path).name, error=e))
             return None
 
     def _get_path(self, item):
@@ -139,7 +144,7 @@ class ThumbnailGenerator:
             max_workers=max_workers,
             mp_context=ctx,
             initializer=_init_worker_logging,
-            initargs=(log_path,),
+            initargs=(log_path, get_language()),
         ) as executor:
             # Map the worker function over the tasks
             for result in executor.map(_process_single_thumbnail, tasks):

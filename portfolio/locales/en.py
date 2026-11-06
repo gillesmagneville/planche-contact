@@ -106,6 +106,7 @@ STRINGS = {
     "help.title": "Help - Planche-Contact",
     "help.description": "Click the button below to open the full manual in your browser.",
     "help.open_manual": "Open the full manual in browser",
+    "help.manual_fallback": "The detailed manual is in {path}.",
 
     # --- About tab ---
     "about.version_build": "Version {version}  —  Built on {date}",
@@ -220,6 +221,29 @@ STRINGS = {
     "engine.warn_include_dir_outside": "Subfolder ignored (outside the input folder): {dir}",
     "engine.log_pdf_created": "PDF created successfully: {path}",
     "engine.raw_module_missing": "Cannot read '{name}': the 'rawpy' module is not installed. Install it with: pip install rawpy",
+
+    "engine.warn_scan_file_failed": "Cannot process {name}: {error}",
+    "engine.log_skipped_in_output": "{count} file(s) ignored because they are in the output folder (planches/gallery of a previous run).",
+    "engine.warn_rawpy_missing": "The 'rawpy' module is not installed: RAW files (.cr2, .cr3, .nef, .dng, .arw) cannot be processed.",
+    "engine.warn_pdf_no_sheets": "No contact sheet to export as a PDF.",
+    "engine.warn_pdf_text_skipped": "Selectable text skipped for {name}: {error}",
+    "engine.error_pdf_add_sheet": "Error adding {name} to the PDF: {error}",
+    "engine.warn_font_missing": "Font {path} not found: PDF without selectable text.",
+    "engine.warn_font_unusable": "Font {path} unusable ({error}): PDF without selectable text.",
+    "engine.warn_html_download_file": "Download companion file not created for {name}: {error}",
+    "engine.warn_html_original": "Original not created for {name}: {error}",
+    "engine.warn_html_image": "Error on {name}: {error}",
+    "engine.warn_thumbnail_failed": "Cannot create a thumbnail for {name}: {error}",
+    "engine.warn_watermark_failed": "Cannot apply the watermark: {error}",
+
+    # --- Profile (portfolio/presentation/profile.py, load_profile()) ---
+    "profile.warn_not_object": "Profile: invalid JSON content (an object was expected), default values used.",
+    "profile.warn_not_found": "Profile not found: {path} - default values used.",
+    "profile.warn_unreadable": "Profile unreadable ({path}): {error} - default values used.",
+    "profile.warn_invalid": "Profile invalid ({path}): {error} - default values used.",
+
+    # --- Photo captions (portfolio/presentation/captions.py) ---
+    "caption.equiv_24x36": "equiv. 24×36",
 
     # --- Text drawn on the contact sheet itself (JPEG/PDF -
     # portfolio/contactsheet.py, _draw_page_number()) ---

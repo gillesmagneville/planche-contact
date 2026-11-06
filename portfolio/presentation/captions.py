@@ -29,6 +29,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Callable, Optional
 
+from ..i18n import _
 from .profile import Profile
 
 
@@ -77,7 +78,7 @@ def _default_display(field: str, value: Any) -> Optional[str]:
         if field == "focal_length":
             return f"{_format_number(float(value))} mm"
         if field == "focal_35mm":
-            return f"{int(value)} mm (éq. 24×36)"
+            return f"{int(value)} mm ({_('caption.equiv_24x36')})"
         if field == "aperture":
             return f"f/{_format_number(float(value))}"
         if field == "shutter_speed":

@@ -2548,9 +2548,11 @@ class PlancheContactGTK(Gtk.Application):
                 webbrowser.open(f'file://{f.name}')
 
     def _get_full_manual_html(self):
-        return """<!DOCTYPE html>
-<html><body><h1>Planche-Contact</h1>
-<p>Le manuel détaillé se trouve dans <code>docs/planche-contact-manual.html</code>.</p>
+        # Last resort, when no manual file is found: tells where it should be.
+        text = _("help.manual_fallback", path="<code>docs/planche-contact-manual.html</code>")
+        return f"""<!DOCTYPE html>
+<html lang="{get_language()}"><head><meta charset="utf-8"></head><body><h1>Planche-Contact</h1>
+<p>{text}</p>
 </body></html>"""
 
     def _build_help_tab(self):

@@ -119,7 +119,7 @@ def _write_download_script(original_path: Path, original_name: str) -> bool:
             out.write('");')
         return True
     except Exception as e:
-        logging.getLogger(__name__).warning(f"Fichier annexe de téléchargement non créé pour {original_name}: {e}")
+        logging.getLogger(__name__).warning(_("engine.warn_html_download_file", name=original_name, error=e))
         try:
             script_path.unlink()
         except OSError:
@@ -280,14 +280,14 @@ def _process_full_image_worker(args):
                 # _write_download_script): its failure does not invalidate the original.
                 _write_download_script(target_original, original_name)
             except Exception as e:
-                logging.getLogger(__name__).warning(f"Original non créé pour {path.name}: {e}")
+                logging.getLogger(__name__).warning(_("engine.warn_html_original", name=path.name, error=e))
                 try:
                     target_original.unlink()  # no truncated file
                 except OSError:
                     pass
         return (True, metadata)
     except Exception as e:
-        logging.getLogger(__name__).warning(f"Erreur sur {path.name}: {e}")
+        logging.getLogger(__name__).warning(_("engine.warn_html_image", name=path.name, error=e))
         if not is_raw_file(path):
             # No useful fallback for a RAW (unreadable by a browser).
             try:

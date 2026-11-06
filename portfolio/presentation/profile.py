@@ -36,6 +36,8 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any, Optional
 
+from ..i18n import _
+
 logger = logging.getLogger(__name__)
 
 
@@ -96,7 +98,7 @@ def _coerce(value: Any, expected_type: type, default: Any, field_name: str) -> A
     if isinstance(value, expected_type) and not (expected_type in (int, float) and isinstance(value, bool)):
         return value
     if value is not None:
-        logger.debug(f"Profil : valeur invalide pour '{field_name}' ({value!r}), valeur par défaut utilisée.")
+        logger.debug(f"Profile: invalid value for '{field_name}' ({value!r}), default value used.")
     return default
 
 
@@ -105,8 +107,8 @@ def _coerce_choice(value: Any, choices: tuple, default: str, field_name: str) ->
         return value
     if value is not None:
         logger.debug(
-            f"Profil : valeur '{value!r}' non reconnue pour '{field_name}' "
-            f"(attendu parmi {choices}), valeur par défaut '{default}' utilisée."
+            f"Profile: value {value!r} not recognised for '{field_name}' "
+            f"(expected one of {choices}), default value '{default}' used."
         )
     return default
 
@@ -116,7 +118,7 @@ def _coerce_optional_int(value: Any, default: Optional[int], field_name: str) ->
         return default
     if isinstance(value, int) and not isinstance(value, bool) and value > 0:
         return value
-    logger.debug(f"Profil : entier positif attendu pour '{field_name}' ({value!r}), ignoré.")
+    logger.debug(f"Profile: positive integer expected for '{field_name}' ({value!r}), ignored.")
     return default
 
 
@@ -208,9 +210,9 @@ class CaptionSettings:
                 if isinstance(f, str) and f in CAPTION_FIELDS and f not in fields_out:
                     fields_out.append(f)
                 else:
-                    logger.debug(f"Profil : champ de légende ignoré (inconnu ou dupliqué) : {f!r}")
+                    logger.debug(f"Profile: caption field ignored (unknown or duplicated): {f!r}")
         elif fields_in is not None:
-            logger.debug("Profil : 'captions.fields' doit être une liste, ignoré.")
+            logger.debug("Profile: 'captions.fields' must be a list, ignored.")
 
         overrides_in = data.get("format_overrides")
         overrides_out: dict[str, str] = {}
@@ -263,7 +265,7 @@ class ThemeCustomColors:
             if isinstance(value, str) and value.startswith("#"):
                 return value
             if value is not None:
-                logger.debug(f"Profil : couleur personnalisée invalide ignorée : {value!r}")
+                logger.debug(f"Profile: invalid custom colour ignored: {value!r}")
             return None
 
         return cls(
@@ -314,7 +316,7 @@ class Profile:
     @classmethod
     def from_dict(cls, data: dict) -> "Profile":
         if not isinstance(data, dict):
-            logger.warning("Profil : contenu JSON invalide (objet attendu), valeurs par défaut utilisées.")
+            logger.warning(_("profile.warn_not_object"))
             return cls()
         name = data.get("name")
         return cls(
@@ -360,10 +362,10 @@ def load_profile(path: "str | Path") -> Profile:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except FileNotFoundError:
-        logger.warning(f"Profil introuvable : {path} - valeurs par défaut utilisées.")
+        logger.warning(_("profile.warn_not_found", path=path))
         return default_profile()
     except (OSError, json.JSONDecodeError) as e:
-        logger.warning(f"Profil illisible ({path}) : {e} - valeurs par défaut utilisées.")
+        logger.warning(_("profile.warn_unreadable", path=path, error=e))
         return default_profile()
 
     try:
@@ -371,7 +373,7 @@ def load_profile(path: "str | Path") -> Profile:
     except Exception as e:
         # Final safety net: even an unexpected error in from_dict() must
         # never interrupt a generation over a mere profile problem.
-        logger.warning(f"Profil invalide ({path}) : {e} - valeurs par défaut utilisées.")
+        logger.warning(_("profile.warn_invalid", path=path, error=e))
         return default_profile()
 
 
