@@ -289,8 +289,9 @@ exist in the current `portfolio.py`).
   `build-deb.sh`, `build-appimage.sh`, `build-windows.ps1`, `debian/postinst` —
   are entirely in English, messages included, and their confirmation questions
   are answered by `y` (`[y/N]`); the comments of `windows/installer.nsi` and
-  `windows/planche-contact.spec` are in English too, while the screens of the
-  Windows installer itself stay in French); strings visible to the user in the
+  `windows/planche-contact.spec` are in English too, and the Windows installer
+  itself speaks the four languages of the program, English being the fallback
+  when Windows is in another language); strings visible to the user in the
   interface and messages through `portfolio/locales/` (English, French,
   German, Spanish — `en.py` must stay complete, since English is the
   fallback language). The documentation (`.md` files) is bilingual: the

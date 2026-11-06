@@ -49,7 +49,9 @@ réponse refuse. À la fin, deux fichiers apparaissent à la racine du dépôt :
 - `planche-contact_X.Y.Z_windows-portable.zip` — dossier autonome à
   décompresser et lancer sans installation.
 - `planche-contact_X.Y.Z_windows-setup.exe` — installeur classique
-  (raccourcis menu Démarrer, désinstalleur), si NSIS est disponible.
+  (raccourcis facultatifs du menu Démarrer et du Bureau, lancement du
+  programme en fin d'installation, désinstalleur), si NSIS est disponible. Il parle anglais, français, espagnol et allemand, selon la langue de
+  Windows (anglais si Windows est dans une autre langue).
 
 ## Avertissement SmartScreen à l'installation
 

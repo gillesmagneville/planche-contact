@@ -50,7 +50,10 @@ the repository:
 - `planche-contact_X.Y.Z_windows-portable.zip` — standalone folder to
   unzip and launch without installation.
 - `planche-contact_X.Y.Z_windows-setup.exe` — classic installer
-  (Start menu shortcuts, uninstaller), if NSIS is available.
+  (optional Start menu and Desktop shortcuts, option to launch the program at
+  the end, uninstaller), if NSIS is available. It speaks
+  English, French, Spanish and German, following the language of Windows
+  (English if Windows is in another language).
 
 ## SmartScreen warning at installation
 

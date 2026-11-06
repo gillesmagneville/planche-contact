@@ -290,8 +290,9 @@ bel et bien dans `portfolio.py` actuel).
   `debian/postinst` — sont entièrement en anglais, messages compris, et leurs
   questions de confirmation attendent `y` (`[y/N]`) ; les commentaires de
   `windows/installer.nsi` et de `windows/planche-contact.spec` sont aussi en
-  anglais, alors que les écrans de l'installeur Windows restent en français) ;
-  chaînes visibles par
+  anglais, et l'installeur Windows lui-même parle les quatre langues du
+  programme, l'anglais servant de repli quand Windows est dans une autre
+  langue) ; chaînes visibles par
   l'utilisateur dans l'interface et les messages via `portfolio/locales/`
   (anglais, français, allemand, espagnol — `en.py` doit rester complet,
   l'anglais étant la langue de repli). La documentation (fichiers `.md`)
