@@ -106,6 +106,7 @@ STRINGS = {
     "help.title": "Aide - Planche-Contact",
     "help.description": "Clique sur le bouton ci-dessous pour ouvrir le manuel complet dans ton navigateur.",
     "help.open_manual": "Ouvrir le manuel complet dans le navigateur",
+    "help.manual_fallback": "Le manuel détaillé se trouve dans {path}.",
 
     # --- About tab ---
     "about.version_build": "Version {version}  —  Build du {date}",
@@ -220,6 +221,29 @@ STRINGS = {
     "engine.warn_include_dir_outside": "Sous-dossier ignoré (hors du dossier d'entrée) : {dir}",
     "engine.log_pdf_created": "PDF créé avec succès : {path}",
     "engine.raw_module_missing": "Impossible de lire '{name}' : le module 'rawpy' n'est pas installé. Installez-le avec : pip install rawpy",
+
+    "engine.warn_scan_file_failed": "Impossible de traiter {name} : {error}",
+    "engine.log_skipped_in_output": "{count} fichier(s) ignoré(s) car situé(s) dans le dossier de sortie (planches/gallery d'une génération précédente).",
+    "engine.warn_rawpy_missing": "Le module 'rawpy' n'est pas installé : les fichiers RAW (.cr2, .cr3, .nef, .dng, .arw) ne pourront pas être traités.",
+    "engine.warn_pdf_no_sheets": "Aucune planche à exporter en PDF.",
+    "engine.warn_pdf_text_skipped": "Texte sélectionnable ignoré pour {name} : {error}",
+    "engine.error_pdf_add_sheet": "Erreur lors de l'ajout de {name} au PDF : {error}",
+    "engine.warn_font_missing": "Police {path} introuvable : PDF sans texte sélectionnable.",
+    "engine.warn_font_unusable": "Police {path} inutilisable ({error}) : PDF sans texte sélectionnable.",
+    "engine.warn_html_download_file": "Fichier annexe de téléchargement non créé pour {name} : {error}",
+    "engine.warn_html_original": "Original non créé pour {name} : {error}",
+    "engine.warn_html_image": "Erreur sur {name} : {error}",
+    "engine.warn_thumbnail_failed": "Vignette impossible pour {name} : {error}",
+    "engine.warn_watermark_failed": "Filigrane impossible : {error}",
+
+    # --- Profile (portfolio/presentation/profile.py, load_profile()) ---
+    "profile.warn_not_object": "Profil : contenu JSON invalide (objet attendu), valeurs par défaut utilisées.",
+    "profile.warn_not_found": "Profil introuvable : {path} - valeurs par défaut utilisées.",
+    "profile.warn_unreadable": "Profil illisible ({path}) : {error} - valeurs par défaut utilisées.",
+    "profile.warn_invalid": "Profil invalide ({path}) : {error} - valeurs par défaut utilisées.",
+
+    # --- Photo captions (portfolio/presentation/captions.py) ---
+    "caption.equiv_24x36": "éq. 24×36",
 
     # --- Text drawn on the contact sheet itself (JPEG/PDF -
     # portfolio/contactsheet.py, _draw_page_number()) ---

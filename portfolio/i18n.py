@@ -6,11 +6,11 @@ rather than gettext/.po/.mo: no compilation step, no extra dependency to
 package in the .deb or the Windows installer - a choice consistent with
 the rest of the project (see PROJECT_CONTEXT.md, §5).
 
-This module translates ONLY the graphical interface
-(planche-contact-gtk.py) and the dialog window it displays. The CLI
-(portfolio/portfolio.py), the generated HTML gallery and the manual
-remain in French for now (see CHANGELOG.md - scope deliberately limited
-at first).
+These dictionaries serve the graphical interface (planche-contact-gtk.py)
+and its dialogs, the messages of the CLI (portfolio/portfolio.py) and of the
+engine (the log), the text drawn on the sheets and the generated HTML
+gallery. The manual is one file per language (docs/). Only the messages
+meant for the developer (logger.debug) stay in English, untranslated.
 """
 import locale
 import logging
@@ -113,7 +113,7 @@ def _(key, **kwargs):
     text = strings.get(key)
     if text is None:
         text = _ALL_STRINGS[_FALLBACK_LANGUAGE].get(key, key)
-        logger.debug(f"Clé de traduction manquante en '{_current_language}' : {key}")
+        logger.debug(f"Missing translation key in '{_current_language}': {key}")
     if kwargs:
         try:
             return text.format(**kwargs)

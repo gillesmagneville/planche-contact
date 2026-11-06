@@ -156,7 +156,7 @@ class ImageScanner:
                     "sort_key": sort_key,
                 })
             except Exception as e:
-                self.logger.warning(f"Impossible de traiter {path.name}: {e}")
+                self.logger.warning(_("engine.warn_scan_file_failed", name=path.name, error=e))
 
         # Sorting the images
         images.sort(key=lambda x: x["sort_key"])
@@ -166,10 +166,7 @@ class ImageScanner:
             item["num"] = f"{i:03d}"
 
         if skipped_output:
-            self.logger.info(
-                f"{skipped_output} fichier(s) ignoré(s) car situé(s) dans le dossier "
-                f"de sortie (planches/gallery d'une génération précédente)."
-            )
+            self.logger.info(_("engine.log_skipped_in_output", count=skipped_output))
         self.logger.info(_("engine.log_images_found_sorted", count=len(images)))
         return images
 

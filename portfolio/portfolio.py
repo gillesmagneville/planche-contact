@@ -20,6 +20,7 @@ from portfolio.htmlgallery import HTMLGalleryGenerator
 from portfolio.csvindex import CSVIndexGenerator
 from portfolio.utils import setup_logging
 from portfolio.i18n import _, set_language, AVAILABLE_LANGUAGES
+from portfolio.rawloader import warn_if_rawpy_missing
 from portfolio.presentation import compute_effective_per_page, load_profile
 
 
@@ -189,6 +190,9 @@ def _generate_preview_sheet(args, profile_kwargs):
 def main():
     args = parse_args()
     start = time.time()
+
+    # Once the language is set (parse_args): see rawloader.warn_if_rawpy_missing.
+    warn_if_rawpy_missing()
 
     # Config arguments that do not come from the "simple" options:
     # the profile (--profile) and the selected subfolders (--include-dir...).

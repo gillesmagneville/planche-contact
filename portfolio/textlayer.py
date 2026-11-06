@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
 
+from .i18n import _
 from .utils import _BUNDLED_FONTS_DIR
 
 logger = logging.getLogger(__name__)
@@ -76,12 +77,12 @@ def _register_fonts() -> Optional[dict]:
         except KeyError:
             path = _font_path(bold)
             if not path.is_file():
-                logger.warning("Police %s introuvable : PDF sans texte sélectionnable.", path)
+                logger.warning(_("engine.warn_font_missing", path=path))
                 return None
             try:
                 pdfmetrics.registerFont(TTFont(name, str(path)))
             except Exception as exc:  # unreadable font: give up the text layer
-                logger.warning("Police %s inutilisable (%s) : PDF sans texte sélectionnable.", path, exc)
+                logger.warning(_("engine.warn_font_unusable", path=path, error=exc))
                 return None
         names[bold] = name
     return names

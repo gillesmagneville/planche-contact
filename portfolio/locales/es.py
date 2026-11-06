@@ -104,6 +104,7 @@ STRINGS = {
     "help.title": "Ayuda - Planche-Contact",
     "help.description": "Haga clic en el botón de abajo para abrir el manual completo en su navegador.",
     "help.open_manual": "Abrir el manual completo en el navegador",
+    "help.manual_fallback": "El manual detallado se encuentra en {path}.",
 
     # --- About tab ---
     "about.version_build": "Versión {version}  —  Compilación del {date}",
@@ -170,7 +171,7 @@ STRINGS = {
 
     # --- CLI (portfolio/portfolio.py) ---
     "cli.description": "Generador de hojas de contacto fotográficas",
-    "cli.help_input": "Carpeta de origen de las imágenes",
+    "cli.help_input": "Carpeta de entrada con las imágenes",
     "cli.help_output": "Carpeta de salida",
     "cli.help_recursive": "Búsqueda recursiva",
     "cli.help_num": "Número de imágenes por hoja",
@@ -219,6 +220,29 @@ STRINGS = {
     "engine.log_pdf_created": "PDF creado con éxito: {path}",
     "engine.raw_module_missing": "No se puede leer '{name}': el módulo 'rawpy' no está instalado. Instálelo con: pip install rawpy",
 
+    "engine.warn_scan_file_failed": "No se puede procesar {name}: {error}",
+    "engine.log_skipped_in_output": "{count} archivo(s) ignorado(s) por estar en la carpeta de salida (planches/gallery de una generación anterior).",
+    "engine.warn_rawpy_missing": "El módulo 'rawpy' no está instalado: no se podrán procesar los archivos RAW (.cr2, .cr3, .nef, .dng, .arw).",
+    "engine.warn_pdf_no_sheets": "No hay ninguna hoja de contacto para exportar a PDF.",
+    "engine.warn_pdf_text_skipped": "Texto seleccionable omitido en {name}: {error}",
+    "engine.error_pdf_add_sheet": "Error al añadir {name} al PDF: {error}",
+    "engine.warn_font_missing": "No se encontró la fuente {path}: PDF sin texto seleccionable.",
+    "engine.warn_font_unusable": "La fuente {path} no se puede usar ({error}): PDF sin texto seleccionable.",
+    "engine.warn_html_download_file": "No se creó el archivo auxiliar de descarga de {name}: {error}",
+    "engine.warn_html_original": "No se creó el original de {name}: {error}",
+    "engine.warn_html_image": "Error en {name}: {error}",
+    "engine.warn_thumbnail_failed": "No se puede crear la miniatura de {name}: {error}",
+    "engine.warn_watermark_failed": "No se puede aplicar la marca de agua: {error}",
+
+    # --- Profile (portfolio/presentation/profile.py, load_profile()) ---
+    "profile.warn_not_object": "Perfil: contenido JSON no válido (se esperaba un objeto), se usan los valores predeterminados.",
+    "profile.warn_not_found": "Perfil no encontrado: {path} - se usan los valores predeterminados.",
+    "profile.warn_unreadable": "Perfil ilegible ({path}): {error} - se usan los valores predeterminados.",
+    "profile.warn_invalid": "Perfil no válido ({path}): {error} - se usan los valores predeterminados.",
+
+    # --- Photo captions (portfolio/presentation/captions.py) ---
+    "caption.equiv_24x36": "equiv. 24×36",
+
     # --- Text drawn on the contact sheet itself (JPEG/PDF -
     # portfolio/contactsheet.py, _draw_page_number()) ---
     "sheet.page_label": "Hoja {page}/{total}",
@@ -236,13 +260,13 @@ STRINGS = {
     "adv.layout_subtitle": "Diseño",
     "adv.template_label": "Modelo",
     "adv.template.grid": "Cuadrícula",
-    "adv.template.landscape": "Paisaje",
-    "adv.template.portrait": "Retrato",
+    "adv.template.landscape": "Horizontal",
+    "adv.template.portrait": "Vertical",
     "adv.template.large_thumbs": "Miniaturas grandes",
     "adv.template.free": "Libre",
     "adv.orientation_label": "Orientación de la página",
-    "adv.orientation.portrait": "Retrato",
-    "adv.orientation.landscape": "Paisaje",
+    "adv.orientation.portrait": "Vertical",
+    "adv.orientation.landscape": "Horizontal",
     "adv.fit_mode_label": "Ajuste de la foto",
     "adv.fit_mode.contain": "Foto completa (contain)",
     "adv.fit_mode.cover": "Rellenar (cover)",
@@ -258,7 +282,7 @@ STRINGS = {
     "adv.header_position.top_right": "A la derecha",
     "adv.header_position.none": "Oculto",
     "adv.page_numbering_label": "Numerar las hojas",
-    "adv.page_numbering_tooltip": "Muestra «Hoja X/Y» al pie de cada hoja de contactos y del PDF. No afecta a la galería HTML, que conserva su propia paginación. La línea de crédito siempre se muestra.",
+    "adv.page_numbering_tooltip": "Muestra «Hoja X/Y» al pie de cada hoja de contacto y del PDF. No afecta a la galería HTML, que conserva su propia paginación. La línea de crédito siempre se muestra.",
     "adv.captions_subtitle": "Leyendas por foto",
     "adv.caption_position_label": "Posición de la leyenda",
     "adv.caption_position.none": "Ninguna",
@@ -300,8 +324,8 @@ STRINGS = {
     "adv.profile_saved": "Perfil guardado: {path}",
     "adv.profile_loaded": "Perfil cargado: {path}",
     "adv.profile_save_error": "No se pudo guardar este perfil: {error}",
-    "adv.preview_button": "Vista previa de la lámina…",
-    "adv.preview_title": "Vista previa de la lámina",
+    "adv.preview_button": "Vista previa de la hoja…",
+    "adv.preview_title": "Vista previa de la hoja",
     "adv.preview_generating": "Generando la vista previa…",
     "adv.preview_error": "No se pudo generar la vista previa: {error}",
     "adv.preview_no_photos": "No se encontraron fotos en la carpeta de entrada para generar una vista previa.",

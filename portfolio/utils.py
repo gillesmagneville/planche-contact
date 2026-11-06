@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Optional
 from PIL import Image, ImageDraw, ImageFont
 
+from .i18n import _
 from .rawloader import is_raw_file, get_original_dimensions
 
 try:
@@ -129,7 +130,7 @@ def apply_watermark(
         return Image.alpha_composite(img, overlay).convert("RGB")
 
     except Exception as e:
-        logging.getLogger(__name__).warning(f"Filigrane impossible : {e}")
+        logging.getLogger(__name__).warning(_("engine.warn_watermark_failed", error=e))
         return image
 
 
@@ -318,7 +319,7 @@ def _fill_from_pil(path: Path, metadata: dict) -> None:
             if gps is not None:
                 metadata["gps"] = gps
     except Exception as e:
-        logging.getLogger(__name__).debug(f"Métadonnées EXIF illisibles pour {path.name} : {e}")
+        logging.getLogger(__name__).debug(f"EXIF metadata unreadable for {path.name}: {e}")
 
 
 def _exifread_str(tags: dict, key: str) -> Optional[str]:
@@ -419,7 +420,7 @@ def _fill_from_exifread(path: Path, metadata: dict) -> None:
         if gps is not None:
             metadata["gps"] = gps
     except Exception as e:
-        logging.getLogger(__name__).debug(f"Métadonnées EXIF (RAW) illisibles pour {path.name} : {e}")
+        logging.getLogger(__name__).debug(f"EXIF metadata (RAW) unreadable for {path.name}: {e}")
 
 
 def get_exif_metadata(path: Path) -> dict:
@@ -477,7 +478,7 @@ def format_file_size(num_bytes: int) -> str:
     computation happens AFTER the HTML gallery itself is generated (see
     htmlgallery.py), so the active language at that moment is always the
     right one."""
-    from .i18n import _, get_language
+    from .i18n import get_language
 
     size = float(num_bytes)
     decimal_separator = "," if get_language() != "en" else "."

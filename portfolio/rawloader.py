@@ -43,10 +43,15 @@ try:
     RAWPY_AVAILABLE = True
 except ImportError:
     RAWPY_AVAILABLE = False
-    logger.warning(
-        "Le module 'rawpy' n'est pas installé : les fichiers RAW "
-        "(.cr2, .cr3, .nef, .dng, .arw) ne pourront pas être traités."
-    )
+
+
+def warn_if_rawpy_missing():
+    """Logs, in the active language, that RAW files cannot be processed
+    when the optional `rawpy` module is missing. Not done at import time:
+    the language is only set afterwards (see portfolio.i18n), the message
+    would always come out in English."""
+    if not RAWPY_AVAILABLE:
+        logger.warning(_("engine.warn_rawpy_missing"))
 
 
 def is_raw_file(path: Path) -> bool:
@@ -85,7 +90,7 @@ def get_original_dimensions(path: Path):
                 width, height = height, width
             return (width, height)
     except Exception as e:
-        logger.debug(f"Dimensions d'origine illisibles pour {path.name} : {e}")
+        logger.debug(f"Original dimensions unreadable for {path.name}: {e}")
         return None
 
 
@@ -137,7 +142,7 @@ def _load_raw(path: Path, use_embedded_thumb: bool = True, target_size=None, fil
             except (rawpy.LibRawNoThumbnailError, rawpy.LibRawUnsupportedThumbnailError):
                 pass
             except Exception as e:
-                logger.debug(f"Aperçu embarqué inutilisable pour {path.name} : {e}")
+                logger.debug(f"Embedded preview unusable for {path.name}: {e}")
 
         # No usable preview (or too small): full demosaicing.
         rgb = raw.postprocess(use_camera_wb=True, no_auto_bright=False, output_bps=8)
