@@ -8,6 +8,10 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 ## [Non publié]
 
+## [5.2.2] - 2026-11-09
+
+Version de maintenance : le programme ne gagne aucune nouvelle fonctionnalité. L'installeur Windows parle les quatre langues du programme et propose ses raccourcis et une case « Lancer », les messages du journal et l'équivalent 24×36 des légendes suivent la langue du programme, les textes espagnols et allemands ont été relus, et la construction de l'AppImage est plus robuste.
+
 ### Ajouté
 
 - **Une politique de sécurité** ([`SECURITY.fr.md`](SECURITY.fr.md), en français et en anglais) : comment signaler une vulnérabilité en privé, quelles versions reçoivent des correctifs et ce qu'on peut en attendre. C'est un fichier du dépôt ; les paquets ne l'embarquent pas.
@@ -26,6 +30,7 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 - **`build-appimage.sh` mélangeait à l'AppImage le programme installé sur la machine de construction.** Quand le paquet `.deb` est installé, `quick-sharun` (l'outil d'assemblage) copiait de lui-même `/usr/share/planche-contact` dans l'AppImage : tout le virtualenv du paquet (des centaines de Mo) s'y ajoutait et, pire, les fichiers de la version installée (`VERSION`, `planche-contact-gtk.py`, `portfolio/`...) écrasaient ceux du projet, ce qui donnait une AppImage de l'ancienne version. Cette copie est maintenant désactivée, et le script vérifie, avant de livrer l'AppImage, que les fichiers de l'application qu'elle contient sont exactement ceux du projet (sinon il supprime l'AppImage et s'arrête). Les AppImage publiées (5.2.0 et 5.2.1) ont été construites sur une machine sans le paquet installé et ne sont pas concernées.
 - `build-appimage.sh` ne demande plus à `quick-sharun` d'embarquer GStreamer (avec ffmpeg, des codecs et des voix de synthèse vocale) que les versions récentes de GTK 4 entraînent : l'interface ne lit ni son ni vidéo.
 - **Le contrôle graphique de `./build-appimage.sh --test` pouvait rester bloqué indéfiniment sur Ubuntu 26.04** (sa commande `timeout`, celle de uutils coreutils, était arrêtée par le terminal en même temps que le programme qu'elle surveillait, si bien qu'elle ne le coupait jamais et que Ctrl+C restait sans effet). Le programme est maintenant lancé dans sa propre session, sans accès au terminal, et surveillé par le script lui-même ; il doit être toujours en marche après 15 secondes, et un programme arrêté ou terminé trop tôt est désormais signalé comme un échec. Ses fichiers temporaires sont supprimés avec le dossier du test.
+- **`build-appimage.sh` s'arrêtait sur une erreur d'empreinte quelques jours après chaque version.** Le script téléchargeait `quick-sharun` (l'outil d'assemblage) depuis la branche principale du projet Anylinux-AppImages, qui change presque chaque jour, alors que l'empreinte SHA-256 attendue était écrite une fois pour toutes dans le script : dès que le script amont bougeait, la construction s'arrêtait avec « l'empreinte de quick-sharun ne correspond pas ». Le script le télécharge maintenant depuis un commit fixe du projet, relu au préalable, si bien que l'empreinte reste valable. Pour adopter une version plus récente, indiquez son adresse et son empreinte avec `QUICK_SHARUN_URL` et `QUICK_SHARUN_SHA256`, comme avant.
 
 ## [5.2.1] - 2026-11-01
 

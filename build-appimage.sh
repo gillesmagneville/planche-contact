@@ -18,14 +18,17 @@ PYTHON="${PYTHON:-python3}"
 # (https://github.com/pkgforge-dev/Anylinux-AppImages) that bundles the
 # libraries GTK4 and Python need - glibc included, which makes the AppImage
 # independent of the distribution that runs it - then assembles the
-# .AppImage file. It is downloaded at every build, but its SHA-256 checksum
-# is verified: if the upstream script changes, the build stops instead of
-# running code nobody has read (see the QUICK_SHARUN_URL /
-# QUICK_SHARUN_SHA256 environment variables to adopt a new version after
-# reviewing it). It in turn verifies the checksums of everything it then
-# downloads (sharun, appimagetool...).
-QUICK_SHARUN_URL="${QUICK_SHARUN_URL:-https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/refs/heads/main/useful-tools/quick-sharun.sh}"
-QUICK_SHARUN_SHA256="${QUICK_SHARUN_SHA256:-fa9dbe2532d568e1c1b8eeaba94d1c57109b776b5541d21b74d3f44b74faf4d3}"
+# .AppImage file. It is downloaded at every build from a fixed commit of
+# the project (not from its main branch, which changes almost every day and
+# would make the expected checksum obsolete within days), and its SHA-256
+# checksum is verified: if the script is not the one that was read, the
+# build stops instead of running code nobody has read. To adopt a newer
+# version, read it, then give its address (with the new commit) and its
+# checksum through the QUICK_SHARUN_URL / QUICK_SHARUN_SHA256 environment
+# variables, or update the two values below. It in turn verifies the
+# checksums of everything it then downloads (sharun, appimagetool...).
+QUICK_SHARUN_URL="${QUICK_SHARUN_URL:-https://raw.githubusercontent.com/pkgforge-dev/Anylinux-AppImages/c667d37d4bb827d51cf7dca7d5a314b13aefae24/useful-tools/quick-sharun.sh}"
+QUICK_SHARUN_SHA256="${QUICK_SHARUN_SHA256:-4a99974f361fd3fb6367c8b6b054d8ee97b03710df8a029fa6e59af7ff5844b0}"
 # ===========================================================
 
 show_help() {
@@ -361,8 +364,8 @@ if ! echo "$QUICK_SHARUN_SHA256  $QUICK_SHARUN" | sha256sum -c - > /dev/null 2>&
     echo "Error: the checksum of quick-sharun does not match the expected one."
     echo "  expected: $QUICK_SHARUN_SHA256"
     echo "  obtained: $(sha256sum "$QUICK_SHARUN" | cut -d' ' -f1)"
-    echo "The upstream script has changed since the last verification. Read it"
-    echo "($QUICK_SHARUN), then run again with QUICK_SHARUN_SHA256=<new checksum>."
+    echo "The script is not the one that was verified. Read it ($QUICK_SHARUN),"
+    echo "then run again with QUICK_SHARUN_SHA256=<new checksum>."
     exit 1
 fi
 

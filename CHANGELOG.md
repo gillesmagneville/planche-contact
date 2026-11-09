@@ -8,6 +8,10 @@ The project follows the recommendations of **Keep a Changelog** and **Semantic V
 
 ## [Unreleased]
 
+## [5.2.2] - 2026-11-09
+
+Maintenance release: the program gains no new feature. The Windows installer speaks the four languages of the program and offers its shortcuts and a "Run" box, the messages of the log and the 35 mm equivalent of the captions follow the language of the program, the Spanish and German texts were proofread, and the AppImage build is more robust.
+
 ### Added
 
 - **A security policy** ([`SECURITY.md`](SECURITY.md), in English and in French): how to report a vulnerability privately, which versions receive fixes and what to expect. It is a file of the repository; the packages do not ship it.
@@ -26,6 +30,7 @@ The project follows the recommendations of **Keep a Changelog** and **Semantic V
 - **`build-appimage.sh` mixed into the AppImage the program installed on the build machine.** When the `.deb` package is installed, `quick-sharun` (the assembly tool) copied by itself `/usr/share/planche-contact` into the AppImage: the whole virtualenv of the package (hundreds of MB) was added and, worse, the files of the installed version (`VERSION`, `planche-contact-gtk.py`, `portfolio/`...) overwrote those of the project, which gave an AppImage of the old version. This copy is now disabled, and the script checks, before delivering the AppImage, that the application files inside it are exactly those of the project (otherwise it deletes the AppImage and stops). The published AppImages (5.2.0 and 5.2.1) were built on a machine without the package installed and are not affected.
 - `build-appimage.sh` no longer asks `quick-sharun` to bundle GStreamer (with ffmpeg, codecs and speech voices) that recent GTK 4 versions pull in: the interface plays neither sound nor video.
 - **The graphical check of `./build-appimage.sh --test` could stay blocked forever on Ubuntu 26.04** (its `timeout` command, from uutils coreutils, was stopped by the terminal along with the program it supervised, so it never cut it off, and Ctrl+C had no effect either). The program is now started in its own session, without access to the terminal, and watched by the script itself; it must still be running after 15 seconds, and a program stopped or ended too early is now reported as a failure. Its temporary files are deleted with the test folder.
+- **`build-appimage.sh` stopped on a checksum error a few days after each release.** The script downloaded `quick-sharun` (the assembly tool) from the main branch of the Anylinux-AppImages project, which changes almost every day, while the expected SHA-256 was written once in the script: as soon as the upstream script moved, the build stopped with "the checksum of quick-sharun does not match". The script now downloads it from a fixed commit of the project, which was read beforehand, so the checksum stays valid. To adopt a newer version, give its address and its checksum with `QUICK_SHARUN_URL` and `QUICK_SHARUN_SHA256`, as before.
 
 ## [5.2.1] - 2026-11-01
 
