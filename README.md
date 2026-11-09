@@ -44,7 +44,7 @@ Generate high-resolution contact sheets, PDF documents, responsive HTML gallerie
 
 ## Download
 
-**Latest stable release: [v5.2.1](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.2.1)**
+**Latest stable release: [v5.2.2](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.2.2)**
 
 Planche-Contact is available as ready-to-use packages for Linux and Windows.
 
@@ -52,31 +52,31 @@ Planche-Contact is available as ready-to-use packages for Linux and Windows.
 
 **Debian / Ubuntu — 64-bit**
 
-[Download `planche-contact_5.2.1_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.1/planche-contact_5.2.1_amd64.deb)
+[Download `planche-contact_5.2.2_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.2/planche-contact_5.2.2_amd64.deb)
 
 ```bash
-sudo apt install ./planche-contact_5.2.1_amd64.deb
+sudo apt install ./planche-contact_5.2.2_amd64.deb
 ```
 
 SHA-256:
 
 ```text
-e77d98d07e70747793786a62a6d1f9056df669c99287ee693c274aad421a579d
+537ebf49030437b7f38b3637830e027cfaa7209b9dd20bd97eddcaf7a2f89291
 ```
 
 **Any Linux distribution — AppImage**
 
-[Download `Planche-Contact-5.2.1-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.1/Planche-Contact-5.2.1-x86_64.AppImage)
+[Download `Planche-Contact-5.2.2-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.2/Planche-Contact-5.2.2-x86_64.AppImage)
 
 ```bash
-chmod +x Planche-Contact-5.2.1-x86_64.AppImage
-./Planche-Contact-5.2.1-x86_64.AppImage
+chmod +x Planche-Contact-5.2.2-x86_64.AppImage
+./Planche-Contact-5.2.2-x86_64.AppImage
 ```
 
 SHA-256:
 
 ```text
-af9fc5a794653f5556fd82a4b5ac670a6e463d1e30fe48ebf4d6d71b34ec06e2
+cc8f533971fbc41a268286ef7b089151eb9cbdbc65947a503e077d4ca597ee13
 ```
 
 A single file that bundles Python, GTK 4 and every library Planche-Contact needs: nothing to install. Details and build: [AppImage](#appimage-any-linux-distribution).
@@ -85,22 +85,22 @@ A single file that bundles Python, GTK 4 and every library Planche-Contact needs
 
 **Windows 10 / 11 — Installer**
 
-[Download `planche-contact_5.2.1_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.1/planche-contact_5.2.1_windows-setup.exe)
+[Download `planche-contact_5.2.2_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.2/planche-contact_5.2.2_windows-setup.exe)
 
 SHA-256:
 
 ```text
-349924cb3264bc643d7369774ea2ac24049603e91083dbaf06dae600a5707c7a
+872b746c1ad74080894b1766723a0fa5b06729a0fc4b1619fa9176b6cfac481d
 ```
 
 **Windows — Portable version**
 
-[Download `planche-contact_5.2.1_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.1/planche-contact_5.2.1_windows-portable.zip)
+[Download `planche-contact_5.2.2_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.2/planche-contact_5.2.2_windows-portable.zip)
 
 SHA-256:
 
 ```text
-cb3f47b8cd11ba8f564f3e30d4ca366f35ff61dc4360890276281c6c58d860db
+785e429dd1e25a711be9a7f4de435e23b4d3d76f42104d12c80940c01866ae0b
 ```
 
 If you simply want to use Planche-Contact, **you do not need to build it from source**.
@@ -341,6 +341,8 @@ This makes Planche-Contact particularly useful when you simply want to **present
 
 # What's new?
 
+Version **5.2.2** is a maintenance release: the program gains no new feature. The Windows installer now speaks the four languages of the program and offers its shortcuts and a "Run" box, the messages of the log and the 35 mm equivalent of the captions follow the language of the program, the Spanish and German texts were proofread, and the AppImage build is more robust.
+
 Version **5.2.1** is a maintenance release: the project now has a [Code of Conduct](CODE_OF_CONDUCT.md), which the packages ship, and its build scripts are written in English. The program itself does not change.
 
 Version **5.2.0** answers requests from users.
@@ -411,7 +413,7 @@ cd planche-contact
 ./build-appimage.sh --test
 ```
 
-This produces `Planche-Contact-<version>-<arch>.AppImage` and its `.sha256` at the root of the project (`--test` then runs a real PDF generation and starts the interface under a virtual display; add `xvfb` to the packages above for that last step). The script downloads `quick-sharun` from the [Anylinux-AppImages](https://github.com/pkgforge-dev/Anylinux-AppImages) project and **checks its SHA-256 before running it**: if the upstream script has changed, the build stops instead of running code nobody has read.
+This produces `Planche-Contact-<version>-<arch>.AppImage` and its `.sha256` at the root of the project (`--test` then runs a real PDF generation and starts the interface under a virtual display; add `xvfb` to the packages above for that last step). The script downloads `quick-sharun` from the [Anylinux-AppImages](https://github.com/pkgforge-dev/Anylinux-AppImages) project, at a fixed commit that was read beforehand, and **checks its SHA-256 before running it**: if the script is not the expected one, the build stops instead of running code nobody has read.
 
 - The interface is drawn with GTK's software renderer (Cairo): no OpenGL, Vulkan or graphics driver is needed, and the graphics libraries of the host are not loaded.
 - The AppImage is built for the architecture of the machine that builds it (`x86_64`, `aarch64`...).
