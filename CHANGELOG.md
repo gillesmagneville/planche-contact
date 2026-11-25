@@ -8,6 +8,10 @@ The project follows the recommendations of **Keep a Changelog** and **Semantic V
 
 ## [Unreleased]
 
+## [5.3.0] - 2026-11-25
+
+The program gains an **Open in Planche-Contact** entry in the right-click menu of the file manager (Nautilus on Linux, Windows Explorer on Windows), and a command-line option to process a list of photos.
+
 ### Added
 
 - **"Open in Planche-Contact" in the right-click menu of the file manager**, on a folder or on a selection of photos (formats supported by the program only; photos and folders can be mixed). The program opens with that folder as input folder, or, for a selection, with the folder common to the selected items and only the selected photos (plus the photos placed directly in each selected folder). A line under the input folder shows how many photos were received, and a **"Use the whole folder"** button gives back all the photos of the folder. The output folder is the selected folder or, for a selection of photos, the folder that holds them (the results are created there; the `planches/` and `gallery/` folders of a previous run are not counted as photos). While a selection is active, the recursive search and the choice of subfolders are unavailable. The entry is written in the four languages of the program.

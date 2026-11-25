@@ -8,6 +8,10 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 ## [Non publié]
 
+## [5.3.0] - 2026-11-25
+
+Le programme gagne une entrée **Ouvrir dans Planche-Contact** dans le menu du clic droit du gestionnaire de fichiers (Nautilus sous Linux, Explorateur de Windows sous Windows), et une option de ligne de commande pour traiter une liste de photos.
+
 ### Ajouté
 
 - **« Ouvrir dans Planche-Contact » dans le menu du clic droit du gestionnaire de fichiers**, sur un dossier ou sur une sélection de photos (formats pris en charge par le programme uniquement ; photos et dossiers peuvent être mélangés). Le programme s'ouvre avec ce dossier comme dossier d'entrée ou, pour une sélection, avec le dossier commun aux éléments sélectionnés et seulement les photos sélectionnées (plus les photos placées directement dans chaque dossier sélectionné). Une ligne sous le dossier d'entrée indique combien de photos ont été reçues, et un bouton **« Utiliser tout le dossier »** redonne toutes les photos du dossier. Le dossier de sortie est le dossier sélectionné ou, pour une sélection de photos, le dossier qui les contient (les résultats y sont créés ; les dossiers `planches/` et `gallery/` d'une génération précédente ne sont pas comptés comme des photos). Tant qu'une sélection est active, la recherche récursive et le choix des sous-dossiers sont indisponibles. L'entrée est écrite dans les quatre langues du programme.

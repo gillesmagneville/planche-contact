@@ -345,6 +345,8 @@ Planche-Contact est donc particulièrement utile lorsque vous voulez simplement 
 
 # Nouveautés
 
+La version **5.3.0** ajoute une entrée **Ouvrir dans Planche-Contact** au menu du clic droit du gestionnaire de fichiers : sur un dossier, ou sur une sélection de photos, dans Nautilus (Linux, paquet `.deb`) et dans l'Explorateur de Windows (premier niveau du menu de Windows 11). Le programme s'ouvre avec ce dossier, ou avec ces seules photos, et les résultats sont générés dans le même dossier. La ligne de commande gagne `--files-from`, qui traite une liste de photos.
+
 La version **5.2.2** est une version de maintenance : le programme ne gagne aucune nouvelle fonctionnalité. L'installeur Windows parle maintenant les quatre langues du programme et propose ses raccourcis et une case « Lancer », les messages du journal et l'équivalent 24×36 des légendes suivent la langue du programme, les textes espagnols et allemands ont été relus, et la construction de l'AppImage est plus robuste.
 
 La version **5.2.1** est une version de maintenance : le projet a maintenant un [code de conduite](CODE_OF_CONDUCT.fr.md), que les paquets embarquent, et ses scripts de construction sont écrits en anglais. Le programme lui-même ne change pas.

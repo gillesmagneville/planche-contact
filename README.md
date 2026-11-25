@@ -345,6 +345,8 @@ This makes Planche-Contact particularly useful when you simply want to **present
 
 # What's new?
 
+Version **5.3.0** adds an **Open in Planche-Contact** entry to the right-click menu of the file manager: on a folder, or on a selection of photos, in Nautilus (Linux, `.deb` package) and in the Windows Explorer (first level of the Windows 11 menu). The program opens with that folder, or with only those photos, and the results are generated in the same folder. The command line gains `--files-from`, which processes a list of photos.
+
 Version **5.2.2** is a maintenance release: the program gains no new feature. The Windows installer now speaks the four languages of the program and offers its shortcuts and a "Run" box, the messages of the log and the 35 mm equivalent of the captions follow the language of the program, the Spanish and German texts were proofread, and the AppImage build is more robust.
 
 Version **5.2.1** is a maintenance release: the project now has a [Code of Conduct](CODE_OF_CONDUCT.md), which the packages ship, and its build scripts are written in English. The program itself does not change.
