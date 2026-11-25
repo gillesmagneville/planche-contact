@@ -195,7 +195,7 @@ Changing the language takes effect after restarting the application. The chosen 
 <ul>
     <li>a <strong>single folder</strong> becomes the input folder, and all its photos are processed (the recursive search stays your choice);</li>
     <li>a <strong>selection of photos</strong> (or of several folders, or a mix) is processed as such: the input folder is the folder common to the selected items, and only the selected photos are processed, plus the photos placed directly in each selected folder (not those of their subfolders). A line under the input folder shows the number of photos received; the <strong>"Use the whole folder"</strong> button drops the selection and processes all the photos of the input folder again. While a selection is active, the recursive search and the choice of subfolders are unavailable.</li>
-    <li>the output folder is set to a <code>Portfolio</code> folder inside the input folder (you can change it as usual).</li>
+    <li>the output folder is the folder that was selected or, for a selection of photos, the folder that holds them (you can change it as usual). The results are created there: sheets in <code>planches/</code>, gallery in <code>gallery/</code>, and the PDF, the CSV and the log next to them. A new generation replaces them without counting them as photos.</li>
 </ul>
 <p>On Linux, if Planche-Contact is already open, the selection replaces the contents of its window (unless a generation is running, in which case it is ignored and a message is written in the log). On Windows each opening starts its own window.</p>
 <div class="note">

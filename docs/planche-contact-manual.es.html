@@ -195,7 +195,7 @@ Un cambio de idioma solo tiene efecto tras reiniciar la aplicación. El idioma e
 <ul>
     <li>una <strong>carpeta sola</strong> pasa a ser la carpeta de entrada y se procesan todas sus fotos (la búsqueda recursiva sigue siendo su elección);</li>
     <li>una <strong>selección de fotos</strong> (o de varias carpetas, o una mezcla) se procesa tal cual: la carpeta de entrada es la carpeta común a los elementos seleccionados y solo se procesan las fotos seleccionadas, más las fotos situadas directamente en cada carpeta seleccionada (no las de sus subcarpetas). Una línea bajo la carpeta de entrada indica el número de fotos recibidas; el botón <strong>«Usar toda la carpeta»</strong> descarta la selección y vuelve a procesar todas las fotos de la carpeta de entrada. Mientras hay una selección activa, la búsqueda recursiva y la elección de subcarpetas no están disponibles;</li>
-    <li>la carpeta de salida se fija en una carpeta <code>Portfolio</code> dentro de la carpeta de entrada (modificable como de costumbre).</li>
+    <li>la carpeta de salida es la carpeta seleccionada o, para una selección de fotos, la carpeta que las contiene (modificable como de costumbre). Los resultados se crean allí: hojas en <code>planches/</code>, galería en <code>gallery/</code>, y el PDF, el CSV y el registro al lado. Una nueva generación los sustituye sin contarlos como fotos.</li>
 </ul>
 <p>En Linux, si Planche-Contact ya está abierto, la selección sustituye el contenido de su ventana (salvo que haya una generación en curso: entonces se ignora y se escribe un mensaje en el registro). En Windows, cada apertura inicia su propia ventana.</p>
 <div class="note">

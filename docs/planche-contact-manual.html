@@ -195,7 +195,7 @@ Un changement de langue ne prend effet qu'au redémarrage de l'application. La l
 <ul>
     <li>un <strong>dossier seul</strong> devient le dossier d'entrée, et toutes ses photos sont traitées (la recherche récursive reste à votre choix) ;</li>
     <li>une <strong>sélection de photos</strong> (ou de plusieurs dossiers, ou un mélange) est traitée telle quelle : le dossier d'entrée est le dossier commun aux éléments sélectionnés, et seules les photos sélectionnées sont traitées, plus les photos placées directement dans chaque dossier sélectionné (pas celles de leurs sous-dossiers). Une ligne sous le dossier d'entrée indique le nombre de photos reçues ; le bouton <strong>« Utiliser tout le dossier »</strong> abandonne la sélection et traite de nouveau toutes les photos du dossier d'entrée. Tant qu'une sélection est active, la recherche récursive et le choix des sous-dossiers sont indisponibles ;</li>
-    <li>le dossier de sortie est fixé à un dossier <code>Portfolio</code> dans le dossier d'entrée (modifiable comme d'habitude).</li>
+    <li>le dossier de sortie est le dossier sélectionné ou, pour une sélection de photos, le dossier qui les contient (modifiable comme d'habitude). Les résultats y sont créés : planches dans <code>planches/</code>, galerie dans <code>gallery/</code>, et le PDF, le CSV et le journal à côté. Une nouvelle génération les remplace sans les compter comme des photos.</li>
 </ul>
 <p>Sous Linux, si Planche-Contact est déjà ouvert, la sélection remplace le contenu de sa fenêtre (sauf si une génération est en cours : elle est alors ignorée et un message est écrit dans le journal). Sous Windows, chaque ouverture lance sa propre fenêtre.</p>
 <div class="note">

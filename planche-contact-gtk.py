@@ -2306,11 +2306,14 @@ class PlancheContactGTK(Gtk.Application):
         self._reset_subfolder_selection()
         self._set_file_selection(selection.files)
 
-        # The output goes next to the photos, as when the field is left empty:
-        # a context menu is used on ever-changing folders, and the output
-        # folder remembered from an earlier session would otherwise have its
-        # sheets replaced by the generation of an unrelated folder.
-        self.output_entry.set_text(str(selection.input_dir / "Portfolio"))
+        # The results go in the folder that was selected (or, for a selection
+        # of photos, the folder that holds them): a context menu is used on
+        # ever-changing folders, and the output folder remembered from an
+        # earlier session would otherwise have its sheets replaced by the
+        # generation of an unrelated folder. The "planches" and "gallery"
+        # subfolders of a previous run are excluded from the scan, so this
+        # does not feed the results back into the next generation.
+        self.output_entry.set_text(str(selection.input_dir))
 
         if selection.files is None:
             self._log(_("launch.log_folder", dir=selection.input_dir))
