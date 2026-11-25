@@ -183,6 +183,25 @@ Die GPS-Koordinaten wird, falls aktiviert, im Klartext auf dem erstellten Kontak
 Eine Sprachänderung wird erst nach einem Neustart der Anwendung wirksam. Die gewählte Sprache wird auch für die Kommandozeile und für jede danach erstellte HTML-Galerie verwendet — siehe §4 und §5.
 </div>
 
+<h3>3.9 Öffnen aus dem Dateimanager (Kontextmenü)</h3>
+<p>Planche-Contact fügt dem Rechtsklick-Menü des Dateimanagers den Eintrag <strong>„In Planche-Contact öffnen“</strong> hinzu. Er erscheint bei einem <strong>Ordner</strong> und bei einer <strong>Auswahl von Fotos</strong> (nur unterstützte Formate; Fotos und Ordner können gemischt werden), unter Linux auch auf dem Hintergrund eines geöffneten Ordners.</p>
+<table>
+<tr><th>System</th><th>So erhalten Sie den Eintrag</th></tr>
+<tr><td><strong>Linux (Dateien / Nautilus)</strong></td><td>Wird mit dem <code>.deb</code>-Paket installiert: eine Erweiterung in <code>/usr/share/nautilus-python/extensions/</code>, die das Paket <code>python3-nautilus</code> benötigt (vom Paket empfohlen; bei Bedarf mit <code>sudo apt install python3-nautilus</code> installieren). Die Installation startet Nautilus neu; andernfalls <code>nautilus -q</code> ausführen. Nicht in der AppImage enthalten.</td></tr>
+<tr><td><strong>Windows 11</strong></td><td>Auf der <strong>ersten Ebene</strong> des Menüs, mit dem Installationsprogramm (Komponente „Explorer-Kontextmenü“, standardmäßig angehakt). Bei der portablen Version <code>register-context-menu.cmd</code> im Programmordner ausführen. Lässt sich die erste Ebene nicht einrichten (Installation externer Apps deaktiviert, S-Modus ...), steht der Eintrag unter „Weitere Optionen anzeigen“.</td></tr>
+<tr><td><strong>Windows 10</strong></td><td>Dieselbe Komponente des Installationsprogramms; der Eintrag steht im gewohnten Rechtsklick-Menü.</td></tr>
+</table>
+<p>Das Fenster öffnet sich mit der getroffenen Auswahl:</p>
+<ul>
+    <li>ein <strong>einzelner Ordner</strong> wird zum Quellordner, und alle seine Fotos werden verarbeitet (die rekursive Suche bleibt Ihre Entscheidung);</li>
+    <li>eine <strong>Auswahl von Fotos</strong> (oder mehrerer Ordner oder eine Mischung) wird so verarbeitet, wie sie ist: Quellordner ist der gemeinsame Ordner der ausgewählten Elemente, und verarbeitet werden nur die ausgewählten Fotos sowie die Fotos, die direkt in jedem ausgewählten Ordner liegen (nicht die ihrer Unterordner). Eine Zeile unter dem Quellordner zeigt die Anzahl der übernommenen Fotos; die Schaltfläche <strong>„Ganzen Ordner verwenden“</strong> verwirft die Auswahl und verarbeitet wieder alle Fotos des Quellordners. Solange eine Auswahl aktiv ist, sind die rekursive Suche und die Auswahl der Unterordner nicht verfügbar;</li>
+    <li>der Zielordner wird auf einen Ordner <code>Portfolio</code> im Quellordner gesetzt (wie gewohnt änderbar).</li>
+</ul>
+<p>Ist Planche-Contact unter Linux bereits geöffnet, ersetzt die Auswahl den Inhalt seines Fensters (läuft gerade eine Erstellung, wird sie ignoriert und eine Meldung ins Protokoll geschrieben). Unter Windows startet jedes Öffnen ein eigenes Fenster.</p>
+<div class="note">
+Die Auswahl wird dem Programm über eine temporäre Textdatei übergeben (<code>--paths-from</code>, siehe §4.1), sodass auch eine sehr große Auswahl kein Problem ist. Um den Eintrag unter Windows zu entfernen, nutzen Sie das Deinstallationsprogramm bzw. bei der portablen Version <code>unregister-context-menu.cmd</code>.
+</div>
+
 <h2>4. Kommandozeilen-Schnittstelle (CLI)</h2>
 
 <h3>4.1 Hauptoptionen</h3>
@@ -204,12 +223,14 @@ Eine Sprachänderung wird erst nach einem Neustart der Anwendung wirksam. Die ge
 <tr><td><code>-r, --recursive</code></td><td>Rekursive Analyse der Unterordner</td><td></td></tr>
 <tr><td><code>--include-dir</code></td><td>Nur die Fotos verarbeiten, die direkt in diesem Unterordner liegen (Pfad relativ zum Quellordner, <code>.</code> für den Quellordner selbst). Mehrfach angebbar; impliziert die rekursive Suche. Ohne diese Option werden alle Fotos verarbeitet.</td><td><code>--include-dir Paris --include-dir "Sommer 2026"</code></td></tr>
 <tr><td><code>--include-dirs-file</code></td><td>Textdatei (UTF-8) mit den zu verarbeitenden Unterordnern, einer pro Zeile (wie mehrere <code>--include-dir</code>)</td><td><code>--include-dirs-file ordner.txt</code></td></tr>
+<tr><td><code>--files-from</code></td><td>Textdatei (UTF-8) mit den zu verarbeitenden Fotos, eines pro Zeile (absoluter Pfad oder relativ zum Quellordner); nur diese Fotos werden verarbeitet. Das verwendet das Kontextmenü des Dateimanagers.</td><td><code>--files-from photos.txt</code></td></tr>
 <tr><td><code>--sort</code></td><td>Sortierung der Fotos: <code>date</code> (EXIF) oder <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Anzahl der Bilder pro HTML-Galerieseite (Standard: 48)</td><td><code>--html-per-page 60</code></td></tr>
 <tr><td><code>--html-originals</code></td><td>Die Originale in voller Größe der HTML-Galerie hinzufügen (die Download-Schaltfläche liefert sie; RAW-Dateien werden in JPEG umgewandelt, keine RAW-Datei landet in der Galerie; die Galerie wird deutlich größer, und die Originale tragen kein Wasserzeichen)</td><td><code>--html --html-originals</code></td></tr>
 <tr><td><code>--language</code></td><td>Sprache der Meldungen und der erstellten HTML-Galerie: <code>system</code> (Standard), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language de</code></td></tr>
 <tr><td><code>--profile</code></td><td>JSON-Profildatei (Layout, Bildunterschriften, Thema — siehe §3.3), erstellt über die Schaltfläche „Profil speichern…“ der grafischen Oberfläche, oder von Hand geschrieben/bearbeitet. Eine fehlende oder ungültige Datei greift stillschweigend auf die Standardeinstellungen zurück.</td><td><code>--profile mein-profil.json</code></td></tr>
 </table>
+<p>Die grafische Oberfläche selbst akzeptiert <code>--paths-from DATEI</code> (ein Ordner- oder Fotopfad pro Zeile, UTF-8; eine Datei mit dem Namen <code>planche-contact-selection-*.txt</code> wird nach dem Lesen gelöscht) oder direkt angegebene Pfade: <code>planche-contact-gtk /pfad/zum/ordner</code>. Das ruft das Kontextmenü auf.</p>
 <div class="note">
 Die Werte für <code>--watermark-orientation</code> bleiben intern immer auf Französisch, unabhängig von der gewählten <code>--language</code> (<code>"Horizontal"</code>, <code>"Diagonale horaire"</code>, <code>"Diagonale anti-horaire"</code>) — dies ist die interne Vorgabe des Programmkerns und hat nichts mit der Anzeigesprache zu tun.
 </div>

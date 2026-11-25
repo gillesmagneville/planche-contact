@@ -169,6 +169,7 @@ mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/64x64/apps"
 mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/128x128/apps"
 mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/256x256/apps"
 mkdir -p "$BUILD_DIR/usr/share/metainfo"
+mkdir -p "$BUILD_DIR/usr/share/nautilus-python/extensions"
 
 echo ">>> Creating the virtualenv..."
 python3 -m venv --system-site-packages "$BUILD_DIR/usr/share/$PACKAGE_NAME/venv"
@@ -271,6 +272,18 @@ else
     echo "Warning: icon not found ($ICON_SOURCE) - the package will be built without a custom icon." >&2
 fi
 
+# "Open in Planche-Contact" entry of the Nautilus context menu (right click on
+# photos or on a folder). Loaded by nautilus-python (python3-nautilus package,
+# declared as a recommended dependency below): it must be installed under
+# /usr/share/nautilus-python/extensions/, the only place visible from
+# Nautilus' sandbox.
+if [ -f "$PROJECT_DIR/nautilus-extension/planche_contact_nautilus.py" ]; then
+    cp "$PROJECT_DIR/nautilus-extension/planche_contact_nautilus.py" \
+        "$BUILD_DIR/usr/share/nautilus-python/extensions/planche_contact_nautilus.py"
+else
+    echo "Warning: nautilus-extension/planche_contact_nautilus.py not found - the package will be built without the Nautilus context menu entry." >&2
+fi
+
 echo ">>> Creating the launch scripts..."
 cat > "$BUILD_DIR/usr/bin/planche-contact-gtk" << 'EOF'
 #!/bin/bash
@@ -336,6 +349,7 @@ fpm -s dir -t deb \
     --depends python3-gi \
     --depends gir1.2-gtk-4.0 \
     --depends libgtk-4-1 \
+    --deb-recommends python3-nautilus \
     --after-install "$PROJECT_DIR/debian/postinst" \
     --after-remove "$PROJECT_DIR/debian/postrm" \
     -C "$BUILD_DIR" \

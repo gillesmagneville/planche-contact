@@ -185,6 +185,10 @@ The generated galleries include an integrated image viewer with features such as
 
 Generate CSV indexes containing image information for further processing or archiving.
 
+### Right-click from your file manager
+
+Right-click a folder, or a selection of photos, and choose **Open in Planche-Contact**: the program opens with that folder, or with only those photos. Available in Nautilus (Linux, `.deb` package) and in the Windows Explorer (installer, first level of the Windows 11 menu).
+
 ### Command Line Interface
 
 Use Planche-Contact from scripts or automated workflows through its command-line interface.
@@ -378,6 +382,13 @@ Download the latest **.deb** package from the **Releases** page.
 sudo apt install ./planche-contact_<version>_amd64.deb
 ```
 
+The package adds an **Open in Planche-Contact** entry to the right-click menu
+of Nautilus (on a folder, on a selection of photos, or on the background of a
+folder). It relies on the `python3-nautilus` package, which the package
+recommends: if it is missing, `sudo apt install python3-nautilus`, then
+`nautilus -q` (the installation already restarts Nautilus). The AppImage does
+not include this entry.
+
 ## AppImage (any Linux distribution)
 
 A single self-contained file that bundles Python, GTK 4 and all the libraries Planche-Contact needs, including the C library: it does not depend on the packages — or the version — of the distribution it runs on.
@@ -460,6 +471,13 @@ The script checks prerequisites (Python 64-bit, GTK4 via
 offers to install anything missing automatically. See
 [`windows/README.md`](windows/README.md) for full details, requirements
 and troubleshooting.
+
+The installer also offers an **Open in Planche-Contact** entry for the
+right-click menu of the Windows Explorer (first level of the Windows 11
+menu); the portable version has `register-context-menu.cmd` for that. How it
+works, what it needs to be built and what it implies (a self-signed
+certificate added to "Trusted People") are in
+[`windows/README.md`](windows/README.md#explorer-context-menu-open-in-planche-contact).
 
 > **Note:** since the installer isn't (yet) code-signed, Windows will very
 > likely show a blue **"Windows protected your PC"** (SmartScreen) warning

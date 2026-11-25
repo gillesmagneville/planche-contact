@@ -183,6 +183,25 @@ La position GPS, si cochée, est affichée en clair sur la planche produite — 
 Un changement de langue ne prend effet qu'au redémarrage de l'application. La langue choisie est aussi utilisée pour la ligne de commande et pour toute galerie HTML générée par la suite — voir §4 et §5.
 </div>
 
+<h3>3.9 Ouverture depuis le gestionnaire de fichiers (menu contextuel)</h3>
+<p>Planche-Contact ajoute une entrée <strong>« Ouvrir dans Planche-Contact »</strong> au menu du clic droit du gestionnaire de fichiers. Elle apparaît sur un <strong>dossier</strong> et sur une <strong>sélection de photos</strong> (formats pris en charge uniquement ; photos et dossiers peuvent être mélangés), et sous Linux aussi sur le fond d'un dossier ouvert.</p>
+<table>
+<tr><th>Système</th><th>Comment obtenir l'entrée</th></tr>
+<tr><td><strong>Linux (Fichiers / Nautilus)</strong></td><td>Installée avec le paquet <code>.deb</code> : une extension placée dans <code>/usr/share/nautilus-python/extensions/</code>, qui nécessite le paquet <code>python3-nautilus</code> (recommandé par le paquet ; à installer avec <code>sudo apt install python3-nautilus</code> s'il manque). L'installation redémarre Nautilus ; sinon, lancer <code>nautilus -q</code>. Absente de l'AppImage.</td></tr>
+<tr><td><strong>Windows 11</strong></td><td>Au <strong>premier niveau</strong> du menu, avec l'installeur (composant « Menu contextuel de l'Explorateur », coché par défaut). Pour la version portable, lancer <code>register-context-menu.cmd</code>, dans le dossier du programme. Si le premier niveau ne peut pas être mis en place (installation d'applications externes désactivée, mode S...), l'entrée est placée sous « Afficher plus d'options ».</td></tr>
+<tr><td><strong>Windows 10</strong></td><td>Même composant de l'installeur ; l'entrée est dans le menu habituel du clic droit.</td></tr>
+</table>
+<p>La fenêtre s'ouvre avec ce qui a été sélectionné :</p>
+<ul>
+    <li>un <strong>dossier seul</strong> devient le dossier d'entrée, et toutes ses photos sont traitées (la recherche récursive reste à votre choix) ;</li>
+    <li>une <strong>sélection de photos</strong> (ou de plusieurs dossiers, ou un mélange) est traitée telle quelle : le dossier d'entrée est le dossier commun aux éléments sélectionnés, et seules les photos sélectionnées sont traitées, plus les photos placées directement dans chaque dossier sélectionné (pas celles de leurs sous-dossiers). Une ligne sous le dossier d'entrée indique le nombre de photos reçues ; le bouton <strong>« Utiliser tout le dossier »</strong> abandonne la sélection et traite de nouveau toutes les photos du dossier d'entrée. Tant qu'une sélection est active, la recherche récursive et le choix des sous-dossiers sont indisponibles ;</li>
+    <li>le dossier de sortie est fixé à un dossier <code>Portfolio</code> dans le dossier d'entrée (modifiable comme d'habitude).</li>
+</ul>
+<p>Sous Linux, si Planche-Contact est déjà ouvert, la sélection remplace le contenu de sa fenêtre (sauf si une génération est en cours : elle est alors ignorée et un message est écrit dans le journal). Sous Windows, chaque ouverture lance sa propre fenêtre.</p>
+<div class="note">
+La sélection est transmise au programme par un fichier texte temporaire (<code>--paths-from</code>, voir §4.1), si bien qu'une très grosse sélection ne pose aucun problème. Pour retirer l'entrée sous Windows, utiliser le désinstalleur, ou <code>unregister-context-menu.cmd</code> pour la version portable.
+</div>
+
 <h2>4. Interface en ligne de commande (CLI)</h2>
 
 <h3>4.1 Options principales</h3>
@@ -204,12 +223,14 @@ Un changement de langue ne prend effet qu'au redémarrage de l'application. La l
 <tr><td><code>-r, --recursive</code></td><td>Analyse récursive des sous-dossiers</td><td></td></tr>
 <tr><td><code>--include-dir</code></td><td>Ne traiter que les photos placées directement dans ce sous-dossier (chemin relatif au dossier d'entrée, <code>.</code> pour le dossier d'entrée lui-même). Répétable ; implique le parcours récursif. Sans cette option, toutes les photos sont traitées.</td><td><code>--include-dir Paris --include-dir "Été 2026"</code></td></tr>
 <tr><td><code>--include-dirs-file</code></td><td>Fichier texte (UTF-8) listant les sous-dossiers à traiter, un par ligne (équivalent de plusieurs <code>--include-dir</code>)</td><td><code>--include-dirs-file dossiers.txt</code></td></tr>
+<tr><td><code>--files-from</code></td><td>Fichier texte (UTF-8) listant les photos à traiter, une par ligne (chemin absolu ou relatif au dossier d'entrée) ; seules ces photos sont traitées. C'est ce qu'utilise le menu contextuel du gestionnaire de fichiers.</td><td><code>--files-from photos.txt</code></td></tr>
 <tr><td><code>--sort</code></td><td>Tri des photos : <code>date</code> (EXIF) ou <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Nombre d'images par page dans la galerie HTML (défaut : 48)</td><td><code>--html-per-page 60</code></td></tr>
 <tr><td><code>--html-originals</code></td><td>Joindre à la galerie HTML les originaux pleine taille (le bouton de téléchargement les donne ; les fichiers RAW sont convertis en JPEG, aucun RAW n'est placé dans la galerie ; la galerie devient nettement plus volumineuse, et les originaux ne portent pas le filigrane)</td><td><code>--html --html-originals</code></td></tr>
 <tr><td><code>--language</code></td><td>Langue des messages et de la galerie HTML générée : <code>system</code> (défaut), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language fr</code></td></tr>
 <tr><td><code>--profile</code></td><td>Fichier de profil JSON (mise en page, légendes, thème — voir §3.3), produit par le bouton « Enregistrer le profil... » de l'interface graphique, ou écrit/modifié à la main. Un fichier absent ou invalide retombe silencieusement sur les réglages par défaut.</td><td><code>--profile mon-profil.json</code></td></tr>
 </table>
+<p>L'interface graphique elle-même accepte <code>--paths-from FICHIER</code> (un chemin de dossier ou de photo par ligne, UTF-8 ; un fichier nommé <code>planche-contact-selection-*.txt</code> est supprimé une fois lu) ou des chemins donnés directement : <code>planche-contact-gtk /chemin/du/dossier</code>. C'est ce qu'appelle le menu contextuel.</p>
 <div class="note">
 Les valeurs de <code>--watermark-orientation</code> restent en français en interne quelle que soit la <code>--language</code> choisie (<code>"Horizontal"</code>, <code>"Diagonale horaire"</code>, <code>"Diagonale anti-horaire"</code>) — c'est le contrat interne du moteur, indépendant de la langue d'affichage.
 </div>

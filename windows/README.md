@@ -92,6 +92,14 @@ Windows 10/11 is extremely rare today anyway.
 Without NSIS, only the portable `.zip` version is produced (the script
 continues normally, it is not blocking).
 
+Optional, only for the Explorer context menu (see the section below; the script
+never installs them and never stops if they are missing):
+
+| Tool | Role |
+|---|---|
+| Visual Studio (or Build Tools) with the **"Desktop development with C++"** workload | Compiles the context menu DLL (MSVC) |
+| Windows 10/11 SDK (`makeappx.exe`, `signtool.exe`) | Builds and signs the package that puts the entry on the **first level** of the Windows 11 menu |
+
 ## Files in this folder
 
 | File | Role |
@@ -99,6 +107,8 @@ continues normally, it is not blocking).
 | `build-windows.ps1` | Main script, Windows equivalent of `build-deb.sh` |
 | `planche-contact.spec` | PyInstaller configuration file (bundles GTK4) |
 | `installer.nsi` | NSIS script generating the `.exe` installer |
+| `build-shellext.ps1` | Builds the Explorer context menu (called by `build-windows.ps1`) |
+| `shellext/` | Sources of the context menu: C++ DLL, package manifest, registration scripts |
 
 A second, tiny `build-windows.ps1` exists **at the root of the repository**:
 it only relays to this one (symmetrical to `build-deb.sh`, which is also
@@ -124,6 +134,83 @@ launched from the root) — that is the one you run in practice.
    `import gi`.
 5. The resulting folder is zipped as is (portable version), and/or
    bundled into an NSIS installer.
+
+## Explorer context menu ("Open in Planche-Contact")
+
+A right click on a **folder** or on a **selection of photos** offers
+**Open in Planche-Contact** (in the language of Windows: English, French,
+Spanish or German). The program opens with that folder, or with only those
+photos (see §3.9 of the manual). On Windows 11 the entry is on the **first
+level** of the menu, not under "Show more options". There is no entry on the
+background of an open folder on Windows (it exists on Linux).
+
+### Installing and removing it
+
+- **Installer**: the component *Explorer context menu* is ticked by default.
+  It registers the entry and **may restart the Windows Explorer** (its windows
+  close for a moment: Windows shows a new entry only then). The uninstaller
+  removes it.
+- **Portable version**: double-click `register-context-menu.cmd` (current user,
+  no administrator rights needed), and `unregister-context-menu.cmd` to remove
+  it. The folder of the program must not be moved afterwards (register again
+  if it is). Options of the PowerShell scripts: `-Machine` (all users,
+  administrator), `-RestartExplorer`, `-Quiet`.
+
+### How it is built
+
+`build-windows.ps1` calls `build-shellext.ps1` once the application is frozen.
+A failure there is only reported as a warning: the application, the `.zip` and
+the installer are produced anyway, just without the menu entry. It produces,
+next to `planche-contact-gtk.exe`:
+
+| File | Role |
+|---|---|
+| `planche_shellext_classic.dll` | The COM component (`IExplorerCommand`), registered the classic way (registry): Windows 10, and "Show more options" on Windows 11 |
+| `planche_shellext.dll` | The same, with the identity of the package embedded: first level of the Windows 11 menu |
+| `planche-contact-shell.msix` | Sparse package declaring the entry (`*` and `Directory`) and the DLL |
+| `planche-contact-shell.cer` | Public certificate that signed the package |
+| `register-context-menu.*`, `unregister-context-menu.*`, `shellext-info.json` | Registration scripts and the identifiers they share with the build |
+
+- **Visual Studio C++ build tools are required** to compile the DLL. If they
+  are missing, there is no menu entry at all.
+- The **Windows SDK** is only needed for the package. Without it, the build
+  carries the classic entry only (so, on Windows 11, under "Show more options").
+- The identifiers (CLSID, package name, certificate subject) are defined **once**,
+  at the top of `build-shellext.ps1`. **Never change the CLSID of a published
+  version.**
+
+### Why a certificate, and what it implies
+
+Windows 11 only shows the first-level entries of applications that have an
+*identity*, which means a package, and a package must be signed. The package
+is signed with a **self-signed** certificate (`CN=Planche-Contact`), created
+the first time on the build machine and kept in its *Current user > Personal*
+store: its private key never leaves that machine and only the public `.cer` is
+shipped. To install the package, the registration script puts that
+certificate in the **"Trusted People"** store (of the machine with the
+installer, of the user otherwise).
+
+This is a real trust decision, to be told to the users: a package signed by
+this certificate is then accepted by Windows without warning, on that
+computer. The key stays with the maintainer, the certificate is valid for ten
+years, and the uninstaller (or `unregister-context-menu.*`) removes it from the
+store. It does not work where Windows refuses packages from outside the
+Microsoft Store (S mode, some company policies): the entry is then registered
+the classic way, under "Show more options", the program itself being
+unaffected.
+
+### Limits
+
+- The package is registered for **one user** (the one who ran the installer
+  or the script). Another account of the same computer runs
+  `register-context-menu.cmd` once to get the entry on the first level (the
+  classic entry is registered for everybody by the installer).
+- Updating while the Explorer holds the DLL: the installer renames the loaded
+  DLL and deletes it at the next restart, so an update never fails on it.
+- Not tested on a real Windows machine at the time of writing (see the
+  CHANGELOG): the C++ source compiles without warning with a cross-compiler
+  and the scripts are checked by automatic tests, but nothing replaces a test
+  of the build with Visual Studio and of the registration on Windows 10 and 11.
 
 ## Troubleshooting
 
@@ -168,6 +255,20 @@ does use the printf style (`"0x%X"`). This fix was validated by
 actually compiling and **running** the installer via `makensis` +
 Wine in a Linux environment (see §6 of `PROJECT_CONTEXT.md`),
 without needing a Windows machine.
+
+**The menu entry does not appear (Windows 11)**
+Restart the Windows Explorer (or sign out and in). Then run
+`register-context-menu.cmd` again and read its messages: it says whether
+the first level could be set up or whether the classic entry was used instead
+("Show more options"). Check in *Settings > Apps > Advanced app settings*
+that installing apps from outside the Store is not blocked. As a last
+resort, `Get-AppxPackage PlancheContact.ShellExtension` in PowerShell tells
+whether the package is registered.
+
+**The build says "Visual Studio C++ build tools not found"**
+Install *Build Tools for Visual Studio* with the "Desktop development with
+C++" workload, then rerun `build-windows.ps1` (or only
+`windows\build-shellext.ps1 -OutDir <folder> -Version X.Y.Z`).
 
 ## What is shared with the Linux version (no duplication)
 

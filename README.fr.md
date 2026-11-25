@@ -185,6 +185,10 @@ Les galeries générées incluent une visionneuse d'images intégrée dotée de 
 
 Générez des index CSV contenant les informations des images, pour un traitement ultérieur ou un archivage.
 
+### Clic droit depuis votre gestionnaire de fichiers
+
+Faites un clic droit sur un dossier, ou sur une sélection de photos, et choisissez **Ouvrir dans Planche-Contact** : le programme s'ouvre avec ce dossier, ou avec ces seules photos. Disponible dans Nautilus (Linux, paquet `.deb`) et dans l'Explorateur de Windows (installeur, premier niveau du menu de Windows 11).
+
 ### Interface en ligne de commande
 
 Utilisez Planche-Contact depuis des scripts ou des flux de travail automatisés grâce à son interface en ligne de commande.
@@ -378,6 +382,13 @@ Téléchargez le dernier paquet **.deb** depuis la page **Releases**.
 sudo apt install ./planche-contact_<version>_amd64.deb
 ```
 
+Le paquet ajoute une entrée **Ouvrir dans Planche-Contact** au menu du clic
+droit de Nautilus (sur un dossier, sur une sélection de photos, ou sur le fond
+d'un dossier). Elle s'appuie sur le paquet `python3-nautilus`, que le paquet
+recommande : s'il manque, `sudo apt install python3-nautilus`, puis
+`nautilus -q` (l'installation redémarre déjà Nautilus). L'AppImage n'inclut
+pas cette entrée.
+
 ## AppImage (toutes distributions Linux)
 
 Un seul fichier autonome qui embarque Python, GTK 4 et toutes les bibliothèques nécessaires à Planche-Contact, y compris la bibliothèque C : il ne dépend ni des paquets, ni de la version de la distribution qui l'exécute.
@@ -460,6 +471,14 @@ Le script vérifie les prérequis (Python 64 bits, GTK4 via
 propose d'installer automatiquement tout ce qui manque. Consultez
 [`windows/README.fr.md`](windows/README.fr.md) pour le détail complet, les
 prérequis et le dépannage.
+
+L'installeur propose aussi une entrée **Ouvrir dans Planche-Contact** pour le
+menu du clic droit de l'Explorateur de Windows (premier niveau du menu de
+Windows 11) ; la version portable dispose pour cela de
+`register-context-menu.cmd`. Son fonctionnement, ce qu'il faut pour la
+construire et ce qu'elle implique (un certificat auto-signé ajouté aux
+« Personnes de confiance ») sont décrits dans
+[`windows/README.fr.md`](windows/README.fr.md).
 
 > **Remarque :** l'installeur n'étant pas (encore) signé numériquement,
 > Windows affichera très probablement un écran bleu **« Windows a protégé

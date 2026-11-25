@@ -1,0 +1,6 @@
+// Resource of planche_shellext.dll (the flavour used by the sparse package;
+// planche_shellext_classic.dll is built without it): the "msix" identity
+// manifest generated next to this file by build-shellext.ps1. It ties the DLL
+// to the package, which Windows 11 requires to load a packaged context menu
+// extension. 24 = RT_MANIFEST, 2 = the manifest of a DLL.
+2 24 "planche_shellext.manifest"

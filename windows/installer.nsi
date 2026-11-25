@@ -79,6 +79,11 @@ LangString SEC_MAIN ${LANG_FRENCH}  "Planche-Contact (obligatoire)"
 LangString SEC_MAIN ${LANG_SPANISH} "Planche-Contact (obligatorio)"
 LangString SEC_MAIN ${LANG_GERMAN}  "Planche-Contact (erforderlich)"
 
+LangString SEC_CONTEXT_MENU ${LANG_ENGLISH} "Explorer context menu: Open in Planche-Contact (may restart Explorer)"
+LangString SEC_CONTEXT_MENU ${LANG_FRENCH}  "Menu contextuel de l'Explorateur : Ouvrir dans Planche-Contact (peut relancer l'Explorateur)"
+LangString SEC_CONTEXT_MENU ${LANG_SPANISH} "Menú contextual del Explorador: Abrir en Planche-Contact (puede reiniciar el Explorador)"
+LangString SEC_CONTEXT_MENU ${LANG_GERMAN}  "Explorer-Kontextmenü: In Planche-Contact öffnen (startet ggf. den Explorer neu)"
+
 LangString SEC_START_MENU ${LANG_ENGLISH} "Start Menu shortcut"
 LangString SEC_START_MENU ${LANG_FRENCH}  "Raccourci du menu Démarrer"
 LangString SEC_START_MENU ${LANG_SPANISH} "Acceso directo del menú Inicio"
@@ -108,9 +113,23 @@ VIProductVersion "${PC_VERSION}.0"
 !insertmacro VersionKeys ${LANG_SPANISH} "Instalador de Planche-Contact"
 !insertmacro VersionKeys ${LANG_GERMAN}  "Installationsprogramm für Planche-Contact"
 
+; The DLLs of the Explorer context menu stay loaded by Explorer (or by the
+; surrogate process dllhost.exe) for a while: a loaded DLL cannot be
+; overwritten, but it can be renamed. The previous version is therefore
+; moved aside before the files are copied, and deleted - at the next restart
+; if it is still in use.
+!macro MoveAsideDll NAME
+    IfFileExists "$INSTDIR\${NAME}" 0 +4
+        Delete "$INSTDIR\${NAME}.old"
+        Rename "$INSTDIR\${NAME}" "$INSTDIR\${NAME}.old"
+        Delete /REBOOTOK "$INSTDIR\${NAME}.old"
+!macroend
+
 Section "$(SEC_MAIN)" SecMain
     SectionIn RO
     SetOutPath "$INSTDIR"
+    !insertmacro MoveAsideDll "planche_shellext.dll"
+    !insertmacro MoveAsideDll "planche_shellext_classic.dll"
     File /r "${PC_DIST_DIR}\*.*"
 
     WriteRegStr HKLM "Software\Planche-Contact" "InstallDir" "$INSTDIR"
@@ -139,6 +158,17 @@ Section "$(SEC_MAIN)" SecMain
                   "EstimatedSize" "$0"
 
     WriteUninstaller "$INSTDIR\Uninstall.exe"
+SectionEnd
+
+; "Open in Planche-Contact" in the Explorer context menu (right click on photos
+; or on a folder). The work is done by register-context-menu.ps1, which comes
+; with the application: first level of the Windows 11 menu through a signed
+; sparse package, otherwise the classic menu (Windows 10, "Show more options").
+; Silently skipped when the package was built without the context menu.
+Section "$(SEC_CONTEXT_MENU)" SecContextMenu
+    IfFileExists "$INSTDIR\register-context-menu.ps1" 0 +3
+        nsExec::ExecToLog '"$WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$INSTDIR\register-context-menu.ps1" -Machine -RestartExplorer -Quiet'
+        Pop $0
 SectionEnd
 
 Section "$(SEC_START_MENU)" SecStartMenu
@@ -170,7 +200,13 @@ Function LaunchProgram
 FunctionEnd
 
 Section "Uninstall"
-    RMDir /r "$INSTDIR"
+    ; Context menu first (the script is about to be deleted with the folder).
+    IfFileExists "$INSTDIR\unregister-context-menu.ps1" 0 +3
+        nsExec::ExecToLog '"$WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$INSTDIR\unregister-context-menu.ps1" -Machine -Quiet'
+        Pop $0
+    ; /REBOOTOK: the DLL of the context menu may still be loaded by Explorer;
+    ; what cannot be deleted now is deleted at the next restart.
+    RMDir /r /REBOOTOK "$INSTDIR"
     RMDir /r "$SMPROGRAMS\Planche-Contact"
     Delete "$DESKTOP\Planche-Contact.lnk"
     DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PlancheContact"

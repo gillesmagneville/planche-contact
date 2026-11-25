@@ -183,6 +183,25 @@ Las coordenadas GPS, si están activadas, se muestran en texto claro en la hoja 
 Un cambio de idioma solo tiene efecto tras reiniciar la aplicación. El idioma elegido también se utiliza para la línea de comandos y para cualquier galería HTML generada posteriormente — véanse §4 y §5.
 </div>
 
+<h3>3.9 Apertura desde el gestor de archivos (menú contextual)</h3>
+<p>Planche-Contact añade una entrada <strong>«Abrir en Planche-Contact»</strong> al menú del clic derecho del gestor de archivos. Aparece sobre una <strong>carpeta</strong> y sobre una <strong>selección de fotos</strong> (solo los formatos admitidos; se pueden mezclar fotos y carpetas), y en Linux también sobre el fondo de una carpeta abierta.</p>
+<table>
+<tr><th>Sistema</th><th>Cómo obtener la entrada</th></tr>
+<tr><td><strong>Linux (Archivos / Nautilus)</strong></td><td>Se instala con el paquete <code>.deb</code>: una extensión situada en <code>/usr/share/nautilus-python/extensions/</code>, que necesita el paquete <code>python3-nautilus</code> (recomendado por el paquete; instálelo con <code>sudo apt install python3-nautilus</code> si falta). La instalación reinicia Nautilus; si no, ejecute <code>nautilus -q</code>. No está en la AppImage.</td></tr>
+<tr><td><strong>Windows 11</strong></td><td>En el <strong>primer nivel</strong> del menú, con el instalador (componente «Menú contextual del Explorador», marcado por defecto). En la versión portátil, ejecute <code>register-context-menu.cmd</code>, en la carpeta del programa. Si no se puede establecer el primer nivel (instalación de aplicaciones externas desactivada, modo S...), la entrada se coloca en «Mostrar más opciones».</td></tr>
+<tr><td><strong>Windows 10</strong></td><td>El mismo componente del instalador; la entrada está en el menú habitual del clic derecho.</td></tr>
+</table>
+<p>La ventana se abre con lo que se ha seleccionado:</p>
+<ul>
+    <li>una <strong>carpeta sola</strong> pasa a ser la carpeta de entrada y se procesan todas sus fotos (la búsqueda recursiva sigue siendo su elección);</li>
+    <li>una <strong>selección de fotos</strong> (o de varias carpetas, o una mezcla) se procesa tal cual: la carpeta de entrada es la carpeta común a los elementos seleccionados y solo se procesan las fotos seleccionadas, más las fotos situadas directamente en cada carpeta seleccionada (no las de sus subcarpetas). Una línea bajo la carpeta de entrada indica el número de fotos recibidas; el botón <strong>«Usar toda la carpeta»</strong> descarta la selección y vuelve a procesar todas las fotos de la carpeta de entrada. Mientras hay una selección activa, la búsqueda recursiva y la elección de subcarpetas no están disponibles;</li>
+    <li>la carpeta de salida se fija en una carpeta <code>Portfolio</code> dentro de la carpeta de entrada (modificable como de costumbre).</li>
+</ul>
+<p>En Linux, si Planche-Contact ya está abierto, la selección sustituye el contenido de su ventana (salvo que haya una generación en curso: entonces se ignora y se escribe un mensaje en el registro). En Windows, cada apertura inicia su propia ventana.</p>
+<div class="note">
+La selección se transmite al programa mediante un archivo de texto temporal (<code>--paths-from</code>, véase §4.1), de modo que una selección muy grande no plantea ningún problema. Para quitar la entrada en Windows, use el desinstalador, o <code>unregister-context-menu.cmd</code> en la versión portátil.
+</div>
+
 <h2>4. Interfaz de línea de comandos (CLI)</h2>
 
 <h3>4.1 Opciones principales</h3>
@@ -204,12 +223,14 @@ Un cambio de idioma solo tiene efecto tras reiniciar la aplicación. El idioma e
 <tr><td><code>-r, --recursive</code></td><td>Análisis recursivo de las subcarpetas</td><td></td></tr>
 <tr><td><code>--include-dir</code></td><td>Procesar solo las fotos situadas directamente en esta subcarpeta (ruta relativa a la carpeta de entrada, <code>.</code> para la propia carpeta de entrada). Se puede repetir; implica la búsqueda recursiva. Sin esta opción se procesan todas las fotos.</td><td><code>--include-dir Paris --include-dir "Verano 2026"</code></td></tr>
 <tr><td><code>--include-dirs-file</code></td><td>Archivo de texto (UTF-8) con las subcarpetas a procesar, una por línea (equivale a varios <code>--include-dir</code>)</td><td><code>--include-dirs-file carpetas.txt</code></td></tr>
+<tr><td><code>--files-from</code></td><td>Archivo de texto (UTF-8) con las fotos a procesar, una por línea (ruta absoluta o relativa a la carpeta de entrada); solo se procesan estas fotos. Es lo que usa el menú contextual del gestor de archivos.</td><td><code>--files-from fotos.txt</code></td></tr>
 <tr><td><code>--sort</code></td><td>Orden de las fotos: <code>date</code> (EXIF) o <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Número de imágenes por página en la galería HTML (por defecto: 48)</td><td><code>--html-per-page 60</code></td></tr>
 <tr><td><code>--html-originals</code></td><td>Añadir a la galería HTML los originales a tamaño completo (el botón de descarga los entrega; los archivos RAW se convierten a JPEG, ningún RAW se coloca en la galería; la galería pesa mucho más, y los originales no llevan la marca de agua)</td><td><code>--html --html-originals</code></td></tr>
 <tr><td><code>--language</code></td><td>Idioma de los mensajes y de la galería HTML generada: <code>system</code> (por defecto), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language es</code></td></tr>
 <tr><td><code>--profile</code></td><td>Archivo de perfil JSON (diseño, leyendas, tema — véase §3.3), generado con el botón «Guardar perfil…» de la interfaz gráfica, o escrito/editado a mano. Un archivo ausente o no válido recurre silenciosamente a los valores por defecto.</td><td><code>--profile mi-perfil.json</code></td></tr>
 </table>
+<p>La propia interfaz gráfica acepta <code>--paths-from ARCHIVO</code> (una ruta de carpeta o de foto por línea, UTF-8; un archivo llamado <code>planche-contact-selection-*.txt</code> se borra una vez leído) o rutas indicadas directamente: <code>planche-contact-gtk /ruta/de/la/carpeta</code>. Es lo que llama el menú contextual.</p>
 <div class="note">
 Los valores de <code>--watermark-orientation</code> permanecen internamente en francés independientemente del <code>--language</code> elegido (<code>"Horizontal"</code>, <code>"Diagonale horaire"</code>, <code>"Diagonale anti-horaire"</code>) — es el contrato interno del motor y no tiene relación con el idioma de visualización.
 </div>

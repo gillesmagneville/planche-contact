@@ -568,6 +568,20 @@ if (-not (Test-Path $appDistDir)) {
 }
 Write-Host ">>> Application frozen successfully in $appDistDir"
 
+# --- Windows Explorer context menu ("Open in Planche-Contact") ---
+# Compiled and packaged here, then copied next to the application so that the
+# portable .zip and the installer both carry it. A failure (no C++ build tools,
+# no Windows SDK...) never stops the build: the packages are then simply made
+# without it, or without its Windows 11 first-level part.
+Write-Host ">>> Building the Windows Explorer context menu..."
+try {
+    & "$WindowsDir\build-shellext.ps1" -OutDir $appDistDir -Version $NewVersion `
+        -IconPng $iconSource -Python $venvPython -WorkDir "$BuildRoot\shellext"
+} catch {
+    Write-Host "Warning: the Explorer context menu was not built: $_" -ForegroundColor Yellow
+    Write-Host "         The packages are made without it (see windows\README.md)." -ForegroundColor Yellow
+}
+
 # --- Portable version (.zip) ---
 Write-Host ">>> Creating the portable version (.zip)..."
 $portableZip = "$ProjectDir\${PackageName}_${NewVersion}_windows-portable.zip"
