@@ -13,10 +13,14 @@
 // The same source is built in two flavours (see windows/build-shellext.ps1):
 //   - planche_shellext.dll         with an embedded "msix" identity manifest,
 //     declared as a COM surrogate server by the sparse package of Windows 11
-//     (first level of the new context menu);
+//     (first level of the new context menu). Built with
+//     PC_HIDE_IN_CLASSIC_MENU: Windows also lists a packaged entry under
+//     "Show more options", where this flavour hides itself (see
+//     IsClassicMenuSite), so that the entry appears once, in the first level;
 //   - planche_shellext_classic.dll without it, registered the classic way
 //     (HKLM\Software\Classes\...\ExplorerCommandHandler) for Windows 10 and
-//     for the "Show more options" menu of Windows 11.
+//     for the "Show more options" menu of Windows 11 when the package could
+//     not be registered. It never hides itself.
 //
 // The CLSID comes from pc_clsid.h, a one-line header generated at build time
 // by build-shellext.ps1 (#define PC_CLSID_STRING L"{...}"): it stays defined
@@ -341,6 +345,34 @@ std::wstring ProbeSite(IUnknown* site) {
 #define PROBE(expression) ((void)0)
 #endif
 
+#ifdef PC_HIDE_IN_CLASSIC_MENU
+bool Supports(IUnknown* object, REFIID iid) {
+    void* other = nullptr;
+    if (object && SUCCEEDED(object->QueryInterface(iid, &other)) && other) {
+        static_cast<IUnknown*>(other)->Release();
+        return true;
+    }
+    return false;
+}
+
+// Windows lists an entry declared by the package twice: in the first level of
+// the new menu and, as it did for the menu of Windows 10, under "Show more
+// options". It is the same IExplorerCommand, called in two different ways
+// (measured with a logging build on Windows 11, build 26300):
+//   new menu       the site only offers IServiceProvider and IObjectWithSite;
+//                  GetState comes first, with fOkToBeSlow = TRUE
+//   classic menu   the site is the classic menu object: it also offers
+//                  IOleWindow and IContextMenu / IContextMenu2 / IContextMenu3;
+//                  GetState comes last, with fOkToBeSlow = FALSE
+// The entry hides itself in the second case. Both signs are required, so that
+// a change in a future Windows can only make the classic copy come back,
+// never make the first-level entry disappear.
+bool IsClassicMenuSite(IUnknown* site) {
+    return Supports(site, IID_IContextMenu) && Supports(site, IID_IContextMenu2) &&
+           Supports(site, IID_IContextMenu3) && Supports(site, IID_IOleWindow);
+}
+#endif
+
 // Writes the paths (UTF-8, one per line) to a new file of the temporary
 // folder; returns its path, or an empty string on failure.
 std::wstring WriteListFile(const std::vector<std::wstring>& paths) {
@@ -462,6 +494,12 @@ public:
     // Shown only when the selection holds at least one folder or photo.
     IFACEMETHODIMP GetState(IShellItemArray* items, BOOL ok_to_be_slow, EXPCMDSTATE* state) override {
         HRESULT result = ComputeState(items, state);
+#ifdef PC_HIDE_IN_CLASSIC_MENU
+        if (classic_site_ && !ok_to_be_slow) {
+            *state = ECS_HIDDEN;  // the copy under "Show more options"
+            PROBE(L"classic menu site: entry hidden here");
+        }
+#endif
         PROBE(L"GetState ok_to_be_slow=" + std::to_wstring(ok_to_be_slow) + L" " + ProbeItems(items) +
               L" -> state=" + std::to_wstring(static_cast<int>(*state)));
         (void)ok_to_be_slow;
@@ -514,6 +552,9 @@ public:
         if (site) site->AddRef();
         if (site_) site_->Release();
         site_ = site;
+#ifdef PC_HIDE_IN_CLASSIC_MENU
+        classic_site_ = IsClassicMenuSite(site);
+#endif
         return S_OK;
     }
     IFACEMETHODIMP GetSite(REFIID riid, void** site) override {
@@ -534,6 +575,9 @@ private:
 
     LONG refs_;
     IUnknown* site_;
+#ifdef PC_HIDE_IN_CLASSIC_MENU
+    bool classic_site_ = false;  // set by SetSite: the classic menu is calling
+#endif
 };
 
 class PlancheFactory final : public IClassFactory {

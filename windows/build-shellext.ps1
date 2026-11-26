@@ -138,7 +138,7 @@ Set-Content -Path $buildCmd -Encoding ASCII -Value @"
 call "$vcvars" >nul || exit /b 1
 cd /d "$WorkDir" || exit /b 1
 rc /nologo /fo planche_shellext.res planche_shellext.rc || exit /b 1
-$cl planche_shellext.cpp planche_shellext.res /Fe:planche_shellext.dll /link /DEF:planche_shellext.def $libs || exit /b 1
+$cl /DPC_HIDE_IN_CLASSIC_MENU planche_shellext.cpp planche_shellext.res /Fe:planche_shellext.dll /link /DEF:planche_shellext.def $libs || exit /b 1
 $cl planche_shellext.cpp /Fe:planche_shellext_classic.dll /link /DEF:planche_shellext.def $libs || exit /b 1
 "@
 & cmd.exe /c "`"$buildCmd`""
