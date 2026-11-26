@@ -154,7 +154,8 @@ if (-not $makeappx -or -not $signtool) {
         $logoScript = @"
 import sys
 from PIL import Image
-source, target = sys.argv[1], sys.argv[2]
+target = sys.argv[1]
+source = sys.argv[2] if len(sys.argv) > 2 else ''
 if source:
     base = Image.open(source).convert('RGBA')
 else:
@@ -165,8 +166,11 @@ for name, size in (('StoreLogo', 50), ('Square44x44Logo', 44), ('Square150x150Lo
         $logoScriptPath = "$WorkDir\make_logos.py"
         Set-Content -Path $logoScriptPath -Value $logoScript
         $pythonExe = if ($Python) { $Python } else { "python" }
-        $source = if ($IconPng -and (Test-Path $IconPng)) { $IconPng } else { "" }
-        & $pythonExe $logoScriptPath $source "$pkgDir\Assets"
+        # No empty argument for the source icon: Windows PowerShell 5.1 does not
+        # pass "" to a program, which would shift the arguments.
+        $logoArgs = @($logoScriptPath, "$pkgDir\Assets")
+        if ($IconPng -and (Test-Path $IconPng)) { $logoArgs += $IconPng }
+        & $pythonExe @logoArgs
         if ($LASTEXITCODE -ne 0) { throw "Creating the logos of the package failed." }
 
         $manifest = Get-Content -Raw -Path (Join-Path $ShellExtDir "AppxManifest.template.xml")
