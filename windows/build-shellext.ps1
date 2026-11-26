@@ -42,6 +42,11 @@
     python.exe with Pillow, to resize the logos (optional).
 .PARAMETER WorkDir
     Scratch folder (recreated).
+.PARAMETER Probe
+    DIAGNOSTIC build, never to be shipped: the DLLs write every call Windows
+    makes to them to %PUBLIC%\planche-shellext-probe.log (C:\Users\Public).
+    Used to find out how the copy of the entry shown under "Show more options"
+    differs from the first-level one.
 #>
 
 param(
@@ -49,7 +54,8 @@ param(
     [Parameter(Mandatory = $true)][string]$Version,
     [string]$IconPng,
     [string]$Python,
-    [string]$WorkDir = "$env:TEMP\planche-contact-shellext"
+    [string]$WorkDir = "$env:TEMP\planche-contact-shellext",
+    [switch]$Probe
 )
 
 $ErrorActionPreference = "Stop"
@@ -122,6 +128,10 @@ if (-not $vcvars) {
 Write-Host ">>> Compiling the context menu DLLs (MSVC)..."
 $libs = "ole32.lib shell32.lib shlwapi.lib uuid.lib user32.lib"
 $cl = "cl /nologo /O2 /EHsc /std:c++17 /utf-8 /W3 /MT /LD /DUNICODE /D_UNICODE"
+if ($Probe) {
+    $cl += " /DPC_PROBE"
+    Write-Host ">>> PROBE build: the DLLs log every call to C:\Users\Public\planche-shellext-probe.log" -ForegroundColor Yellow
+}
 $buildCmd = "$WorkDir\build.cmd"
 Set-Content -Path $buildCmd -Encoding ASCII -Value @"
 @echo off

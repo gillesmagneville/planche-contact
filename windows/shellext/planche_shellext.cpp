@@ -43,6 +43,11 @@
 #include <string>
 #include <vector>
 
+#ifdef PC_PROBE
+#include <docobj.h>
+#include <servprov.h>
+#endif
+
 #include "pc_clsid.h"  // generated: #define PC_CLSID_STRING L"{...}"
 
 namespace {
@@ -154,6 +159,188 @@ std::string ToUtf8(const std::wstring& text) {
     return utf8;
 }
 
+#ifdef PC_PROBE
+// ---------------------------------------------------------------------------
+// DIAGNOSTIC BUILD ONLY (build-shellext.ps1 -Probe). Behaviour is unchanged;
+// every call Windows makes to this entry is written to
+// %PUBLIC%\planche-shellext-probe.log, to find out how the copy of the entry
+// shown under "Show more options" differs from the one of the first level of
+// the Windows 11 menu (process, thread, interfaces asked for, call stack...).
+// Never part of a released build.
+
+std::wstring ProbeBaseName(const wchar_t* path) {
+    const wchar_t* slash = wcsrchr(path, L'\\');
+    return slash ? std::wstring(slash + 1) : std::wstring(path);
+}
+
+std::wstring ProbeHex(unsigned long value) {
+    wchar_t text[16] = {};
+    wsprintfW(text, L"0x%08lx", value);
+    return text;
+}
+
+std::wstring ProbeGuid(REFGUID guid) {
+    wchar_t text[64] = {};
+    if (StringFromGUID2(guid, text, 64) == 0) return L"?";
+    return text;
+}
+
+std::wstring ProbeLogPath() {
+    wchar_t buffer[MAX_PATH + 2] = {};
+    std::wstring dir;
+    DWORD n = GetEnvironmentVariableW(L"PUBLIC", buffer, MAX_PATH);
+    if (n > 0 && n < MAX_PATH) {
+        dir = buffer;
+    } else {
+        n = GetTempPathW(MAX_PATH, buffer);
+        if (n == 0 || n >= MAX_PATH) return std::wstring();
+        dir = buffer;
+    }
+    if (!dir.empty() && dir.back() != L'\\') dir += L'\\';
+    return dir + L"planche-shellext-probe.log";
+}
+
+// The modules the call comes through, innermost first (consecutive duplicates
+// merged): shows whether Explorer itself or the COM runtime is calling.
+std::wstring ProbeStack() {
+    void* frames[16] = {};
+    USHORT count = RtlCaptureStackBackTrace(2, 16, frames, nullptr);
+    std::wstring out;
+    std::wstring last;
+    for (USHORT i = 0; i < count; ++i) {
+        HMODULE module = nullptr;
+        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                    GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                                reinterpret_cast<LPCWSTR>(frames[i]), &module) || !module) {
+            continue;
+        }
+        wchar_t name[MAX_PATH] = {};
+        if (GetModuleFileNameW(module, name, MAX_PATH) == 0) continue;
+        std::wstring base = ProbeBaseName(name);
+        if (base == last) continue;
+        last = base;
+        if (!out.empty()) out += L" < ";
+        out += base;
+    }
+    return out;
+}
+
+void ProbeLog(const std::wstring& message) {
+    try {
+        std::wstring path = ProbeLogPath();
+        if (path.empty()) return;
+        wchar_t module_path[MAX_PATH] = {};
+        GetModuleFileNameW(nullptr, module_path, MAX_PATH);
+        long apartment = -1;
+        long qualifier = -1;
+        APTTYPE apartment_type = APTTYPE_CURRENT;
+        APTTYPEQUALIFIER apartment_qualifier = APTTYPEQUALIFIER_NONE;
+        if (SUCCEEDED(CoGetApartmentType(&apartment_type, &apartment_qualifier))) {
+            apartment = static_cast<long>(apartment_type);
+            qualifier = static_cast<long>(apartment_qualifier);
+        }
+        std::wstring line = L"t=" + std::to_wstring(GetTickCount64()) +
+                            L" pid=" + std::to_wstring(GetCurrentProcessId()) +
+                            L" tid=" + std::to_wstring(GetCurrentThreadId()) +
+                            L" proc=" + ProbeBaseName(module_path) +
+                            L" apt=" + std::to_wstring(apartment) + L"/" + std::to_wstring(qualifier) +
+                            L" | " + message +
+                            L" | stack=" + ProbeStack() + L"\r\n";
+        std::string utf8 = ToUtf8(line);
+        HANDLE file = CreateFileW(path.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                  nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (file == INVALID_HANDLE_VALUE) return;
+        DWORD written = 0;
+        WriteFile(file, utf8.data(), static_cast<DWORD>(utf8.size()), &written, nullptr);
+        CloseHandle(file);
+    } catch (...) {
+    }
+}
+
+bool ProbeSupports(IUnknown* object, REFIID iid) {
+    void* other = nullptr;
+    if (object && SUCCEEDED(object->QueryInterface(iid, &other)) && other) {
+        static_cast<IUnknown*>(other)->Release();
+        return true;
+    }
+    return false;
+}
+
+// "proxy" when the object lives in another process (COM proxies, and only
+// them, answer IClientSecurity).
+std::wstring ProbeKind(IUnknown* object) {
+    if (!object) return L"null";
+    return ProbeSupports(object, IID_IClientSecurity) ? L"proxy" : L"local";
+}
+
+std::wstring ProbeItems(IShellItemArray* items) {
+    if (!items) return L"items=null";
+    std::wstring out = L"items(" + ProbeKind(items) + L")=";
+    DWORD count = 0;
+    if (FAILED(items->GetCount(&count))) return out + L"?";
+    out += std::to_wstring(count);
+    IShellItem* item = nullptr;
+    if (count > 0 && SUCCEEDED(items->GetItemAt(0, &item)) && item) {
+        PWSTR name = nullptr;
+        if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &name)) && name) {
+            out += L" first=" + std::wstring(name);
+            CoTaskMemFree(name);
+        }
+        SFGAOF attributes = 0;
+        if (SUCCEEDED(item->GetAttributes(SFGAO_FOLDER | SFGAO_FILESYSTEM | SFGAO_STREAM, &attributes))) {
+            out += L" attr=" + ProbeHex(static_cast<unsigned long>(attributes));
+        }
+        item->Release();
+    }
+    return out;
+}
+
+std::wstring ProbeSite(IUnknown* site) {
+    if (!site) return L"site=null";
+    struct Entry {
+        const wchar_t* name;
+        const IID* iid;
+    };
+    const Entry entries[] = {
+        {L"IServiceProvider", &IID_IServiceProvider},
+        {L"IOleWindow", &IID_IOleWindow},
+        {L"IOleCommandTarget", &IID_IOleCommandTarget},
+        {L"IObjectWithSite", &IID_IObjectWithSite},
+        {L"IContextMenu", &IID_IContextMenu},
+        {L"IContextMenu2", &IID_IContextMenu2},
+        {L"IContextMenu3", &IID_IContextMenu3},
+        {L"IShellBrowser", &IID_IShellBrowser},
+        {L"IShellView", &IID_IShellView},
+        {L"IFolderView", &IID_IFolderView},
+        {L"IFolderView2", &IID_IFolderView2},
+        {L"IDataObject", &IID_IDataObject},
+        {L"IShellFolder", &IID_IShellFolder},
+    };
+    std::wstring out = L"site(" + ProbeKind(site) + L"):";
+    for (const Entry& entry : entries) {
+        if (ProbeSupports(site, *entry.iid)) {
+            out += L" ";
+            out += entry.name;
+        }
+    }
+    IServiceProvider* services = nullptr;
+    if (SUCCEEDED(site->QueryInterface(IID_IServiceProvider, reinterpret_cast<void**>(&services))) &&
+        services) {
+        void* browser = nullptr;
+        if (SUCCEEDED(services->QueryService(IID_IShellBrowser, IID_IShellBrowser, &browser)) && browser) {
+            out += L" [service:IShellBrowser]";
+            static_cast<IUnknown*>(browser)->Release();
+        }
+        services->Release();
+    }
+    return out;
+}
+
+#define PROBE(expression) ProbeLog(expression)
+#else
+#define PROBE(expression) ((void)0)
+#endif
+
 // Writes the paths (UTF-8, one per line) to a new file of the temporary
 // folder; returns its path, or an empty string on failure.
 std::wstring WriteListFile(const std::vector<std::wstring>& paths) {
@@ -220,21 +407,26 @@ HRESULT LaunchApplication(const std::vector<std::wstring>& paths) {
 
 class PlancheCommand final : public IExplorerCommand, public IObjectWithSite {
 public:
-    PlancheCommand() : refs_(1), site_(nullptr) { InterlockedIncrement(&g_liveObjects); }
+    PlancheCommand() : refs_(1), site_(nullptr) {
+        InterlockedIncrement(&g_liveObjects);
+        PROBE(L"ctor cmdline=" + std::wstring(GetCommandLineW()).substr(0, 220));
+    }
 
     // IUnknown
     IFACEMETHODIMP QueryInterface(REFIID riid, void** object) override {
         if (!object) return E_POINTER;
         *object = nullptr;
+        HRESULT result = S_OK;
         if (riid == IID_IUnknown || riid == IID_IExplorerCommand) {
             *object = static_cast<IExplorerCommand*>(this);
         } else if (riid == IID_IObjectWithSite) {
             *object = static_cast<IObjectWithSite*>(this);
         } else {
-            return E_NOINTERFACE;
+            result = E_NOINTERFACE;
         }
-        AddRef();
-        return S_OK;
+        if (SUCCEEDED(result)) AddRef();
+        PROBE(L"QueryInterface iid=" + ProbeGuid(riid) + (SUCCEEDED(result) ? L" accepted" : L" refused"));
+        return result;
     }
     IFACEMETHODIMP_(ULONG) AddRef() override { return InterlockedIncrement(&refs_); }
     IFACEMETHODIMP_(ULONG) Release() override {
@@ -244,10 +436,12 @@ public:
     }
 
     // IExplorerCommand
-    IFACEMETHODIMP GetTitle(IShellItemArray*, PWSTR* name) override {
+    IFACEMETHODIMP GetTitle(IShellItemArray* items, PWSTR* name) override {
+        PROBE(L"GetTitle " + ProbeItems(items));
         return SHStrDupW(Title(), name);
     }
-    IFACEMETHODIMP GetIcon(IShellItemArray*, PWSTR* icon) override {
+    IFACEMETHODIMP GetIcon(IShellItemArray* items, PWSTR* icon) override {
+        PROBE(L"GetIcon " + ProbeItems(items));
         try {
             return SHStrDupW((ExePath() + L",0").c_str(), icon);
         } catch (...) {
@@ -255,16 +449,25 @@ public:
             return E_FAIL;
         }
     }
-    IFACEMETHODIMP GetToolTip(IShellItemArray*, PWSTR* tip) override {
+    IFACEMETHODIMP GetToolTip(IShellItemArray* items, PWSTR* tip) override {
+        PROBE(L"GetToolTip " + ProbeItems(items));
         *tip = nullptr;
         return E_NOTIMPL;
     }
     IFACEMETHODIMP GetCanonicalName(GUID* name) override {
+        PROBE(L"GetCanonicalName");
         *name = ServerClsid();
         return S_OK;
     }
     // Shown only when the selection holds at least one folder or photo.
-    IFACEMETHODIMP GetState(IShellItemArray* items, BOOL, EXPCMDSTATE* state) override {
+    IFACEMETHODIMP GetState(IShellItemArray* items, BOOL ok_to_be_slow, EXPCMDSTATE* state) override {
+        HRESULT result = ComputeState(items, state);
+        PROBE(L"GetState ok_to_be_slow=" + std::to_wstring(ok_to_be_slow) + L" " + ProbeItems(items) +
+              L" -> state=" + std::to_wstring(static_cast<int>(*state)));
+        (void)ok_to_be_slow;
+        return result;
+    }
+    static HRESULT ComputeState(IShellItemArray* items, EXPCMDSTATE* state) {
         *state = ECS_HIDDEN;
         try {
             DWORD count = 0;
@@ -283,7 +486,9 @@ public:
         }
         return S_OK;
     }
-    IFACEMETHODIMP Invoke(IShellItemArray* items, IBindCtx*) override {
+    IFACEMETHODIMP Invoke(IShellItemArray* items, IBindCtx* bind_context) override {
+        PROBE(L"Invoke " + ProbeItems(items) + (bind_context ? L" bindctx=set" : L" bindctx=null"));
+        (void)bind_context;
         try {
             std::vector<std::wstring> paths = OpenablePaths(items);
             if (paths.empty()) return S_OK;
@@ -293,22 +498,26 @@ public:
         }
     }
     IFACEMETHODIMP GetFlags(EXPCMDFLAGS* flags) override {
+        PROBE(L"GetFlags");
         *flags = ECF_DEFAULT;
         return S_OK;
     }
     IFACEMETHODIMP EnumSubCommands(IEnumExplorerCommand** commands) override {
+        PROBE(L"EnumSubCommands");
         *commands = nullptr;
         return E_NOTIMPL;
     }
 
     // IObjectWithSite
     IFACEMETHODIMP SetSite(IUnknown* site) override {
+        PROBE(L"SetSite " + ProbeSite(site));
         if (site) site->AddRef();
         if (site_) site_->Release();
         site_ = site;
         return S_OK;
     }
     IFACEMETHODIMP GetSite(REFIID riid, void** site) override {
+        PROBE(L"GetSite iid=" + ProbeGuid(riid));
         if (!site_) {
             *site = nullptr;
             return E_FAIL;
@@ -318,6 +527,7 @@ public:
 
 private:
     ~PlancheCommand() {
+        PROBE(L"dtor");
         if (site_) site_->Release();
         InterlockedDecrement(&g_liveObjects);
     }
@@ -383,6 +593,8 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
 STDAPI DllGetClassObject(REFCLSID clsid, REFIID riid, void** object) {
     if (!object) return E_POINTER;
     *object = nullptr;
+    PROBE(L"DllGetClassObject clsid=" + ProbeGuid(clsid) + L" iid=" + ProbeGuid(riid) +
+          L" dll=" + ModuleDirectory());
     if (clsid != ServerClsid()) return CLASS_E_CLASSNOTAVAILABLE;
     PlancheFactory* factory = new (std::nothrow) PlancheFactory();
     if (!factory) return E_OUTOFMEMORY;
