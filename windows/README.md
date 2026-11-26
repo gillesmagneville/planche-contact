@@ -141,8 +141,8 @@ A right click on a **folder** or on a **selection of photos** offers
 **Open in Planche-Contact** (in the language of Windows: English, French,
 Spanish or German). The program opens with that folder, or with only those
 photos (see §3.9 of the manual). On Windows 11 the entry is on the **first
-level** of the menu, not under "Show more options". There is no entry on the
-background of an open folder on Windows (it exists on Linux).
+level** of the menu, and only there (see the limits below). There is no entry
+on the background of an open folder on Windows (it exists on Linux).
 
 ### Installing and removing it
 
@@ -207,10 +207,18 @@ unaffected.
   classic entry is registered for everybody by the installer).
 - Updating while the Explorer holds the DLL: the installer renames the loaded
   DLL and deletes it at the next restart, so an update never fails on it.
-- Not tested on a real Windows machine at the time of writing (see the
-  CHANGELOG): the C++ source compiles without warning with a cross-compiler
-  and the scripts are checked by automatic tests, but nothing replaces a test
-  of the build with Visual Studio and of the registration on Windows 10 and 11.
+- **The copy under "Show more options" is hidden by the DLL itself.** Windows
+  lists an entry declared by a package twice, on the first level and under
+  "Show more options", and nothing in the package manifest prevents it. The
+  DLL of the package recognises the call that comes from the classic menu (the
+  object Windows hands to it is the classic menu, and the call is the one
+  made without waiting) and hides itself there. This is observed behaviour,
+  not a documented feature of Windows: if a future version changes it, the
+  second entry comes back, but the first-level one is never lost. The classic
+  DLL (Windows 10, or the fallback below) never hides itself.
+- Tested by the maintainer on Windows 11 (build 26300); not on Windows 10. The
+  C++ source also compiles without warning with a cross-compiler and the
+  scripts are checked by automatic tests.
 
 ## Troubleshooting
 
@@ -264,6 +272,13 @@ the first level could be set up or whether the classic entry was used instead
 that installing apps from outside the Store is not blocked. As a last
 resort, `Get-AppxPackage PlancheContact.ShellExtension` in PowerShell tells
 whether the package is registered.
+
+**The entry appears twice (Windows 11)**
+Once on the first level and once under "Show more options": the DLL could not
+recognise the classic menu (see the limits above), or a classic registration
+is still there next to the package. Run `unregister-context-menu.cmd`, then
+`register-context-menu.cmd` again. If the second entry is still there, note the
+Windows build number (`winver`) in an issue.
 
 **The build says "Visual Studio C++ build tools not found"**
 Install *Build Tools for Visual Studio* with the "Desktop development with

@@ -141,7 +141,7 @@ Un clic droit sur un **dossier** ou sur une **sélection de photos** propose
 **Ouvrir dans Planche-Contact** (dans la langue de Windows : anglais, français,
 espagnol ou allemand). Le programme s'ouvre avec ce dossier, ou avec ces seules
 photos (voir §3.9 du manuel). Sous Windows 11, l'entrée est au **premier
-niveau** du menu, et non sous « Afficher plus d'options ». Il n'y a pas
+niveau** du menu, et seulement là (voir les limites plus bas). Il n'y a pas
 d'entrée sur le fond d'un dossier ouvert sous Windows (elle existe sous Linux).
 
 ### L'installer et la retirer
@@ -211,11 +211,18 @@ programme lui-même n'étant pas affecté.
 - Mise à jour pendant que l'Explorateur tient la DLL : l'installeur renomme la
   DLL chargée et la supprime au prochain redémarrage, si bien qu'une mise à
   jour n'échoue jamais à cause d'elle.
-- Non testé sur une vraie machine Windows au moment de l'écriture (voir le
-  CHANGELOG) : le source C++ compile sans avertissement avec un
-  compilateur croisé et les scripts sont vérifiés par des tests automatiques,
-  mais rien ne remplace un essai de la construction avec Visual Studio et de
-  l'enregistrement sous Windows 10 et 11.
+- **La copie sous « Afficher plus d'options » est masquée par la DLL
+  elle-même.** Windows liste deux fois une entrée déclarée par un paquet, au
+  premier niveau et sous « Afficher plus d'options », et rien dans le manifeste
+  du paquet ne l'empêche. La DLL du paquet reconnaît l'appel venant de l'ancien
+  menu (l'objet que Windows lui remet est l'ancien menu, et l'appel est celui
+  qui est fait sans attendre) et s'y masque. C'est un comportement observé,
+  pas une fonction documentée de Windows : si une version future le change, la
+  seconde entrée revient, mais celle du premier niveau n'est jamais perdue. La
+  DLL classique (Windows 10, ou le repli ci-dessus) ne se masque jamais.
+- Testé par le mainteneur sous Windows 11 (build 26300) ; pas sous Windows 10.
+  Le source C++ compile aussi sans avertissement avec un compilateur croisé et
+  les scripts sont vérifiés par des tests automatiques.
 
 ## Dépannage
 
@@ -270,6 +277,14 @@ Applications > Paramètres avancés des applications* que l'installation
 d'applications extérieures au Store n'est pas bloquée. En dernier recours,
 `Get-AppxPackage PlancheContact.ShellExtension` dans PowerShell indique si le
 paquet est enregistré.
+
+**L'entrée apparaît deux fois (Windows 11)**
+Une fois au premier niveau et une fois sous « Afficher plus d'options » : la
+DLL n'a pas reconnu l'ancien menu (voir les limites plus haut), ou un
+enregistrement classique est encore là à côté du paquet. Lancer
+`unregister-context-menu.cmd`, puis de nouveau `register-context-menu.cmd`. Si
+la seconde entrée est toujours là, noter le numéro de build de Windows
+(`winver`) dans un ticket.
 
 **La construction dit « Visual Studio C++ build tools not found »**
 Installer *Build Tools for Visual Studio* avec la charge de travail
