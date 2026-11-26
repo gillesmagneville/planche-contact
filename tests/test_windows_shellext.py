@@ -122,6 +122,20 @@ def test_the_package_manifest_template():
     assert com_class.get("Path") == "planche_shellext.dll"
 
 
+def test_only_the_packaged_dll_hides_itself_in_the_classic_menu():
+    """Windows 11 also lists an entry declared by the package under "Show more
+    options": the packaged flavour hides itself there, so that the entry shows
+    once. The classic flavour (Windows 10, or the fallback of Windows 11) must
+    never do it, or its entry would never show at all."""
+    lines = [line for line in BUILD_SCRIPT.splitlines() if "/Fe:planche_shellext" in line]
+    packaged = [line for line in lines if "/Fe:planche_shellext.dll" in line]
+    classic = [line for line in lines if "/Fe:planche_shellext_classic.dll" in line]
+    assert len(packaged) == len(classic) == 1
+    assert "/DPC_HIDE_IN_CLASSIC_MENU" in packaged[0]
+    assert "PC_HIDE_IN_CLASSIC_MENU" not in classic[0]
+    assert "#ifdef PC_HIDE_IN_CLASSIC_MENU" in CPP
+
+
 # ====================== the pieces of the package fit together ======================
 
 
