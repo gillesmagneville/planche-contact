@@ -14,10 +14,10 @@
 
 <p align="center">
 
-![GitHub release](https://img.shields.io/github/v/release/gillesmagneville/planche-contact)
-![GitHub stars](https://img.shields.io/github/stars/gillesmagneville/planche-contact)
-![GitHub forks](https://img.shields.io/github/forks/gillesmagneville/planche-contact)
-![GitHub issues](https://img.shields.io/github/issues/gillesmagneville/planche-contact)
+![GitHub release](https://img.shields.io/github/v/release/gillesmagneville/planche-contact-linux)
+![GitHub stars](https://img.shields.io/github/stars/gillesmagneville/planche-contact-linux)
+![GitHub forks](https://img.shields.io/github/forks/gillesmagneville/planche-contact-linux)
+![GitHub issues](https://img.shields.io/github/issues/gillesmagneville/planche-contact-linux)
 
 </p>
 
@@ -44,7 +44,7 @@ Générez des planches contact haute résolution, des documents PDF, des galerie
 
 ## Téléchargement
 
-**Dernière version stable : [v5.3.0](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.3.0)**
+**Dernière version stable : [v5.3.0](https://github.com/gillesmagneville/planche-contact-linux/releases/tag/v5.3.0)**
 
 Planche-Contact est disponible sous forme de paquets prêts à l'emploi pour Linux et Windows.
 
@@ -52,7 +52,7 @@ Planche-Contact est disponible sous forme de paquets prêts à l'emploi pour Lin
 
 **Debian / Ubuntu — 64 bits**
 
-[Télécharger `planche-contact_5.3.0_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/planche-contact_5.3.0_amd64.deb)
+[Télécharger `planche-contact_5.3.0_amd64.deb`](https://github.com/gillesmagneville/planche-contact-linux/releases/download/v5.3.0/planche-contact_5.3.0_amd64.deb)
 
 ```bash
 sudo apt install ./planche-contact_5.3.0_amd64.deb
@@ -66,7 +66,7 @@ ccf959cdc81dace1df9c1a50eaf7b3927596feb01ce500586d115a50ba474d30
 
 **Toutes distributions Linux — AppImage**
 
-[Télécharger `Planche-Contact-5.3.0-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/Planche-Contact-5.3.0-x86_64.AppImage)
+[Télécharger `Planche-Contact-5.3.0-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact-linux/releases/download/v5.3.0/Planche-Contact-5.3.0-x86_64.AppImage)
 
 ```bash
 chmod +x Planche-Contact-5.3.0-x86_64.AppImage
@@ -85,7 +85,7 @@ Un seul fichier qui embarque Python, GTK 4 et toutes les bibliothèques nécessa
 
 **Windows 10 / 11 — Installeur**
 
-[Télécharger `planche-contact_5.3.0_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/planche-contact_5.3.0_windows-setup.exe)
+[Télécharger `planche-contact_5.3.0_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact-linux/releases/download/v5.3.0/planche-contact_5.3.0_windows-setup.exe)
 
 SHA-256 :
 
@@ -95,7 +95,7 @@ SHA-256 :
 
 **Windows — Version portable**
 
-[Télécharger `planche-contact_5.3.0_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/planche-contact_5.3.0_windows-portable.zip)
+[Télécharger `planche-contact_5.3.0_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact-linux/releases/download/v5.3.0/planche-contact_5.3.0_windows-portable.zip)
 
 SHA-256 :
 
@@ -361,7 +361,7 @@ Parmi les points forts :
 - **AppImage** : un seul fichier pour toutes les distributions Linux, avec son empreinte SHA-256
 - Documentation bilingue (anglais / français) et quatre manuels embarqués dans les paquets
 
-Consultez les [notes de version](https://github.com/gillesmagneville/planche-contact/releases) pour la liste détaillée des changements de chaque version.
+Consultez les [notes de version](https://github.com/gillesmagneville/planche-contact-linux/releases) pour la liste détaillée des changements de chaque version.
 
 ---
 
@@ -422,7 +422,7 @@ APPIMAGE_EXTRACT_AND_RUN=1 ./Planche-Contact-<version>-x86_64.AppImage
 
 ```bash
 sudo apt install python3 python3-venv python3-gi gir1.2-gtk-4.0 patchelf binutils curl strace
-cd planche-contact
+cd planche-contact-linux
 ./build-appimage.sh --test
 ```
 
@@ -439,13 +439,13 @@ Cela produit `Planche-Contact-<version>-<arch>.AppImage` et son `.sha256` à la 
 Clonez le dépôt.
 
 ```bash
-git clone https://github.com/gillesmagneville/planche-contact.git
+git clone https://github.com/gillesmagneville/planche-contact-linux.git
 ```
 
 Placez-vous dans le répertoire du projet.
 
 ```bash
-cd planche-contact
+cd planche-contact-linux
 ```
 
 Installez les dépendances requises.

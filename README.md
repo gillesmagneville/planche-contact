@@ -14,10 +14,10 @@
 
 <p align="center">
 
-![GitHub release](https://img.shields.io/github/v/release/gillesmagneville/planche-contact)
-![GitHub stars](https://img.shields.io/github/stars/gillesmagneville/planche-contact)
-![GitHub forks](https://img.shields.io/github/forks/gillesmagneville/planche-contact)
-![GitHub issues](https://img.shields.io/github/issues/gillesmagneville/planche-contact)
+![GitHub release](https://img.shields.io/github/v/release/gillesmagneville/planche-contact-linux)
+![GitHub stars](https://img.shields.io/github/stars/gillesmagneville/planche-contact-linux)
+![GitHub forks](https://img.shields.io/github/forks/gillesmagneville/planche-contact-linux)
+![GitHub issues](https://img.shields.io/github/issues/gillesmagneville/planche-contact-linux)
 
 </p>
 
@@ -44,7 +44,7 @@ Generate high-resolution contact sheets, PDF documents, responsive HTML gallerie
 
 ## Download
 
-**Latest stable release: [v5.3.0](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.3.0)**
+**Latest stable release: [v5.3.0](https://github.com/gillesmagneville/planche-contact-linux/releases/tag/v5.3.0)**
 
 Planche-Contact is available as ready-to-use packages for Linux and Windows.
 
@@ -52,7 +52,7 @@ Planche-Contact is available as ready-to-use packages for Linux and Windows.
 
 **Debian / Ubuntu — 64-bit**
 
-[Download `planche-contact_5.3.0_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/planche-contact_5.3.0_amd64.deb)
+[Download `planche-contact_5.3.0_amd64.deb`](https://github.com/gillesmagneville/planche-contact-linux/releases/download/v5.3.0/planche-contact_5.3.0_amd64.deb)
 
 ```bash
 sudo apt install ./planche-contact_5.3.0_amd64.deb
@@ -66,7 +66,7 @@ ccf959cdc81dace1df9c1a50eaf7b3927596feb01ce500586d115a50ba474d30
 
 **Any Linux distribution — AppImage**
 
-[Download `Planche-Contact-5.3.0-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/Planche-Contact-5.3.0-x86_64.AppImage)
+[Download `Planche-Contact-5.3.0-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact-linux/releases/download/v5.3.0/Planche-Contact-5.3.0-x86_64.AppImage)
 
 ```bash
 chmod +x Planche-Contact-5.3.0-x86_64.AppImage
@@ -85,7 +85,7 @@ A single file that bundles Python, GTK 4 and every library Planche-Contact needs
 
 **Windows 10 / 11 — Installer**
 
-[Download `planche-contact_5.3.0_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/planche-contact_5.3.0_windows-setup.exe)
+[Download `planche-contact_5.3.0_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact-linux/releases/download/v5.3.0/planche-contact_5.3.0_windows-setup.exe)
 
 SHA-256:
 
@@ -95,7 +95,7 @@ SHA-256:
 
 **Windows — Portable version**
 
-[Download `planche-contact_5.3.0_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/planche-contact_5.3.0_windows-portable.zip)
+[Download `planche-contact_5.3.0_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact-linux/releases/download/v5.3.0/planche-contact_5.3.0_windows-portable.zip)
 
 SHA-256:
 
@@ -361,7 +361,7 @@ Highlights include:
 - **AppImage**: a single file for any Linux distribution, with its SHA-256 checksum
 - Bilingual documentation (English / French) and all four manuals shipped in the packages
 
-See the complete [release notes](https://github.com/gillesmagneville/planche-contact/releases) for the full list of changes of each version.
+See the complete [release notes](https://github.com/gillesmagneville/planche-contact-linux/releases) for the full list of changes of each version.
 
 ---
 
@@ -422,7 +422,7 @@ APPIMAGE_EXTRACT_AND_RUN=1 ./Planche-Contact-<version>-x86_64.AppImage
 
 ```bash
 sudo apt install python3 python3-venv python3-gi gir1.2-gtk-4.0 patchelf binutils curl strace
-cd planche-contact
+cd planche-contact-linux
 ./build-appimage.sh --test
 ```
 
@@ -439,13 +439,13 @@ This produces `Planche-Contact-<version>-<arch>.AppImage` and its `.sha256` at t
 Clone the repository.
 
 ```bash
-git clone https://github.com/gillesmagneville/planche-contact.git
+git clone https://github.com/gillesmagneville/planche-contact-linux.git
 ```
 
 Enter the project directory.
 
 ```bash
-cd planche-contact
+cd planche-contact-linux
 ```
 
 Install the required dependencies.

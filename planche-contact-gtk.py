@@ -2783,8 +2783,8 @@ class PlancheContactGTK(Gtk.Application):
         github_label = Gtk.Label()
         github_label.set_markup(
             '<span size="small">'
-            '<a href="https://github.com/gillesmagneville/planche-contact">'
-            'github.com/gillesmagneville/planche-contact</a>'
+            '<a href="https://github.com/gillesmagneville/planche-contact-linux">'
+            'github.com/gillesmagneville/planche-contact-linux</a>'
             '</span>'
         )
         github_label.set_margin_top(4)

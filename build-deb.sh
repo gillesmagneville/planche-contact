@@ -5,7 +5,7 @@ set -euo pipefail
 PACKAGE_NAME="planche-contact"
 MAINTAINER="Gilles MAGNEVILLE <gilles@magneville.fr>"
 DESCRIPTION="Photographic contact sheet generator"
-URL="https://github.com/gillesmagneville/planche-contact"
+URL="https://github.com/gillesmagneville/planche-contact-linux"
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="$HOME/deb-build/build"
 VERSION_FILE="$PROJECT_DIR/VERSION"

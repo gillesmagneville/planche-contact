@@ -8,6 +8,10 @@ Le projet suit autant que possible les recommandations de **Keep a Changelog** e
 
 ## [Non publié]
 
+### Modifié
+
+- Le dépôt est renommé **`planche-contact-linux`** : tous les liens (README, manuels, politique de sécurité, paquet `.deb`, métadonnées AppStream, onglet « À propos ») pointent vers `github.com/gillesmagneville/planche-contact-linux`. L'ancienne adresse continue de rediriger.
+
 ## [5.3.0] - 2026-11-25
 
 Le programme gagne une entrée **Ouvrir dans Planche-Contact** dans le menu du clic droit du gestionnaire de fichiers (Nautilus sous Linux, Explorateur de Windows sous Windows), et une option de ligne de commande pour traiter une liste de photos.

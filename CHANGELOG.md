@@ -8,6 +8,10 @@ The project follows the recommendations of **Keep a Changelog** and **Semantic V
 
 ## [Unreleased]
 
+### Changed
+
+- The repository is renamed **`planche-contact-linux`**: every link (READMEs, manuals, security policy, `.deb` package, AppStream metadata, "About" tab) points to `github.com/gillesmagneville/planche-contact-linux`. The old address keeps redirecting.
+
 ## [5.3.0] - 2026-11-25
 
 The program gains an **Open in Planche-Contact** entry in the right-click menu of the file manager (Nautilus on Linux, Windows Explorer on Windows), and a command-line option to process a list of photos.

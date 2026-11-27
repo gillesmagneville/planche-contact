@@ -6,7 +6,7 @@ Planche-Contact est maintenu par une seule personne, à titre bénévole. Cette 
 
 ## Versions prises en charge
 
-Seule la **dernière version publiée** reçoit les correctifs de sécurité. Si vous utilisez une version plus ancienne, mettez-la d'abord à jour : les versions sont sur la page des [Releases](https://github.com/gillesmagneville/planche-contact/releases) et les changements sont listés dans le [CHANGELOG](CHANGELOG.fr.md).
+Seule la **dernière version publiée** reçoit les correctifs de sécurité. Si vous utilisez une version plus ancienne, mettez-la d'abord à jour : les versions sont sur la page des [Releases](https://github.com/gillesmagneville/planche-contact-linux/releases) et les changements sont listés dans le [CHANGELOG](CHANGELOG.fr.md).
 
 ## Signaler une vulnérabilité
 
@@ -14,7 +14,7 @@ Seule la **dernière version publiée** reçoit les correctifs de sécurité. Si
 
 Signalez-la en privé, de l'une de ces deux façons :
 
-1. **Sur GitHub** : ouvrez l'[onglet Security](https://github.com/gillesmagneville/planche-contact/security) du dépôt et cliquez sur **Report a vulnerability**. Seuls vous et le mainteneur voyez le signalement.
+1. **Sur GitHub** : ouvrez l'[onglet Security](https://github.com/gillesmagneville/planche-contact-linux/security) du dépôt et cliquez sur **Report a vulnerability**. Seuls vous et le mainteneur voyez le signalement.
 2. **Par courriel** : écrivez à [gilles@magneville.fr](mailto:gilles@magneville.fr) avec l'objet « Planche-Contact sécurité ».
 
 Indiquez, autant que possible :
@@ -49,8 +49,8 @@ Planche-Contact travaille sur votre ordinateur, sur vos propres photos, et ne le
 
 - Une vulnérabilité dans un **composant développé par quelqu'un d'autre** (Pillow, ReportLab, rawpy/LibRaw, GTK, Python…) : merci de la signaler à ce projet. Dites-moi en revanche si la version livrée avec Planche-Contact est touchée, pour que je la mette à jour.
 - Les problèmes qui supposent un ordinateur déjà compromis, ou un accès physique à celui-ci.
-- Les bugs ordinaires sans conséquence pour la sécurité : ouvrez plutôt une [Issue](https://github.com/gillesmagneville/planche-contact/issues).
+- Les bugs ordinaires sans conséquence pour la sécurité : ouvrez plutôt une [Issue](https://github.com/gillesmagneville/planche-contact-linux/issues).
 
 ## Vérifier ce que vous téléchargez
 
-Téléchargez Planche-Contact uniquement depuis la page des [Releases](https://github.com/gillesmagneville/planche-contact/releases) de ce dépôt. Chaque fichier est publié avec son empreinte `.sha256`, également donnée dans le [README](README.fr.md). L'installeur Windows n'est pas signé numériquement (voir le README) : cette vérification n'en est que plus utile.
+Téléchargez Planche-Contact uniquement depuis la page des [Releases](https://github.com/gillesmagneville/planche-contact-linux/releases) de ce dépôt. Chaque fichier est publié avec son empreinte `.sha256`, également donnée dans le [README](README.fr.md). L'installeur Windows n'est pas signé numériquement (voir le README) : cette vérification n'en est que plus utile.
