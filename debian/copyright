@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: planche-contact
 Upstream-Contact: Gilles MAGNEVILLE <gilles@magneville.fr>
-Source: https://github.com/gillesmagneville/planche-contact
+Source: https://github.com/gillesmagneville/planche-contact-linux
 
 Files: *
 Copyright: 2025-2026 Gilles MAGNEVILLE

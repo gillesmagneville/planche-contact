@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Gilles MAGNEVILLE <gilles@magneville.fr>
 Build-Depends: debhelper-compat (= 13)
 Standards-Version: 4.6.2
-Homepage: https://github.com/gillesmagneville/planche-contact
+Homepage: https://github.com/gillesmagneville/planche-contact-linux
 Rules-Requires-Root: no
 
 Package: planche-contact

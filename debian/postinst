@@ -24,7 +24,7 @@ if [ ! -x "$VENV_PYTHON" ]; then
     echo "The .deb package appears to be incomplete or corrupted." >&2
     echo "" >&2
     echo "Solution: download the package again from:" >&2
-    echo "    https://github.com/gillesmagneville/planche-contact/releases" >&2
+    echo "    https://github.com/gillesmagneville/planche-contact-linux/releases" >&2
     echo "then reinstall it." >&2
     echo "" >&2
     echo "The installation is cancelled." >&2
@@ -56,7 +56,7 @@ else
     echo "" >&2
     echo "    2) If the problem persists, report it by copying this error" >&2
     echo "       message into an issue here:" >&2
-    echo "         https://github.com/gillesmagneville/planche-contact/issues" >&2
+    echo "         https://github.com/gillesmagneville/planche-contact-linux/issues" >&2
     echo "" >&2
     echo "The installation is cancelled." >&2
     exit 1

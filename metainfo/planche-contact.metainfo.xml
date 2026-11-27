@@ -64,8 +64,8 @@
 
   <launchable type="desktop-id">planche-contact.desktop</launchable>
 
-  <url type="homepage">https://github.com/gillesmagneville/planche-contact</url>
-  <url type="bugtracker">https://github.com/gillesmagneville/planche-contact/issues</url>
+  <url type="homepage">https://github.com/gillesmagneville/planche-contact-linux</url>
+  <url type="bugtracker">https://github.com/gillesmagneville/planche-contact-linux/issues</url>
 
   <provides>
     <binary>planche-contact-gtk</binary>

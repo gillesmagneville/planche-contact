@@ -6,7 +6,7 @@ Planche-Contact is maintained by one person, on a voluntary basis. This page exp
 
 ## Supported versions
 
-Only the **latest release** receives security fixes. If you use an older version, please update first: the releases are on the [Releases page](https://github.com/gillesmagneville/planche-contact/releases) and the changes are listed in the [CHANGELOG](CHANGELOG.md).
+Only the **latest release** receives security fixes. If you use an older version, please update first: the releases are on the [Releases page](https://github.com/gillesmagneville/planche-contact-linux/releases) and the changes are listed in the [CHANGELOG](CHANGELOG.md).
 
 ## Reporting a vulnerability
 
@@ -14,7 +14,7 @@ Only the **latest release** receives security fixes. If you use an older version
 
 Report it privately, in one of these two ways:
 
-1. **On GitHub**: open the [Security tab](https://github.com/gillesmagneville/planche-contact/security) of the repository and click **Report a vulnerability**. Only you and the maintainer can see the report.
+1. **On GitHub**: open the [Security tab](https://github.com/gillesmagneville/planche-contact-linux/security) of the repository and click **Report a vulnerability**. Only you and the maintainer can see the report.
 2. **By email**: write to [gilles@magneville.fr](mailto:gilles@magneville.fr) with the subject "Planche-Contact security".
 
 Please include, as far as you can:
@@ -49,8 +49,8 @@ Planche-Contact works on your computer, on your own photos, and does not send th
 
 - A vulnerability inside a **component developed by someone else** (Pillow, ReportLab, rawpy/LibRaw, GTK, Python…): please report it to that project. Do tell me if the version shipped with Planche-Contact is affected, so that I can update it.
 - Problems that need a computer which is already compromised, or physical access to it.
-- Ordinary bugs without security consequences: please open an [Issue](https://github.com/gillesmagneville/planche-contact/issues) instead.
+- Ordinary bugs without security consequences: please open an [Issue](https://github.com/gillesmagneville/planche-contact-linux/issues) instead.
 
 ## Checking what you download
 
-Download Planche-Contact only from the [Releases page](https://github.com/gillesmagneville/planche-contact/releases) of this repository. Each file is published with its `.sha256` fingerprint, which is also given in the [README](README.md). The Windows installer is not code-signed (see the README), so this check is all the more useful.
+Download Planche-Contact only from the [Releases page](https://github.com/gillesmagneville/planche-contact-linux/releases) of this repository. Each file is published with its `.sha256` fingerprint, which is also given in the [README](README.md). The Windows installer is not code-signed (see the README), so this check is all the more useful.
