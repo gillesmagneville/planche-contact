@@ -1,0 +1,4 @@
+; Exports of the Explorer context menu DLL (the COM entry points).
+EXPORTS
+    DllGetClassObject   PRIVATE
+    DllCanUnloadNow     PRIVATE

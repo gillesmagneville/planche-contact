@@ -91,6 +91,15 @@ en 32 bits est de toute façon extrêmement rare aujourd'hui.
 Sans NSIS, seule la version portable `.zip` est produite (le script continue
 normalement, ce n'est pas bloquant).
 
+Facultatif, uniquement pour le menu contextuel de l'Explorateur (voir la
+section ci-dessous ; le script ne les installe jamais et ne s'arrête jamais
+s'ils manquent) :
+
+| Outil | Rôle |
+|---|---|
+| Visual Studio (ou Build Tools) avec la charge de travail **« Développement Desktop en C++ »** | Compile la DLL du menu contextuel (MSVC) |
+| SDK Windows 10/11 (`makeappx.exe`, `signtool.exe`) | Construit et signe le paquet qui place l'entrée au **premier niveau** du menu de Windows 11 |
+
 ## Fichiers de ce dossier
 
 | Fichier | Rôle |
@@ -98,6 +107,8 @@ normalement, ce n'est pas bloquant).
 | `build-windows.ps1` | Script principal, équivalent Windows de `build-deb.sh` |
 | `planche-contact.spec` | Fichier de configuration PyInstaller (embarque GTK4) |
 | `installer.nsi` | Script NSIS générant l'installeur `.exe` |
+| `build-shellext.ps1` | Construit le menu contextuel de l'Explorateur (appelé par `build-windows.ps1`) |
+| `shellext/` | Sources du menu contextuel : DLL C++, manifeste du paquet, scripts d'enregistrement |
 
 Un second `build-windows.ps1`, minuscule, existe **à la racine du dépôt** :
 il ne fait que relayer vers celui-ci (symétrique à `build-deb.sh`, qui se
@@ -123,6 +134,95 @@ lance aussi depuis la racine) — c'est celui-là qu'on lance en pratique.
    `import gi`.
 5. Le dossier résultant est zippé tel quel (version portable), et/ou
    embarqué dans un installeur NSIS.
+
+## Menu contextuel de l'Explorateur (« Ouvrir dans Planche-Contact »)
+
+Un clic droit sur un **dossier** ou sur une **sélection de photos** propose
+**Ouvrir dans Planche-Contact** (dans la langue de Windows : anglais, français,
+espagnol ou allemand). Le programme s'ouvre avec ce dossier, ou avec ces seules
+photos (voir §3.9 du manuel). Sous Windows 11, l'entrée est au **premier
+niveau** du menu, et seulement là (voir les limites plus bas). Il n'y a pas
+d'entrée sur le fond d'un dossier ouvert sous Windows (elle existe sous Linux).
+
+### L'installer et la retirer
+
+- **Installeur** : le composant *Menu contextuel de l'Explorateur* est coché
+  par défaut. Il enregistre l'entrée et **peut relancer l'Explorateur de
+  Windows** (ses fenêtres se ferment un instant : Windows n'affiche une
+  nouvelle entrée qu'à ce moment). Le désinstalleur la retire.
+- **Version portable** : double-cliquer sur `register-context-menu.cmd`
+  (utilisateur courant, sans droits d'administrateur), et sur
+  `unregister-context-menu.cmd` pour la retirer. Le dossier du programme ne
+  doit pas être déplacé ensuite (enregistrer de nouveau s'il l'est). Options
+  des scripts PowerShell : `-Machine` (tous les utilisateurs,
+  administrateur), `-RestartExplorer`, `-Quiet`.
+
+### Comment il est construit
+
+`build-windows.ps1` appelle `build-shellext.ps1` une fois l'application
+gelée. Un échec n'y est signalé que par un avertissement : l'application, le
+`.zip` et l'installeur sont produits quand même, simplement sans l'entrée de
+menu. Il produit, à côté de `planche-contact-gtk.exe` :
+
+| Fichier | Rôle |
+|---|---|
+| `planche_shellext_classic.dll` | Le composant COM (`IExplorerCommand`), enregistré à la manière classique (registre) : Windows 10, et « Afficher plus d'options » sous Windows 11 |
+| `planche_shellext.dll` | Le même, avec l'identité du paquet intégrée : premier niveau du menu de Windows 11 |
+| `planche-contact-shell.msix` | Paquet partiel (*sparse*) déclarant l'entrée (`*` et `Directory`) et la DLL |
+| `planche-contact-shell.cer` | Certificat public qui a signé le paquet |
+| `register-context-menu.*`, `unregister-context-menu.*`, `shellext-info.json` | Scripts d'enregistrement et identifiants qu'ils partagent avec la construction |
+
+- **Les outils de compilation C++ de Visual Studio sont indispensables** pour
+  compiler la DLL. S'ils manquent, il n'y a aucune entrée de menu.
+- Le **SDK Windows** n'est nécessaire que pour le paquet. Sans lui, la
+  construction n'embarque que l'entrée classique (donc, sous Windows 11, sous
+  « Afficher plus d'options »).
+- Les identifiants (CLSID, nom du paquet, sujet du certificat) sont définis
+  **une seule fois**, en tête de `build-shellext.ps1`. **Ne jamais changer le
+  CLSID d'une version publiée.**
+
+### Pourquoi un certificat, et ce que cela implique
+
+Windows 11 n'affiche au premier niveau que les entrées d'applications qui ont
+une *identité*, c'est-à-dire un paquet, et un paquet doit être signé. Le
+paquet est signé avec un certificat **auto-signé** (`CN=Planche-Contact`), créé
+la première fois sur la machine de construction et conservé dans son magasin
+*Utilisateur actuel > Personnel* : sa clé privée ne quitte jamais cette machine
+et seul le `.cer` public est distribué. Pour installer le paquet, le script
+d'enregistrement place ce certificat dans le magasin **« Personnes de
+confiance »** (de la machine avec l'installeur, de l'utilisateur sinon).
+
+C'est une vraie décision de confiance, à dire aux utilisateurs : un paquet
+signé par ce certificat est ensuite accepté par Windows sans avertissement, sur
+cet ordinateur. La clé reste chez le mainteneur, le certificat est valable dix
+ans, et le désinstalleur (ou `unregister-context-menu.*`) le retire du
+magasin. Cela ne fonctionne pas là où Windows refuse les paquets extérieurs au
+Microsoft Store (mode S, certaines stratégies d'entreprise) : l'entrée est
+alors enregistrée à la manière classique, sous « Afficher plus d'options », le
+programme lui-même n'étant pas affecté.
+
+### Limites
+
+- Le paquet est enregistré pour **un seul utilisateur** (celui qui a lancé
+  l'installeur ou le script). Un autre compte du même ordinateur lance une
+  fois `register-context-menu.cmd` pour avoir l'entrée au premier niveau
+  (l'entrée classique, elle, est enregistrée pour tout le monde par
+  l'installeur).
+- Mise à jour pendant que l'Explorateur tient la DLL : l'installeur renomme la
+  DLL chargée et la supprime au prochain redémarrage, si bien qu'une mise à
+  jour n'échoue jamais à cause d'elle.
+- **La copie sous « Afficher plus d'options » est masquée par la DLL
+  elle-même.** Windows liste deux fois une entrée déclarée par un paquet, au
+  premier niveau et sous « Afficher plus d'options », et rien dans le manifeste
+  du paquet ne l'empêche. La DLL du paquet reconnaît l'appel venant de l'ancien
+  menu (l'objet que Windows lui remet est l'ancien menu, et l'appel est celui
+  qui est fait sans attendre) et s'y masque. C'est un comportement observé,
+  pas une fonction documentée de Windows : si une version future le change, la
+  seconde entrée revient, mais celle du premier niveau n'est jamais perdue. La
+  DLL classique (Windows 10, ou le repli ci-dessus) ne se masque jamais.
+- Testé par le mainteneur sous Windows 11 (build 26300) ; pas sous Windows 10.
+  Le source C++ compile aussi sans avertissement avec un compilateur croisé et
+  les scripts sont vérifiés par des tests automatiques.
 
 ## Dépannage
 
@@ -167,6 +267,29 @@ utilise bien le style printf (`"0x%X"`). Ce correctif a été validé en
 compilant et en **exécutant** réellement l'installeur via `makensis` +
 Wine dans un environnement Linux (voir §6 de `PROJECT_CONTEXT.fr.md`),
 sans nécessiter de machine Windows.
+
+**L'entrée de menu n'apparaît pas (Windows 11)**
+Relancer l'Explorateur de Windows (ou fermer et rouvrir la session), puis
+relancer `register-context-menu.cmd` et lire ses messages : il indique si le
+premier niveau a pu être mis en place ou si l'entrée classique a été utilisée
+à la place (« Afficher plus d'options »). Vérifier dans *Paramètres >
+Applications > Paramètres avancés des applications* que l'installation
+d'applications extérieures au Store n'est pas bloquée. En dernier recours,
+`Get-AppxPackage PlancheContact.ShellExtension` dans PowerShell indique si le
+paquet est enregistré.
+
+**L'entrée apparaît deux fois (Windows 11)**
+Une fois au premier niveau et une fois sous « Afficher plus d'options » : la
+DLL n'a pas reconnu l'ancien menu (voir les limites plus haut), ou un
+enregistrement classique est encore là à côté du paquet. Lancer
+`unregister-context-menu.cmd`, puis de nouveau `register-context-menu.cmd`. Si
+la seconde entrée est toujours là, noter le numéro de build de Windows
+(`winver`) dans un ticket.
+
+**La construction dit « Visual Studio C++ build tools not found »**
+Installer *Build Tools for Visual Studio* avec la charge de travail
+« Développement Desktop en C++ », puis relancer `build-windows.ps1` (ou
+seulement `windows\build-shellext.ps1 -OutDir <dossier> -Version X.Y.Z`).
 
 ## Ce qui est partagé avec la version Linux (aucune duplication)
 

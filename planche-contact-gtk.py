@@ -66,6 +66,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from portfolio.config import Config
 from portfolio.scanner import ImageScanner, list_image_folders
+from portfolio.launch import paths_from_arguments, resolve_selection
 from portfolio.rawloader import load_image
 from portfolio.utils import AUTHOR_NAME
 from portfolio.i18n import _, set_language, get_language, AVAILABLE_LANGUAGES, detect_system_language
@@ -159,7 +160,10 @@ class FolderPreviewController:
         self.prev_btn.connect("clicked", lambda b: self.go_prev())
         self.next_btn.connect("clicked", lambda b: self.go_next())
 
-    def refresh(self, folder_path):
+    def refresh(self, folder_path, files=None):
+        """Shows the photos of `folder_path`. `files` (paths relative to this
+        folder) replaces the scan of the folder: it is the selection received
+        from a context menu, shown as is."""
         self._token += 1
         token = self._token
 
@@ -171,6 +175,11 @@ class FolderPreviewController:
 
         if not folder_path or not Path(folder_path).is_dir():
             self.status_label.set_text("")
+            return
+
+        if files is not None:
+            folder = Path(folder_path)
+            self._apply_file_list(token, sorted(p for p in (folder / rel for rel in files) if p.is_file()))
             return
 
         self.status_label.set_text(_("preview.analyzing"))
@@ -342,8 +351,25 @@ class FolderPreviewController:
 
 class PlancheContactGTK(Gtk.Application):
     def __init__(self):
-        super().__init__(application_id="com.planchecontact.gtk")
+        # HANDLES_COMMAND_LINE: the folder or the photos given by a context menu
+        # (Nautilus, Windows Explorer) are received in do_command_line(); with
+        # a second launch while the application is already open, this also
+        # forwards them to the running instance instead of opening another
+        # one.
+        super().__init__(
+            application_id="com.planchecontact.gtk",
+            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
+        )
         self.win = None
+        # Paths received on the command line, waiting to be applied to the
+        # form (see _apply_launch_paths).
+        self._launch_paths = None
+        # Photos selected from a context menu (POSIX paths relative to the input
+        # folder), or None = the whole input folder. See _set_file_selection.
+        self._file_selection = None
+        # True while the input field is filled by the program itself (the
+        # "changed" signal must then not reset the selection being applied).
+        self._suppress_input_changed = False
         self.settings_path = Path.home() / ".config" / "planche-contact" / "settings.json"
         self.last_input_dir = ""
         self.last_output_dir = ""
@@ -391,7 +417,22 @@ class PlancheContactGTK(Gtk.Application):
         with open(self.settings_path, "w") as f:
             json.dump(data, f, indent=2)
 
+    def do_command_line(self, command_line):
+        """Launch from a shell, a launcher or a context menu: `--paths-from
+        FILE` and/or paths of a folder or of photos (see portfolio/launch.py).
+        Called in the FIRST instance only, whichever process was launched."""
+        arguments = command_line.get_arguments()[1:]
+        self._launch_paths = paths_from_arguments(arguments, cwd=command_line.get_cwd()) or None
+        self.activate()
+        return 0
+
     def do_activate(self):
+        if self.win is not None:
+            # Already open: a second launch (e.g. another click in a context
+            # menu) brings the window forward and hands over what it received.
+            self.win.present()
+            self._apply_launch_paths()
+            return
         self.win = Gtk.ApplicationWindow(application=self)
         self.win.set_title("Planche-Contact")
         # No set_default_size(): the window opens at the smallest possible size
@@ -439,18 +480,22 @@ class PlancheContactGTK(Gtk.Application):
         notebook.append_page(self._build_help_tab(), Gtk.Label(label=_("tab.help")))
         notebook.append_page(self._build_about_tab(), Gtk.Label(label=_("tab.about")))
 
+        # Folder or photos received from a context menu: applied BEFORE the
+        # window is shown, so that it opens directly at its final size.
+        launched_with_paths = self._apply_launch_paths()
+
         self.win.present()
 
         # The initial set_text() of the input folder field happens before the
         # "changed" signal is connected: the preview is therefore triggered
         # explicitly here for a folder already remembered at startup.
-        if self.last_input_dir:
+        if self.last_input_dir and not launched_with_paths:
             self.input_preview.refresh(self.last_input_dir)
 
         # Same for the output folder: if results already exist (generated
         # during a previous session), "View results" must work without waiting
         # for a new generation.
-        if self.last_output_dir:
+        if self.last_output_dir and not launched_with_paths:
             self._check_existing_results(self.last_output_dir)
 
         # System language selected but with no translation available:
@@ -557,6 +602,21 @@ class PlancheContactGTK(Gtk.Application):
         spacer.set_hexpand(True)
         hbox.append(spacer)
         box.append(hbox)
+
+        # Photos selected in a context menu (Nautilus, Windows Explorer): shown
+        # only while such a selection is active, with the way back to the whole
+        # folder. Hidden - and taking no room - otherwise.
+        self.selection_box = Gtk.Box(spacing=10)
+        self.selection_label = Gtk.Label(label="")
+        self.selection_label.set_xalign(0)
+        self.selection_label.add_css_class("dim-label")
+        self.selection_box.append(self.selection_label)
+        selection_clear_btn = Gtk.Button(label=_("gen.selection_clear"))
+        selection_clear_btn.set_tooltip_text(_("gen.selection_clear_tooltip"))
+        selection_clear_btn.connect("clicked", self._on_clear_file_selection)
+        self.selection_box.append(selection_clear_btn)
+        self.selection_box.set_visible(False)
+        box.append(self.selection_box)
 
         # Preview of the input folder's photos (the system picker offers no
         # thumbnails for a folder choice: an application-generated preview is
@@ -1502,7 +1562,9 @@ class PlancheContactGTK(Gtk.Application):
             self._adv_notify(_("gen.select_input_first"))
             return
 
-        recursive = self.recursive_check.get_active()
+        # A selection of photos (context menu) is processed as is: the
+        # recursive search does not apply to it.
+        recursive = self.recursive_check.get_active() and self._file_selection is None
         include_dirs = self._include_dirs_for_cli()
         # In recursive search the photos may be only in subfolders: the input
         # folder preview (non-recursive) then says nothing, it is the
@@ -1567,6 +1629,9 @@ class PlancheContactGTK(Gtk.Application):
         include_file = self._write_include_dirs_file(include_dirs)
         if include_file:
             cmd.extend(["--include-dirs-file", include_file])
+        files_file = self._write_files_list_file(self._file_selection)
+        if files_file:
+            cmd.extend(["--files-from", files_file])
 
         profile_path = None
         if advanced_profile != default_profile():
@@ -1582,7 +1647,7 @@ class PlancheContactGTK(Gtk.Application):
         threading.Thread(
             target=self._generate_preview,
             args=(cmd, preview_png_path, profile_path, picture, status_label, shown_count,
-                  (include_file,)),
+                  (include_file, files_file)),
             daemon=True,
         ).start()
 
@@ -1688,6 +1753,7 @@ class PlancheContactGTK(Gtk.Application):
         self.csv_check.set_active(True)
         self._apply_profile_to_widgets(interface_default_profile())
         self._reset_subfolder_selection()
+        self._set_file_selection(None)
         self.log_buffer.set_text("")
         self.status_label.set_text("")
         self.progress.set_fraction(0.0)
@@ -2036,7 +2102,9 @@ class PlancheContactGTK(Gtk.Application):
             return
         recursive = self.recursive_check.get_active()
         input_dir = self.input_entry.get_text().strip() if hasattr(self, "input_entry") else ""
-        button.set_sensitive(bool(recursive and input_dir and Path(input_dir).is_dir()))
+        button.set_sensitive(bool(
+            recursive and input_dir and Path(input_dir).is_dir() and self._file_selection is None
+        ))
         if not recursive:
             label.set_text("")
         elif self._subfolder_selection is None:
@@ -2049,7 +2117,7 @@ class PlancheContactGTK(Gtk.Application):
 
     def _include_dirs_for_cli(self):
         """Subfolders to pass to the CLI (tuple), or None = everything."""
-        if not self.recursive_check.get_active():
+        if not self.recursive_check.get_active() or self._file_selection is not None:
             return None
         return self._subfolder_selection
 
@@ -2062,6 +2130,18 @@ class PlancheContactGTK(Gtk.Application):
         fd, path = tempfile.mkstemp(suffix=".txt", prefix="planche-contact-dirs-")
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write("".join(f"{name}\n" for name in include_dirs))
+        return path
+
+    def _write_files_list_file(self, files):
+        """Writes the selected photos to a UTF-8 temporary file (one per line,
+        relative to the input folder) for --files-from and returns its path, or
+        None when the whole folder is processed. Deleted by the caller once the
+        CLI has finished, like the other temporary files."""
+        if files is None:
+            return None
+        fd, path = tempfile.mkstemp(suffix=".txt", prefix="planche-contact-files-")
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write("".join(f"{name}\n" for name in files))
         return path
 
     def _count_photos(self, input_dir, include_dirs):
@@ -2196,10 +2276,83 @@ class PlancheContactGTK(Gtk.Application):
         dialog.present()
         threading.Thread(target=scan_folders, daemon=True).start()
 
+    # ====================== CONTEXT MENU LAUNCH ======================
+    # "Open in Planche-Contact" in the Nautilus / Windows Explorer menu starts
+    # the program with the folder or the photos that were selected (see
+    # portfolio/launch.py): they are put in the form here, the generation is
+    # left to the user.
+
+    def _apply_launch_paths(self):
+        """Puts the folder or the photos received on the command line in the
+        form. Returns True if something was applied."""
+        paths, self._launch_paths = self._launch_paths, None
+        if not paths:
+            return False
+        if not self.run_button.get_sensitive():
+            # A generation is running: changing the input under its feet would
+            # only confuse the log and the results shown afterwards.
+            self._log(_("launch.busy"))
+            return False
+        selection = resolve_selection(paths)
+        if selection is None:
+            self._log(_("launch.nothing_usable"))
+            return False
+
+        self._suppress_input_changed = True
+        try:
+            self.input_entry.set_text(str(selection.input_dir))
+        finally:
+            self._suppress_input_changed = False
+        self._reset_subfolder_selection()
+        self._set_file_selection(selection.files)
+
+        # The results go in the folder that was selected (or, for a selection
+        # of photos, the folder that holds them): a context menu is used on
+        # ever-changing folders, and the output folder remembered from an
+        # earlier session would otherwise have its sheets replaced by the
+        # generation of an unrelated folder. The "planches" and "gallery"
+        # subfolders of a previous run are excluded from the scan, so this
+        # does not feed the results back into the next generation.
+        self.output_entry.set_text(str(selection.input_dir))
+
+        if selection.files is None:
+            self._log(_("launch.log_folder", dir=selection.input_dir))
+        else:
+            self._log(_("launch.log_selection", count=selection.count, dir=selection.input_dir))
+
+        # Immediate preview (the debounce of _on_input_entry_changed was skipped).
+        if self._preview_debounce_id is not None:
+            GLib.source_remove(self._preview_debounce_id)
+            self._preview_debounce_id = None
+        self.input_preview.refresh(str(selection.input_dir), files=selection.files)
+        return True
+
+    def _set_file_selection(self, files):
+        """Selected photos (relative POSIX paths) or None = the whole input
+        folder; shows or hides the selection row accordingly. The recursive
+        search makes no sense for a selection: it is switched off and locked."""
+        self._file_selection = tuple(files) if files is not None else None
+        active = self._file_selection is not None
+        self.selection_box.set_visible(active)
+        if active:
+            self.selection_label.set_text(_("gen.selection_note", count=len(self._file_selection)))
+            self.recursive_check.set_active(False)
+        self.recursive_check.set_sensitive(not active)
+        self._update_subfolder_widgets()
+
+    def _on_clear_file_selection(self, button):
+        self._set_file_selection(None)
+        self.input_preview.refresh(self.input_entry.get_text().strip())
+
     # ====================== INPUT FOLDER PREVIEW ======================
 
     def _on_input_entry_changed(self, entry):
-        # Another input folder: the subfolder choice no longer applies.
+        if self._suppress_input_changed:
+            return
+        # Another input folder: a selection of photos no longer applies...
+        if self._file_selection is not None:
+            self._set_file_selection(None)
+        # ...nor the subfolder choice.
         self._reset_subfolder_selection()
         # Debounce: we avoid relaunching a scan on every keystroke.
         if self._preview_debounce_id is not None:
@@ -2322,11 +2475,14 @@ class PlancheContactGTK(Gtk.Application):
             cmd.extend(["--watermark", watermark])
             cmd.extend(["--watermark-orientation", orientation])
             cmd.extend(["--watermark-opacity", str(opacity)])
-        if self.recursive_check.get_active():
+        if self.recursive_check.get_active() and self._file_selection is None:
             cmd.append("-r")
         include_file = self._write_include_dirs_file(self._include_dirs_for_cli())
         if include_file:
             cmd.extend(["--include-dirs-file", include_file])
+        files_file = self._write_files_list_file(self._file_selection)
+        if files_file:
+            cmd.extend(["--files-from", files_file])
         if self.pdf_check.get_active():
             cmd.append("--pdf")
         if self.html_check.get_active():
@@ -2363,7 +2519,7 @@ class PlancheContactGTK(Gtk.Application):
         }
 
         threading.Thread(
-            target=self._run_cli, args=(cmd, (profile_path, include_file)), daemon=True,
+            target=self._run_cli, args=(cmd, (profile_path, include_file, files_file)), daemon=True,
         ).start()
 
     def _run_cli(self, cmd, cleanup_paths=()):

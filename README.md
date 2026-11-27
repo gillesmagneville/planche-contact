@@ -44,7 +44,7 @@ Generate high-resolution contact sheets, PDF documents, responsive HTML gallerie
 
 ## Download
 
-**Latest stable release: [v5.2.2](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.2.2)**
+**Latest stable release: [v5.3.0](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.3.0)**
 
 Planche-Contact is available as ready-to-use packages for Linux and Windows.
 
@@ -52,31 +52,31 @@ Planche-Contact is available as ready-to-use packages for Linux and Windows.
 
 **Debian / Ubuntu — 64-bit**
 
-[Download `planche-contact_5.2.2_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.2/planche-contact_5.2.2_amd64.deb)
+[Download `planche-contact_5.3.0_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/planche-contact_5.3.0_amd64.deb)
 
 ```bash
-sudo apt install ./planche-contact_5.2.2_amd64.deb
+sudo apt install ./planche-contact_5.3.0_amd64.deb
 ```
 
 SHA-256:
 
 ```text
-537ebf49030437b7f38b3637830e027cfaa7209b9dd20bd97eddcaf7a2f89291
+ccf959cdc81dace1df9c1a50eaf7b3927596feb01ce500586d115a50ba474d30
 ```
 
 **Any Linux distribution — AppImage**
 
-[Download `Planche-Contact-5.2.2-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.2/Planche-Contact-5.2.2-x86_64.AppImage)
+[Download `Planche-Contact-5.3.0-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/Planche-Contact-5.3.0-x86_64.AppImage)
 
 ```bash
-chmod +x Planche-Contact-5.2.2-x86_64.AppImage
-./Planche-Contact-5.2.2-x86_64.AppImage
+chmod +x Planche-Contact-5.3.0-x86_64.AppImage
+./Planche-Contact-5.3.0-x86_64.AppImage
 ```
 
 SHA-256:
 
 ```text
-cc8f533971fbc41a268286ef7b089151eb9cbdbc65947a503e077d4ca597ee13
+bb153dca02f2f7a10798658fe0293a1c3165b517f614e332e12be3d94cc93126
 ```
 
 A single file that bundles Python, GTK 4 and every library Planche-Contact needs: nothing to install. Details and build: [AppImage](#appimage-any-linux-distribution).
@@ -85,22 +85,22 @@ A single file that bundles Python, GTK 4 and every library Planche-Contact needs
 
 **Windows 10 / 11 — Installer**
 
-[Download `planche-contact_5.2.2_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.2/planche-contact_5.2.2_windows-setup.exe)
+[Download `planche-contact_5.3.0_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/planche-contact_5.3.0_windows-setup.exe)
 
 SHA-256:
 
 ```text
-872b746c1ad74080894b1766723a0fa5b06729a0fc4b1619fa9176b6cfac481d
+47ee8ecb1e5e589d87ed0b4e0261f000c0d32886951d8e5e6a3964eeb1830536
 ```
 
 **Windows — Portable version**
 
-[Download `planche-contact_5.2.2_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.2/planche-contact_5.2.2_windows-portable.zip)
+[Download `planche-contact_5.3.0_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/planche-contact_5.3.0_windows-portable.zip)
 
 SHA-256:
 
 ```text
-785e429dd1e25a711be9a7f4de435e23b4d3d76f42104d12c80940c01866ae0b
+00d7b32543e3f12e4358da8886d22049e3fe71880dab9cd86e9b028e7c342995
 ```
 
 If you simply want to use Planche-Contact, **you do not need to build it from source**.
@@ -184,6 +184,10 @@ The generated galleries include an integrated image viewer with features such as
 ### CSV Export
 
 Generate CSV indexes containing image information for further processing or archiving.
+
+### Right-click from your file manager
+
+Right-click a folder, or a selection of photos, and choose **Open in Planche-Contact**: the program opens with that folder, or with only those photos. Available in Nautilus (Linux, `.deb` package) and in the Windows Explorer (installer, first level of the Windows 11 menu).
 
 ### Command Line Interface
 
@@ -341,6 +345,8 @@ This makes Planche-Contact particularly useful when you simply want to **present
 
 # What's new?
 
+Version **5.3.0** adds an **Open in Planche-Contact** entry to the right-click menu of the file manager: on a folder, or on a selection of photos, in Nautilus (Linux, `.deb` package) and in the Windows Explorer (first level of the Windows 11 menu). The program opens with that folder, or with only those photos, and the results are generated in the same folder. The command line gains `--files-from`, which processes a list of photos.
+
 Version **5.2.2** is a maintenance release: the program gains no new feature. The Windows installer now speaks the four languages of the program and offers its shortcuts and a "Run" box, the messages of the log and the 35 mm equivalent of the captions follow the language of the program, the Spanish and German texts were proofread, and the AppImage build is more robust.
 
 Version **5.2.1** is a maintenance release: the project now has a [Code of Conduct](CODE_OF_CONDUCT.md), which the packages ship, and its build scripts are written in English. The program itself does not change.
@@ -377,6 +383,13 @@ Download the latest **.deb** package from the **Releases** page.
 ```bash
 sudo apt install ./planche-contact_<version>_amd64.deb
 ```
+
+The package adds an **Open in Planche-Contact** entry to the right-click menu
+of Nautilus (on a folder, on a selection of photos, or on the background of a
+folder). It relies on the `python3-nautilus` package, which the package
+recommends: if it is missing, `sudo apt install python3-nautilus`, then
+`nautilus -q` (the installation already restarts Nautilus). The AppImage does
+not include this entry.
 
 ## AppImage (any Linux distribution)
 
@@ -460,6 +473,13 @@ The script checks prerequisites (Python 64-bit, GTK4 via
 offers to install anything missing automatically. See
 [`windows/README.md`](windows/README.md) for full details, requirements
 and troubleshooting.
+
+The installer also offers an **Open in Planche-Contact** entry for the
+right-click menu of the Windows Explorer (first level of the Windows 11
+menu); the portable version has `register-context-menu.cmd` for that. How it
+works, what it needs to be built and what it implies (a self-signed
+certificate added to "Trusted People") are in
+[`windows/README.md`](windows/README.md#explorer-context-menu-open-in-planche-contact).
 
 > **Note:** since the installer isn't (yet) code-signed, Windows will very
 > likely show a blue **"Windows protected your PC"** (SmartScreen) warning

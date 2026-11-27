@@ -95,6 +95,11 @@ def parse_args():
                         help=_("cli.help_include_dir"))
     parser.add_argument("--include-dirs-file", type=Path, default=None, metavar="FILE",
                         help=_("cli.help_include_dirs_file"))
+    # Exact list of photos to process (used by the graphical interface when it
+    # is opened from a context menu on a selection of photos, see
+    # portfolio/launch.py): the input folder is not walked.
+    parser.add_argument("--files-from", type=Path, default=None, metavar="FILE",
+                        help=_("cli.help_files_from"))
 
     # Preview mode (specification §3), reserved for internal use by the
     # graphical interface (planche-contact-gtk.py, _on_preview_clicked):
@@ -128,6 +133,20 @@ def _include_dirs_from_args(args):
             sys.exit(2)
         dirs.extend(line for line in text.splitlines() if line.strip())
     return tuple(dirs)
+
+
+def _only_files_from_args(args):
+    """Photos listed by --files-from (UTF-8, one per line, relative to the
+    input folder or absolute), or None if the option is not given (the whole
+    folder). An empty file = no photo selected."""
+    if args.files_from is None:
+        return None
+    try:
+        text = Path(args.files_from).read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeDecodeError) as exc:
+        print(_("cli.error_files_from", path=args.files_from, error=exc), file=sys.stderr)
+        sys.exit(2)
+    return tuple(line for line in text.splitlines() if line.strip())
 
 
 def _generate_preview_sheet(args, profile_kwargs):
@@ -202,6 +221,9 @@ def main():
     include_dirs = _include_dirs_from_args(args)
     if include_dirs is not None:
         profile_kwargs["include_dirs"] = include_dirs
+    only_files = _only_files_from_args(args)
+    if only_files is not None:
+        profile_kwargs["only_files"] = only_files
 
     if args.preview_output is not None:
         # Preview mode: see _generate_preview_sheet() - an entirely separate

@@ -62,4 +62,57 @@ else
     exit 1
 fi
 
+# --- Nautilus context menu --------------------------------------------------
+# Restarts Nautilus if it is running, so that it reloads the list of Python
+# extensions and shows "Open in Planche-Contact" immediately (otherwise the
+# entry only appears at the next login). Only done when the extension is
+# there AND nautilus-python (python3-nautilus, a recommended dependency) is
+# installed: without it, restarting Nautilus would change nothing.
+#
+# The message follows the system language: English, French, Spanish or
+# German, falling back to English. The language is chosen by the same rules
+# as gettext (and therefore as the menu entry itself): take the first
+# non-empty variable among LANGUAGE, LC_ALL, LC_MESSAGES and LANG; it may
+# hold several languages separated by ":", the first available language
+# wins; "C" and "POSIX" stop the search (English).
+# This block is deliberately identical to nautilus-convert-images's postinst.
+pick_language() {
+    _lang=en
+    _list=
+    for _var in "${LANGUAGE:-}" "${LC_ALL:-}" "${LC_MESSAGES:-}" "${LANG:-}"; do
+        if [ -n "$_var" ]; then
+            _list=$_var
+            break
+        fi
+    done
+    _old_ifs=$IFS
+    IFS=:
+    set -f
+    for _entry in $_list; do
+        case $_entry in
+            C | C.* | POSIX | POSIX.*) break ;;
+            fr | fr_* | fr.* | fr@*) _lang=fr; break ;;
+            es | es_* | es.* | es@*) _lang=es; break ;;
+            de | de_* | de.* | de@*) _lang=de; break ;;
+        esac
+    done
+    set +f
+    IFS=$_old_ifs
+    echo "$_lang"
+}
+
+if [ -f /usr/share/nautilus-python/extensions/planche_contact_nautilus.py ] \
+    && dpkg -s python3-nautilus >/dev/null 2>&1 \
+    && command -v nautilus >/dev/null 2>&1; then
+    if pgrep -x nautilus >/dev/null 2>&1; then
+        nautilus -q >/dev/null 2>&1 || true
+        case "$(pick_language)" in
+            fr) echo "planche-contact : Nautilus a été redémarré pour activer l'entrée de menu « Ouvrir dans Planche-Contact »." ;;
+            es) echo "planche-contact: Nautilus se ha reiniciado para activar la entrada de menú «Abrir en Planche-Contact»." ;;
+            de) echo "planche-contact: Nautilus wurde neu gestartet, um den Menüeintrag „In Planche-Contact öffnen“ zu aktivieren." ;;
+            *)  echo "planche-contact: Nautilus was restarted to enable the \"Open in Planche-Contact\" menu entry." ;;
+        esac
+    fi
+fi
+
 exit 0

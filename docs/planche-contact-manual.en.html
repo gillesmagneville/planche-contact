@@ -183,6 +183,25 @@ GPS position, if enabled, is shown in plain text on the generated sheet — only
 Changing the language takes effect after restarting the application. The chosen language is also used for the command line and for any HTML gallery generated afterwards — see §4 and §5.
 </div>
 
+<h3>3.9 Opening from the file manager (context menu)</h3>
+<p>Planche-Contact adds an <strong>"Open in Planche-Contact"</strong> entry to the right-click menu of the file manager. It appears on a <strong>folder</strong> and on a <strong>selection of photos</strong> (supported formats only; photos and folders can be mixed), and on Linux also on the background of an open folder.</p>
+<table>
+<tr><th>System</th><th>How to get the entry</th></tr>
+<tr><td><strong>Linux (Files / Nautilus)</strong></td><td>Installed with the <code>.deb</code> package: an extension in <code>/usr/share/nautilus-python/extensions/</code>, which needs the <code>python3-nautilus</code> package (recommended by the package; install it with <code>sudo apt install python3-nautilus</code> if it is missing). The installation restarts Nautilus; otherwise run <code>nautilus -q</code>. Not available in the AppImage.</td></tr>
+<tr><td><strong>Windows 11</strong></td><td>On the <strong>first level</strong> of the menu, with the installer (component "Explorer context menu", ticked by default). For the portable version, run <code>register-context-menu.cmd</code>, found in the program's folder. If the first level cannot be set up (sideloading disabled, S mode...), the entry is placed under "Show more options".</td></tr>
+<tr><td><strong>Windows 10</strong></td><td>Same installer component; the entry is in the usual right-click menu.</td></tr>
+</table>
+<p>The window opens with what was selected:</p>
+<ul>
+    <li>a <strong>single folder</strong> becomes the input folder, and all its photos are processed (the recursive search stays your choice);</li>
+    <li>a <strong>selection of photos</strong> (or of several folders, or a mix) is processed as such: the input folder is the folder common to the selected items, and only the selected photos are processed, plus the photos placed directly in each selected folder (not those of their subfolders). A line under the input folder shows the number of photos received; the <strong>"Use the whole folder"</strong> button drops the selection and processes all the photos of the input folder again. While a selection is active, the recursive search and the choice of subfolders are unavailable.</li>
+    <li>the output folder is the folder that was selected or, for a selection of photos, the folder that holds them (you can change it as usual). The results are created there: sheets in <code>planches/</code>, gallery in <code>gallery/</code>, and the PDF, the CSV and the log next to them. A new generation replaces them without counting them as photos.</li>
+</ul>
+<p>On Linux, if Planche-Contact is already open, the selection replaces the contents of its window (unless a generation is running, in which case it is ignored and a message is written in the log). On Windows each opening starts its own window.</p>
+<div class="note">
+The selection is passed to the program by a temporary text file (<code>--paths-from</code>, see §4.1), so that a very large selection is no problem. To remove the Windows entry, use the uninstaller, or <code>unregister-context-menu.cmd</code> for the portable version.
+</div>
+
 <h2>4. Command-line interface (CLI)</h2>
 
 <h3>4.1 Main options</h3>
@@ -204,12 +223,14 @@ Changing the language takes effect after restarting the application. The chosen 
 <tr><td><code>-r, --recursive</code></td><td>Recursively scan subfolders</td><td></td></tr>
 <tr><td><code>--include-dir</code></td><td>Process only the photos placed directly in this subfolder (path relative to the input folder, <code>.</code> for the input folder itself). Repeatable; implies a recursive scan. Without it, all the photos are processed.</td><td><code>--include-dir Paris --include-dir "Summer 2026"</code></td></tr>
 <tr><td><code>--include-dirs-file</code></td><td>Text file (UTF-8) listing the subfolders to process, one per line (same as several <code>--include-dir</code>)</td><td><code>--include-dirs-file folders.txt</code></td></tr>
+<tr><td><code>--files-from</code></td><td>Text file (UTF-8) listing the photos to process, one per line (absolute path or relative to the input folder); only these photos are processed. This is what the context menu of the file manager uses.</td><td><code>--files-from photos.txt</code></td></tr>
 <tr><td><code>--sort</code></td><td>Sort photos by: <code>date</code> (EXIF) or <code>name</code></td><td><code>--sort name</code></td></tr>
 <tr><td><code>--html-per-page</code></td><td>Number of images per HTML gallery page (default: 48)</td><td><code>--html-per-page 60</code></td></tr>
 <tr><td><code>--html-originals</code></td><td>Add the full-size originals to the HTML gallery (the download button serves them; RAW files are converted to JPEG, no RAW file is placed in the gallery; the gallery gets much bigger, and the originals do not carry the watermark)</td><td><code>--html --html-originals</code></td></tr>
 <tr><td><code>--language</code></td><td>Language of the messages and of the generated HTML gallery: <code>system</code> (default), <code>en</code>, <code>fr</code>, <code>de</code>, <code>es</code></td><td><code>--language en</code></td></tr>
 <tr><td><code>--profile</code></td><td>JSON profile file (layout, captions, theme — see §3.3), produced by the "Save profile..." button in the graphical interface, or written/edited by hand. A missing or invalid file silently falls back to the default settings.</td><td><code>--profile my-profile.json</code></td></tr>
 </table>
+<p>The graphical interface itself accepts <code>--paths-from FILE</code> (one folder or photo path per line, UTF-8; a file named <code>planche-contact-selection-*.txt</code> is deleted once read) or paths given directly: <code>planche-contact-gtk /path/to/folder</code>. It is what the context menu calls.</p>
 <div class="note">
 The values for <code>--watermark-orientation</code> stay in French internally regardless of the chosen <code>--language</code> (<code>"Horizontal"</code>, <code>"Diagonale horaire"</code>, <code>"Diagonale anti-horaire"</code>) — this is the engine's internal contract and is unrelated to the display language.
 </div>

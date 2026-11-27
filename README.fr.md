@@ -44,7 +44,7 @@ Générez des planches contact haute résolution, des documents PDF, des galerie
 
 ## Téléchargement
 
-**Dernière version stable : [v5.2.2](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.2.2)**
+**Dernière version stable : [v5.3.0](https://github.com/gillesmagneville/planche-contact/releases/tag/v5.3.0)**
 
 Planche-Contact est disponible sous forme de paquets prêts à l'emploi pour Linux et Windows.
 
@@ -52,31 +52,31 @@ Planche-Contact est disponible sous forme de paquets prêts à l'emploi pour Lin
 
 **Debian / Ubuntu — 64 bits**
 
-[Télécharger `planche-contact_5.2.2_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.2/planche-contact_5.2.2_amd64.deb)
+[Télécharger `planche-contact_5.3.0_amd64.deb`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/planche-contact_5.3.0_amd64.deb)
 
 ```bash
-sudo apt install ./planche-contact_5.2.2_amd64.deb
+sudo apt install ./planche-contact_5.3.0_amd64.deb
 ```
 
 SHA-256 :
 
 ```text
-537ebf49030437b7f38b3637830e027cfaa7209b9dd20bd97eddcaf7a2f89291
+ccf959cdc81dace1df9c1a50eaf7b3927596feb01ce500586d115a50ba474d30
 ```
 
 **Toutes distributions Linux — AppImage**
 
-[Télécharger `Planche-Contact-5.2.2-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.2/Planche-Contact-5.2.2-x86_64.AppImage)
+[Télécharger `Planche-Contact-5.3.0-x86_64.AppImage`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/Planche-Contact-5.3.0-x86_64.AppImage)
 
 ```bash
-chmod +x Planche-Contact-5.2.2-x86_64.AppImage
-./Planche-Contact-5.2.2-x86_64.AppImage
+chmod +x Planche-Contact-5.3.0-x86_64.AppImage
+./Planche-Contact-5.3.0-x86_64.AppImage
 ```
 
 SHA-256 :
 
 ```text
-cc8f533971fbc41a268286ef7b089151eb9cbdbc65947a503e077d4ca597ee13
+bb153dca02f2f7a10798658fe0293a1c3165b517f614e332e12be3d94cc93126
 ```
 
 Un seul fichier qui embarque Python, GTK 4 et toutes les bibliothèques nécessaires à Planche-Contact : rien à installer. Détails et construction : [AppImage](#appimage-toutes-distributions-linux).
@@ -85,22 +85,22 @@ Un seul fichier qui embarque Python, GTK 4 et toutes les bibliothèques nécessa
 
 **Windows 10 / 11 — Installeur**
 
-[Télécharger `planche-contact_5.2.2_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.2/planche-contact_5.2.2_windows-setup.exe)
+[Télécharger `planche-contact_5.3.0_windows-setup.exe`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/planche-contact_5.3.0_windows-setup.exe)
 
 SHA-256 :
 
 ```text
-872b746c1ad74080894b1766723a0fa5b06729a0fc4b1619fa9176b6cfac481d
+47ee8ecb1e5e589d87ed0b4e0261f000c0d32886951d8e5e6a3964eeb1830536
 ```
 
 **Windows — Version portable**
 
-[Télécharger `planche-contact_5.2.2_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.2.2/planche-contact_5.2.2_windows-portable.zip)
+[Télécharger `planche-contact_5.3.0_windows-portable.zip`](https://github.com/gillesmagneville/planche-contact/releases/download/v5.3.0/planche-contact_5.3.0_windows-portable.zip)
 
 SHA-256 :
 
 ```text
-785e429dd1e25a711be9a7f4de435e23b4d3d76f42104d12c80940c01866ae0b
+00d7b32543e3f12e4358da8886d22049e3fe71880dab9cd86e9b028e7c342995
 ```
 
 Si vous voulez simplement utiliser Planche-Contact, **vous n'avez pas besoin de le compiler depuis les sources**.
@@ -184,6 +184,10 @@ Les galeries générées incluent une visionneuse d'images intégrée dotée de 
 ### Export CSV
 
 Générez des index CSV contenant les informations des images, pour un traitement ultérieur ou un archivage.
+
+### Clic droit depuis votre gestionnaire de fichiers
+
+Faites un clic droit sur un dossier, ou sur une sélection de photos, et choisissez **Ouvrir dans Planche-Contact** : le programme s'ouvre avec ce dossier, ou avec ces seules photos. Disponible dans Nautilus (Linux, paquet `.deb`) et dans l'Explorateur de Windows (installeur, premier niveau du menu de Windows 11).
 
 ### Interface en ligne de commande
 
@@ -341,6 +345,8 @@ Planche-Contact est donc particulièrement utile lorsque vous voulez simplement 
 
 # Nouveautés
 
+La version **5.3.0** ajoute une entrée **Ouvrir dans Planche-Contact** au menu du clic droit du gestionnaire de fichiers : sur un dossier, ou sur une sélection de photos, dans Nautilus (Linux, paquet `.deb`) et dans l'Explorateur de Windows (premier niveau du menu de Windows 11). Le programme s'ouvre avec ce dossier, ou avec ces seules photos, et les résultats sont générés dans le même dossier. La ligne de commande gagne `--files-from`, qui traite une liste de photos.
+
 La version **5.2.2** est une version de maintenance : le programme ne gagne aucune nouvelle fonctionnalité. L'installeur Windows parle maintenant les quatre langues du programme et propose ses raccourcis et une case « Lancer », les messages du journal et l'équivalent 24×36 des légendes suivent la langue du programme, les textes espagnols et allemands ont été relus, et la construction de l'AppImage est plus robuste.
 
 La version **5.2.1** est une version de maintenance : le projet a maintenant un [code de conduite](CODE_OF_CONDUCT.fr.md), que les paquets embarquent, et ses scripts de construction sont écrits en anglais. Le programme lui-même ne change pas.
@@ -377,6 +383,13 @@ Téléchargez le dernier paquet **.deb** depuis la page **Releases**.
 ```bash
 sudo apt install ./planche-contact_<version>_amd64.deb
 ```
+
+Le paquet ajoute une entrée **Ouvrir dans Planche-Contact** au menu du clic
+droit de Nautilus (sur un dossier, sur une sélection de photos, ou sur le fond
+d'un dossier). Elle s'appuie sur le paquet `python3-nautilus`, que le paquet
+recommande : s'il manque, `sudo apt install python3-nautilus`, puis
+`nautilus -q` (l'installation redémarre déjà Nautilus). L'AppImage n'inclut
+pas cette entrée.
 
 ## AppImage (toutes distributions Linux)
 
@@ -460,6 +473,14 @@ Le script vérifie les prérequis (Python 64 bits, GTK4 via
 propose d'installer automatiquement tout ce qui manque. Consultez
 [`windows/README.fr.md`](windows/README.fr.md) pour le détail complet, les
 prérequis et le dépannage.
+
+L'installeur propose aussi une entrée **Ouvrir dans Planche-Contact** pour le
+menu du clic droit de l'Explorateur de Windows (premier niveau du menu de
+Windows 11) ; la version portable dispose pour cela de
+`register-context-menu.cmd`. Son fonctionnement, ce qu'il faut pour la
+construire et ce qu'elle implique (un certificat auto-signé ajouté aux
+« Personnes de confiance ») sont décrits dans
+[`windows/README.fr.md`](windows/README.fr.md).
 
 > **Remarque :** l'installeur n'étant pas (encore) signé numériquement,
 > Windows affichera très probablement un écran bleu **« Windows a protégé

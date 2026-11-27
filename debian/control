@@ -16,7 +16,7 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
          libgtk-4-1,
          python3-pil,
          python3-reportlab
-Recommends: python3-pil, python3-reportlab
+Recommends: python3-pil, python3-reportlab, python3-nautilus
 Description: Lightweight photographic contact sheet generator
  Planche Contact is a simple and fast tool that generates high-quality
  (300 dpi) contact sheets from folders of images.

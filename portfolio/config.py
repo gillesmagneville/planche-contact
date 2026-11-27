@@ -18,6 +18,12 @@ class Config:
     # Choosing subfolders forces a recursive search (see ImageScanner.scan()).
     # The list of possible folders comes from scanner.list_image_folders().
     include_dirs: Optional[tuple] = None
+    # Photos to keep (POSIX paths relative to input_dir): only these files are
+    # processed, nothing else of the input folder is looked at. Used when the
+    # application is opened from a context menu on a selection of photos
+    # (see portfolio/launch.py). None (default) = the whole folder, the
+    # historical behaviour. `recursive` has no effect when it is set.
+    only_files: Optional[tuple] = None
     sort_by: str = "date"
 
     # Generation options
